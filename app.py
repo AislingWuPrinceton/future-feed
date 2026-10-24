@@ -65,10 +65,10 @@ def generate_post(habit, kind, life_event="", combo_with=None):
     nxt = st["next_milestone"]["milestone"] if st["next_milestone"] else "none"
 
     if kind in ("boss", "comeback"):
-        at_risk_chapter = min(ch + 1, len(game.template_for(habit)["chapters"]) - 1)
-        future = game.future_date_for(st, habit, at_risk_chapter, salt=st["checkins"])
+        post_chapter = min(ch + 1, len(game.template_for(habit)["chapters"]) - 1)  # the moment at risk
     else:
-        future = game.future_date_for(st, habit, max(ch, 0), salt=st["checkins"])
+        post_chapter = max(ch, 0)
+    future = game.future_date_for(st, habit, post_chapter, salt=st["checkins"])
 
     context = {
         "profile": {"name": prof["name"], "handle": prof["handle"]},
@@ -117,15 +117,15 @@ def generate_post(habit, kind, life_event="", combo_with=None):
 
     with db.connect() as c:
         cur = c.execute(
-            "INSERT INTO posts (habit_id, timeline, kind, level, future_date, caption, location, comments, likes, photo, basis, created_day, run_id) "
-            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
-            (habit["id"], "kept", kind, st["level"], future, caption, s["location"][:60],
+            "INSERT INTO posts (habit_id, timeline, kind, level, chapter, future_date, caption, location, comments, likes, photo, basis, created_day, run_id) "
+            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            (habit["id"], "kept", kind, st["level"], post_chapter, future, caption, s["location"][:60],
              json.dumps(s["comments"][:3], ensure_ascii=False), likes, json.dumps(photo),
              (basis + " " + combo_tag).strip(), game.today().isoformat(), run_id))
         c.execute(
-            "INSERT INTO posts (habit_id, timeline, kind, level, future_date, caption, location, comments, likes, photo, basis, created_day, run_id) "
-            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
-            (habit["id"], "stopped", kind, st["level"], future, s["stopped_caption"], "",
+            "INSERT INTO posts (habit_id, timeline, kind, level, chapter, future_date, caption, location, comments, likes, photo, basis, created_day, run_id) "
+            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            (habit["id"], "stopped", kind, st["level"], post_chapter, future, s["stopped_caption"], "",
              json.dumps([{"handle": prof["cast"][0]["handle"], "text": s["stopped_comment"]}] if s["stopped_comment"] else [],
                         ensure_ascii=False),
              max(3, likes // 6), json.dumps(stopped_photo), "", game.today().isoformat(), run_id))
@@ -202,6 +202,14 @@ def set_avatar(body: AvatarIn):
     return {"ok": True}
 
 
+def with_chapter_dates(h):
+    """Stats plus the date you'd reach each chapter at your current pace (the road's year markers)."""
+    st = game.stats(h)
+    st["chapter_dates"] = [game.future_date_for(st, h, i) for i in range(len(game.template_for(h)["chapters"]))]
+    st["chapters"] = [c["milestone"] for c in game.template_for(h)["chapters"]]
+    return st
+
+
 @app.get("/api/state")
 def state(plain: bool = False):
     if profile() and not plain:
@@ -210,7 +218,7 @@ def state(plain: bool = False):
         "profile": profile(),
         "today": game.today().isoformat(),
         "day_offset": db.get_setting("day_offset", 0),
-        "habits": [game.stats(h) for h in active_habits()],
+        "habits": [with_chapter_dates(h) for h in active_habits()],
         "templates": [{k: t[k] for k in ("key", "label", "short", "emoji", "unit", "default_amount")} for t in game.HABITS["habits"]],
         "level_checkins": game.LEVEL_CHECKINS,
         "avatar_characters": AVATAR_CHARACTERS,
@@ -329,9 +337,15 @@ def feed(timeline: str = "kept"):
         rows = [dict(r) for r in c.execute(
             "SELECT p.*, h.key AS habit_key FROM posts p LEFT JOIN habits h ON h.id = p.habit_id "
             "WHERE timeline = ? ORDER BY p.id DESC LIMIT 100", (timeline,))]
+    # Postcards move with your pace: each post's date is recomputed from today's real adherence.
+    habits = {h["id"]: (h, game.stats(h)) for h in active_habits()}
     for r in rows:
         r["comments"] = json.loads(r["comments"] or "[]")
         r["photo"] = json.loads(r["photo"]) if r["photo"] else None
+        r["live_date"] = r["future_date"]
+        if r["chapter"] is not None and r["habit_id"] in habits:
+            h, st = habits[r["habit_id"]]
+            r["live_date"] = game.future_date_for(st, h, r["chapter"], salt=r["id"])
     return rows
 
 

@@ -3,67 +3,74 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>Future Feed</title>
+  <title>Future Feed · the road to 2036</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=Grand+Hotel&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;700&family=Nunito:wght@400;600;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
-<div class="shell">
-  <main class="app">
-    <header class="bar">
+  <header class="top">
+    <div class="brand">
       <span class="logo">Future Feed</span>
-      <span class="bar-actions">
-        <button class="menu-btn" id="menu-btn" aria-haspopup="true" aria-expanded="false">Menu <span class="caret">▾</span></button>
-        <div class="menu" id="menu" hidden>
-          <button id="menu-avatar"><span class="mi" data-ico="camera"></span><span><b>Your future self</b><small>Change your photo or character</small></span></button>
-          <button id="demo-btn"><span class="mi" data-ico="flame"></span><span><b>Time travel (demo)</b><small>Skip days to see level-ups and slumps fast</small></span></button>
-          <button id="usage-btn"><span class="mi" data-ico="check"></span><span><b>AI usage &amp; safety log</b><small>Tokens per post, and what the safety checks caught</small></span></button>
-          <button id="menu-reset" class="danger"><span class="mi" data-ico="lock"></span><span><b>Start over</b><small>Erase habits, check-ins, and posts</small></span></button>
-        </div>
-      </span>
-    </header>
+      <span class="tagline">postcards from the you of 2036</span>
+    </div>
+    <span class="bar-actions">
+      <button class="menu-btn sketch" id="menu-btn" aria-haspopup="true" aria-expanded="false">Menu <span class="caret">▾</span></button>
+      <div class="menu sketch" id="menu" hidden>
+        <button id="menu-avatar"><span class="mi" data-ico="camera"></span><span><b>Your future self</b><small>Change your photo or character</small></span></button>
+        <button id="menu-play"><span class="mi" data-ico="play"></span><span><b>Play your next 10 years</b><small>All your postcards as a story</small></span></button>
+        <button id="demo-btn"><span class="mi" data-ico="flame"></span><span><b>Time travel (demo)</b><small>Skip days to see level-ups and slumps fast</small></span></button>
+        <button id="usage-btn"><span class="mi" data-ico="check"></span><span><b>AI usage &amp; safety log</b><small>Tokens per postcard, and what the safety checks caught</small></span></button>
+        <button id="menu-reset" class="danger"><span class="mi" data-ico="lock"></span><span><b>Start over</b><small>Erase habits, check-ins, and postcards</small></span></button>
+      </div>
+    </span>
+  </header>
 
+  <main class="page">
     <!-- onboarding -->
-    <section class="onboard" id="onboard" hidden>
+    <section class="onboard sheet-page" id="onboard" hidden>
       <p class="kicker">It's 2036.</p>
-      <h1>Meet the you who<br>kept going.</h1>
-      <p class="muted">Pick one small thing to do every day. Each check-in writes the next post on your Instagram ten years from now.</p>
+      <h1>Meet the you who kept going.</h1>
+      <p class="muted">Pick one small thing to do every day. Each check-in sends you a postcard from your future, and moves you one step down the road to 2036.</p>
       <form id="onboard-form">
         <label>Your first name<input id="ob-name" required maxlength="30" placeholder="Aisling"></label>
         <label>Who do you most want cheering you on?
-          <small class="muted hint">The person you'd most want to see you get there. They'll show up in your future posts.</small>
+          <small class="muted hint">The person you'd most want to see you get there. They'll show up in your postcards.</small>
           <input id="ob-bestie" maxlength="30" placeholder="Jess, Mom, my partner…"></label>
         <div id="ob-avatar-wrap">
-          <p class="label">Pick your future self <small class="muted">(they level up with you)</small></p>
+          <p class="label">Who walks the road? <small class="muted">(they level up with you)</small></p>
           <div class="avpick" id="ob-avatar"></div>
         </div>
         <p class="label">Your daily thing</p>
         <div class="pick" id="ob-habits"></div>
         <p class="err" id="ob-err"></p>
-        <button class="btn primary" type="submit">Show me 2036</button>
+        <button class="btn primary sketch" type="submit">Start walking</button>
       </form>
     </section>
 
     <!-- game -->
     <section id="game" hidden>
-      <div class="me-top" id="me-top"></div>
-      <div class="stories" id="stories"></div>
-      <div id="today"></div>
-      <div id="journey"></div>
-
-      <div class="seg" id="timeline">
-        <button data-tl="kept" class="on">You, kept going</button>
-        <button data-tl="stopped">You, if you stopped</button>
+      <div class="dash">
+        <div id="me"></div>
+        <div id="today"></div>
       </div>
-
-      <div class="feed" id="feed"></div>
+      <section class="roadwrap" id="roadwrap">
+        <div class="road-head">
+          <h2>The road to 2036</h2>
+          <div class="road-tabs" id="road-tabs"></div>
+        </div>
+        <p class="road-legend">Each postcard is pinned where it would happen at your real pace. Keep going and they move closer. Below runs <i>the road not taken</i>.</p>
+        <div class="road" id="road"></div>
+      </section>
     </section>
   </main>
-  <aside class="side" id="side"></aside>
-</div>
 
-  <!-- story reel: your next ten years, played like Instagram stories -->
+  <!-- postcard viewer -->
+  <div class="overlay" id="pc" hidden>
+    <div class="pc-big" id="pc-body"></div>
+  </div>
+
+  <!-- story reel -->
   <div class="reel" id="reel" hidden>
     <div class="reel-bars" id="reel-bars"></div>
     <button class="reel-x" id="reel-x" aria-label="Close">×</button>
@@ -74,63 +81,63 @@
 
   <!-- change avatar -->
   <div class="overlay" id="avsheet" hidden>
-    <div class="sheet">
-      <h2>Your future self</h2>
-      <p class="muted">Pick a character or use your photo. Your photo stays on this computer and is never sent to the AI.</p>
+    <div class="sheet sketch">
+      <h2>Who walks the road?</h2>
+      <p class="muted">Use your photo or pick a character. Your photo stays on this computer and is never sent to the AI.</p>
       <div class="avpick" id="av-pick"></div>
       <p class="err" id="av-err"></p>
-      <div class="row"><button class="btn" id="av-cancel">Cancel</button><button class="btn primary" id="av-save">Save</button></div>
+      <div class="row"><button class="btn sketch" id="av-cancel">Cancel</button><button class="btn primary sketch" id="av-save">Save</button></div>
     </div>
   </div>
 
   <!-- level-up celebration -->
   <div class="overlay" id="levelup" hidden>
-    <div class="card pop">
+    <div class="card sketch pop">
       <div class="confetti" id="confetti"></div>
       <div class="lu-emoji" id="lu-emoji"></div>
-      <p class="kicker">Level <span id="lu-level"></span> unlocked</p>
+      <p class="kicker">Stop <span id="lu-level"></span> reached</p>
       <div class="dots" id="lu-dots"></div>
       <h2 id="lu-title"></h2>
       <p class="muted" id="lu-sub"></p>
-      <button class="btn primary" id="lu-close">See the post</button>
+      <button class="btn primary sketch" id="lu-close">Open your postcard</button>
     </div>
   </div>
 
   <!-- add habit -->
   <div class="overlay" id="add" hidden>
-    <div class="sheet">
+    <div class="sheet sketch">
       <h2>Add a daily thing</h2>
       <div class="pick" id="add-habits"></div>
       <p class="err" id="add-err"></p>
-      <div class="row"><button class="btn" id="add-cancel">Cancel</button><button class="btn primary" id="add-save">Add</button></div>
+      <div class="row"><button class="btn sketch" id="add-cancel">Cancel</button><button class="btn primary sketch" id="add-save">Add</button></div>
     </div>
   </div>
 
   <!-- usage + safety -->
   <div class="overlay" id="usage" hidden>
-    <div class="sheet">
+    <div class="sheet sketch">
       <h2>AI usage</h2>
       <p class="muted" id="u-today"></p>
       <table class="usage"><thead><tr><th>Time</th><th>Agents</th><th>In</th><th>Cached</th><th>Out</th></tr></thead><tbody id="u-runs"></tbody></table>
       <h2 class="mt">Safety log</h2>
       <ul class="events" id="u-events"></ul>
-      <button class="btn" id="u-close">Close</button>
+      <button class="btn sketch" id="u-close">Close</button>
     </div>
   </div>
 
   <!-- demo -->
   <div class="overlay" id="demo" hidden>
-    <div class="sheet">
-      <h2>Demo controls</h2>
-      <p class="muted">Move the app's clock so a month of play fits into a few minutes. App date: <b id="demo-date"></b></p>
+    <div class="sheet sketch">
+      <h2>Time travel (demo)</h2>
+      <p class="muted">Move the app's clock so a month fits into a few minutes. App date: <b id="demo-date"></b></p>
       <div class="demo-grid">
-        <button class="btn" data-days="1" data-rate="0">Next day</button>
-        <button class="btn" data-days="4" data-rate="0">Skip 4 days (slump)</button>
-        <button class="btn" data-days="14" data-rate="0.85">Fast-forward 2 weeks</button>
-        <button class="btn danger" id="demo-reset">Reset everything</button>
+        <button class="btn sketch" data-days="1" data-rate="0">Next day</button>
+        <button class="btn sketch" data-days="4" data-rate="0">Skip 4 days (slump)</button>
+        <button class="btn sketch" data-days="14" data-rate="0.85">Fast-forward 2 weeks</button>
+        <button class="btn danger sketch" id="demo-reset">Start over</button>
       </div>
       <p class="muted small" id="demo-status"></p>
-      <button class="btn" id="demo-close">Close</button>
+      <button class="btn sketch" id="demo-close">Close</button>
     </div>
   </div>
 

@@ -4,14 +4,15 @@ import rough from "./vendor/rough.esm.js";
 const $ = (id) => document.getElementById(id);
 renderAll();
 const hico = (key, cls = "") => ico(HABIT_ICON(key), cls);
-let S = null;              // latest /api/state
-let timeline = "kept";
-let newestPostId = null;    // to animate a freshly written post
+
+let S = null;            // latest /api/state
+let POSTS = { kept: [], stopped: [] };
+let roadHabit = null;    // which habit's road is shown
 let busy = false;
-// ?mode=plain = control group for the A/B test: an ordinary streak tracker, no future feed.
+// ?mode=plain = control group for the A/B test: an ordinary streak tracker, no road, no AI.
 const PLAIN = new URLSearchParams(location.search).get("mode") === "plain";
 const Q = PLAIN ? "?plain=true" : "";
-// ?study=1 (opened from the study console): one habit only, and a researcher bar with the clock buttons.
+// ?study=1 (opened from the study console): one habit only, plus a researcher bar.
 const STUDY = new URLSearchParams(location.search).get("study") === "1";
 
 const api = async (url, body, method) => {
@@ -25,6 +26,12 @@ const api = async (url, body, method) => {
   return data;
 };
 
+function esc(s) {
+  return String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+const lower = (t) => t.charAt(0).toLowerCase() + t.slice(1).replace(/\.$/, "");
+const year = (iso) => iso.slice(0, 4);
+
 // ---------- boot ----------
 
 async function refresh() {
@@ -32,19 +39,16 @@ async function refresh() {
   const onboarded = !!S.profile;
   $("onboard").hidden = onboarded;
   $("game").hidden = !onboarded;
+  $("menu-avatar").hidden = $("menu-play").hidden = PLAIN || !onboarded;
   if (!onboarded) return renderOnboard();
-  renderStories();
-  renderToday();
-  renderJourney();
-  renderMe();
-  $("menu-avatar").hidden = PLAIN;
-  document.querySelector(".seg").hidden = PLAIN;
-  if (PLAIN) {
-    $("feed").innerHTML = "";
-    document.querySelectorAll(".prog, .meta, .lv, .quest, .pace").forEach((el) => (el.hidden = true));
-    return;
+  if (!PLAIN) {
+    const [kept, stopped] = await Promise.all([api("/api/feed?timeline=kept"), api("/api/feed?timeline=stopped")]);
+    POSTS = { kept, stopped };
   }
-  await renderFeed();
+  renderMe();
+  renderToday();
+  renderRoad();
+  if (STUDY && $("sb-date")) $("sb-date").textContent = `Day ${S.day_offset + 1}`;
 }
 
 // ---------- onboarding / add habit ----------
@@ -54,7 +58,7 @@ const START = ["Brand new", "Tried it a little", "Comfortable with basics", "Alr
 function pickItem(t, on) {
   const custom = t.key === "custom";
   return `
-    <div class="pick-item ${on ? "on" : ""}" data-key="${t.key}">
+    <div class="pick-item sketch ${on ? "on" : ""}" data-key="${t.key}">
       <div class="pick-top">
         <span class="em">${hico(t.key)}</span>
         ${custom ? `<input class="cname" maxlength="40" placeholder="Something else: meditate, draw, piano…">` : `<span class="name">${t.label}</span>`}
@@ -65,26 +69,26 @@ function pickItem(t, on) {
         <label>Where are you starting?
           <select class="lvl">${START.map((x, i) => `<option value="${i}">${x}</option>`).join("")}</select></label>
         <label>Your dream, in a few words <small>(optional)</small>
-          <input class="goal" maxlength="100" placeholder="${custom ? "e.g. finish a 10-day retreat" : t.goal_hint || "e.g. play at my sister's wedding"}"></label>
+          <input class="goal" maxlength="100" placeholder="${custom ? "e.g. finish a 10-day retreat" : "e.g. play at my sister's wedding"}"></label>
       </div>
     </div>`;
 }
 
 function pickList(el, preselect) {
-  const all = [...S.templates, { key: "custom", label: "Something else", emoji: "✨", unit: "minutes", default_amount: 15 }];
+  const all = [...S.templates, { key: "custom", label: "Something else", unit: "minutes", default_amount: 15 }];
   el.innerHTML = all.map((t) => pickItem(t, t.key === preselect)).join("");
   el.querySelectorAll(".pick-item").forEach((item) => {
     item.addEventListener("click", (e) => {
       if (e.target.closest("input, select, label")) {
-        if (e.target.classList.contains("cname") && !item.classList.contains("on")) select(el, item, true);
+        if (e.target.classList.contains("cname") && !item.classList.contains("on")) selectPick(el, item, true);
         return;
       }
-      select(el, item, !item.classList.contains("on"));
+      selectPick(el, item, !item.classList.contains("on"));
     });
   });
 }
 
-function select(el, item, on) {
+function selectPick(el, item, on) {
   if (STUDY && on) el.querySelectorAll(".pick-item").forEach((o) => o !== item && o.classList.remove("on"));  // one habit per round keeps A/B fair
   item.classList.toggle("on", on);
 }
@@ -97,10 +101,12 @@ const picked = (el) => [...el.querySelectorAll(".pick-item.on")].map((i) => ({
   name: i.querySelector(".cname")?.value.trim() || "",
 }));
 
+let readOnboardAvatar = () => ({ character: "🦊" });
+
 function renderOnboard() {
   $("ob-avatar-wrap").hidden = PLAIN;
   if (!PLAIN && !$("ob-avatar").children.length) readOnboardAvatar = avatarPicker($("ob-avatar"));
-  if (PLAIN) {  // control group must not hear about the future feed
+  if (PLAIN) {  // the control group must not hear about the road or the postcards
     document.querySelector(".onboard .kicker").textContent = "Daily habits";
     document.querySelector(".onboard h1").textContent = "Build a streak.";
     document.querySelector(".onboard .muted").textContent = "Pick one small thing to do every day and check in each day you do it.";
@@ -110,13 +116,13 @@ function renderOnboard() {
   if (!$("ob-habits").children.length) pickList($("ob-habits"), "guitar");
 }
 
-// Adds each picked habit; a custom one waits on the Ladder agent and may be refused for safety.
+// A custom habit waits on the Ladder agent and may be refused for safety.
 async function addHabits(list, errEl, btn) {
   const label = btn.textContent;
   btn.disabled = true;
   const errors = [];
   for (const h of list) {
-    btn.textContent = h.key === "custom" ? "Designing your path…" : "Adding…";
+    btn.textContent = h.key === "custom" ? "Designing your road…" : "Adding…";
     if (h.key === "custom" && !h.name) { errors.push("Name your custom daily thing."); continue; }
     try { await api("/api/habits", h); } catch (err) { errors.push(err.message); }
   }
@@ -156,273 +162,8 @@ $("add-save").onclick = async () => {
   refresh();
 };
 
-// ---------- stories + today ----------
-
-function renderStories() {
-  $("stories").innerHTML = S.habits.map((h) => `
-    <button class="story" data-scroll="${h.id}">
-      <span class="ring ${h.checked_today ? "done" : ""}"><span>${hico(h.key)}</span><b class="lv">Lv ${h.level}</b></span>
-      <span class="slabel">${h.short}</span>
-    </button>`).join("") + `
-    <button class="story" id="add-story">
-      <span class="ring done add-ring"><span>+</span></span><span class="slabel">New</span>
-    </button>`;
-  $("add-story").onclick = openAdd;
-}
-
-function amountText(h) {
-  return h.unit === "dollars" ? `$${h.amount}` : `${h.amount} min`;
-}
-
-function renderToday() {
-  const L = S.level_checkins;
-  $("today").innerHTML = S.habits.map((h) => {
-    const prev = L[h.level - 1] || 0;
-    const next = h.next_level_at;
-    const pct = next ? Math.round(((h.checkins - prev) / (next - prev)) * 100) : 100;
-    const quest = h.quest ? `
-      <div class="quest"><b>Slump detected.</b> Future you is losing momentum.
-        Check in ${h.quest.target} days in a row to save the moment: <b>${h.quest.progress}/${h.quest.target}</b></div>` : "";
-    const pace = h.capped_by_pace
-      ? `<p class="pace">Your story is held back by your pace (${Math.round(h.adherence * 100)}% of days). Check in more often to unlock bigger moments.</p>` : "";
-    return `
-      <div class="task ${h.checked_today ? "done" : ""}" id="task-${h.id}">
-        <div class="top">
-          <span class="task-ico">${hico(h.key)}</span>
-          <span class="q">${h.checked_today ? "Done for today" : `${h.label}, ${amountText(h)} today?`}
-            <small>${ico("flame", "inline")} ${h.streak}-day streak · ${h.checkins} check-ins · ${Math.round(h.adherence * 100)}% of days</small></span>
-          <button class="go" data-checkin="${h.id}" ${h.checked_today || busy ? "disabled" : ""}>${h.checked_today ? `${ico("check", "inline")} Done` : "I did it"}</button>
-        </div>
-        <div class="prog"><i style="width:${pct}%"></i></div>
-        <div class="meta"><span>Level ${h.level}</span><span>${next ? `${next - h.checkins} more to Level ${h.level + 1}` : "Max level"}</span></div>
-        ${quest}${pace}
-      </div>`;
-  }).join("");
-  $("today").querySelectorAll("[data-checkin]").forEach((b) => (b.onclick = () => checkin(+b.dataset.checkin)));
-}
-
-async function checkin(id) {
-  if (busy) return;
-  busy = true;
-  renderToday();
-  const habit = S.habits.find((h) => h.id === id);
-  journeyHabit = id;
-  if (PLAIN) {
-    await api(`/api/habits/${id}/checkin${Q}`, {}).catch((err) => alert(err.message));
-    busy = false;
-    return refresh();
-  }
-  timeline = "kept";
-  syncSeg();
-  $("feed").insertAdjacentHTML("afterbegin", writingCard(habit));
-  const stop = animateWriting();
-  $("feed").querySelector(".locked")?.remove();
-  try {
-    const r = await api(`/api/habits/${id}/checkin`, {});
-    newestPostId = r.post_id;
-    stop();
-    busy = false;
-    await refresh();
-    if (r.kind === "level_up") {
-      const h = S.habits.find((x) => x.id === id);
-      const lower = (t) => t.charAt(0).toLowerCase() + t.slice(1).replace(/\.$/, "");
-      $("lu-level").textContent = h.level;
-      $("lu-emoji").innerHTML = avatarHTML(104);
-      $("lu-title").textContent = h.allowed_milestone ? `Future you ${lower(h.allowed_milestone.milestone)}.` : "A new chapter begins.";
-      $("lu-sub").textContent = h.next_milestone ? `Next chapter: ${lower(h.next_milestone.milestone)}.` : "You've reached the top of this story.";
-      $("lu-dots").innerHTML = Array.from({ length: 6 }, (_, i) =>
-        `<i class="${i <= h.allowed_chapter ? "on" : ""} ${i === h.allowed_chapter ? "now" : ""}"></i>`).join("");
-      confetti();
-      $("levelup").hidden = false;
-    }
-  } catch (err) {
-    stop();
-    busy = false;
-    $("writing")?.remove();
-    alert(err.message);
-    refresh();
-  }
-}
-// While the agents work (~5-10 s): a post-shaped card, a year counter rolling forward,
-// and status lines that follow the real pipeline (game engine -> story -> reality check -> photo).
-function writingCard(habit) {
-  return `
-    <article class="post writing" id="writing">
-      <div class="ph">${avatarHTML(36)}
-        <span class="who">${esc(S.profile.handle)}<span class="where">traveling through time…</span></span></div>
-      <div class="media warp">
-        <div class="year" id="w-year">${S.today.slice(0, 4)}</div>
-        <div class="wstep" id="w-step">Counting your ${esc(habit.short.toLowerCase())} check-ins</div>
-        <div class="wbar"><i></i></div>
-      </div>
-      <div class="skel"><i style="width:40%"></i><i style="width:90%"></i><i style="width:70%"></i></div>
-    </article>`;
-}
-
-function animateWriting() {
-  const steps = ["Counting your check-ins and pace", "Story agent is writing your next chapter",
-    "Reality check: does this fit your real pace?", "Finding a photo for the moment", "Almost there"];
-  let year = +S.today.slice(0, 4), i = 0;
-  const yr = setInterval(() => {
-    year = year >= 2036 ? +S.today.slice(0, 4) : year + 1;
-    const el = $("w-year");
-    if (el) el.textContent = year;
-  }, 260);
-  const st = setInterval(() => {
-    i = Math.min(i + 1, steps.length - 1);
-    const el = $("w-step");
-    if (el) { el.classList.remove("in"); void el.offsetWidth; el.textContent = steps[i]; el.classList.add("in"); }
-  }, 1800);
-  return () => { clearInterval(yr); clearInterval(st); };
-}
-
-function confetti() {
-  const colors = ["#f9ce34", "#ee2a7b", "#6228d7", "#0095f6", "#1a9c5b"];
-  $("confetti").innerHTML = Array.from({ length: 40 }, () => {
-    const x = Math.random() * 100, d = 0.8 + Math.random() * 1.2, r = Math.random() * 360;
-    return `<i style="left:${x}%;background:${colors[Math.floor(Math.random() * 5)]};animation-duration:${d}s;transform:rotate(${r}deg)"></i>`;
-  }).join("");
-}
-
-$("lu-close").onclick = () => ($("levelup").hidden = true);
-
-// ---------- feed ----------
-
-const HEART = '<svg viewBox="0 0 24 24"><path d="M12 20s-7-4.4-9-8.6C1.5 8.2 3.6 5 6.8 5c2 0 3.4 1.1 5.2 3 1.8-1.9 3.2-3 5.2-3 3.2 0 5.3 3.2 3.8 6.4C19 15.6 12 20 12 20z"/></svg>';
-const BUBBLE = '<svg viewBox="0 0 24 24"><path d="M20 11.5a8 8 0 0 1-11.6 7.1L4 20l1.4-4.2A8 8 0 1 1 20 11.5z"/></svg>';
-const SEND = '<svg viewBox="0 0 24 24"><path d="M21 3 10 14M21 3l-7 18-4-7-7-4z"/></svg>';
-const BADGE = { level_up: "LEVEL UP", life_event: "PLOT TWIST", boss: "SLUMP", comeback: "COMEBACK", combo: "COMBO" };
-
-function whenText(iso) {
-  const d = new Date(iso + "T12:00:00");
-  const years = (d - new Date(S.today + "T12:00:00")) / (365 * 864e5);
-  const away = years < 1 ? `${Math.max(1, Math.round(years * 12))} months from now` : `${years.toFixed(1).replace(".0", "")} years from now`;
-  return `${d.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })} · ${away}`;
-}
-
-async function renderFeed() {
-  const posts = await api(`/api/feed?timeline=${timeline}`);
-  const prof = S.profile;
-  const handle = timeline === "kept" ? prof.handle : prof.handle.replace(".2036", ".someday");
-  const pending = S.habits.filter((h) => !h.checked_today);
-  const locked = timeline === "kept" && pending.length ? `
-    <article class="locked"><div class="media"><span class="lock">${ico("lock")}</span>
-      <p>Tomorrow's you is waiting</p><small>Check in on ${pending.map((h) => h.label.toLowerCase()).join(" or ")} to see what happens next.</small>
-    </div></article>` : "";
-  if (!posts.length) {
-    $("feed").innerHTML = locked + `<p class="empty">${timeline === "kept"
-      ? "Your 2036 feed is empty. Check in today and your first post appears."
-      : "This is the you who stopped. Their feed fills in as yours does."}</p>`;
-    return;
-  }
-  $("feed").innerHTML = locked + posts.map((p) => {
-    const photo = p.photo
-      ? `<div class="fallback">${emojiFor(p.habit_key)}</div><img src="${p.photo.url}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">`
-      : `<div class="fallback">${emojiFor(p.habit_key)}</div>`;
-    const credit = p.photo ? `Photo: <a href="${esc(p.photo.page)}" target="_blank" rel="noopener">${esc(p.photo.title || "untitled")}</a> by ${esc(p.photo.creator)}, ${esc(p.photo.license)}` : "";
-    const b = (p.basis || "").replace(/ ?combo:\d+/, "").trim();
-    const basis = timeline === "kept" && b ? `Reality check ✓ fits your current pace · ${b === "estimate" ? "milestone is an estimate" : esc(b)}<br>` : "";
-    return `
-      <article class="post ${timeline} ${p.id === newestPostId || p.id === newestPostId + 1 ? "new" : ""}">
-        <div class="ph">${avatarHTML(36, { gray: timeline === "stopped", tier: timeline === "stopped" ? 0 : undefined })}
-          <span class="who">${esc(handle)}<span class="where">${esc(p.location || "")}</span></span></div>
-        <div class="media">${photo}${BADGE[p.kind] && timeline === "kept" ? `<span class="badge ${p.kind}">${BADGE[p.kind]}</span>` : ""}</div>
-        <div class="acts">${HEART}${BUBBLE}${SEND}</div>
-        <div class="likes">${p.likes.toLocaleString()} likes</div>
-        <div class="cap"><b>${esc(handle)}</b>${esc(p.caption)}</div>
-        <div class="cmts">${p.comments.map((c) => `<div><b>${esc(c.handle)}</b>${esc(c.text)}</div>`).join("")}</div>
-        <div class="when">${whenText(p.future_date)}</div>
-        <div class="basis">${basis}${credit}</div>
-      </article>`;
-  }).join("");
-}
-
-function emojiFor(key) {
-  return hico(key);
-}
-
-function syncSeg() {
-  document.querySelectorAll("#timeline button").forEach((b) => b.classList.toggle("on", b.dataset.tl === timeline));
-}
-$("timeline").onclick = (e) => {
-  const b = e.target.closest("button");
-  if (!b) return;
-  timeline = b.dataset.tl;
-  syncSeg();
-  newestPostId = null;
-  renderFeed();
-};
-
-// ---------- usage + safety ----------
-
-const EVENT = {
-  overclaim_fixed: "Reality check rewrote an overclaim",
-  budget_block: "Daily budget cap hit",
-};
-// ---------- menu ----------
-document.querySelectorAll(".mi[data-ico]").forEach((m) => (m.innerHTML = ico(m.dataset.ico)));
-const closeMenu = () => { $("menu").hidden = true; $("menu-btn").setAttribute("aria-expanded", "false"); };
-$("menu-btn").onclick = (e) => {
-  e.stopPropagation();
-  const open = $("menu").hidden;
-  $("menu").hidden = !open;
-  $("menu-btn").setAttribute("aria-expanded", String(open));
-};
-document.addEventListener("click", (e) => { if (!e.target.closest("#menu")) closeMenu(); });
-$("menu").addEventListener("click", closeMenu);
-$("menu-avatar").onclick = () => (S?.profile ? openAvatarSheet() : null);
-$("menu-reset").onclick = () => $("demo-reset").click();
-
-$("usage-btn").onclick = async () => {
-  const u = await api("/api/usage");
-  $("u-today").textContent = `Today: ${u.today_tokens.toLocaleString()} of ${u.daily_cap.toLocaleString()} tokens`;
-  $("u-runs").innerHTML = u.runs.map((r) => `<tr><td>${r.t.slice(5, 16)}</td><td>${r.agents.replace(/,/g, " + ")}</td><td>${r.i}</td><td>${r.ca}</td><td>${r.o}</td></tr>`).join("");
-  $("u-events").innerHTML = u.events.map((e) => {
-    let detail = esc(e.detail);
-    try {
-      const d = JSON.parse(e.detail);
-      if (d.before) detail = `<s>${esc(d.before)}</s><br>→ ${esc(d.after)}<br><i>${esc(d.why)}</i>`;
-    } catch {}
-    return `<li><b>${EVENT[e.kind] || e.kind}</b> · ${e.created_at.slice(5, 16)}<br>${detail}</li>`;
-  }).join("") || "<li>Nothing yet</li>";
-  $("usage").hidden = false;
-};
-$("u-close").onclick = () => ($("usage").hidden = true);
-
-// ---------- demo clock ----------
-
-$("demo-btn").onclick = () => {
-  $("demo-date").textContent = S ? S.today : "";
-  $("demo-status").textContent = "";
-  $("demo").hidden = false;
-};
-$("demo-close").onclick = () => ($("demo").hidden = true);
-document.querySelectorAll("#demo [data-days]").forEach((b) => {
-  b.onclick = async () => {
-    $("demo-status").textContent = "Moving the clock…";
-    const r = await api("/api/demo/advance", { days: +b.dataset.days, rate: +b.dataset.rate });
-    $("demo-date").textContent = r.today;
-    $("demo-status").textContent = "Done. Checking for slumps and level-ups…";
-    await refresh();
-    $("demo").hidden = true;
-  };
-});
-$("demo-reset").onclick = async () => {
-  if (!confirm("Erase all habits, check-ins, and posts?")) return;
-  await api("/api/demo/reset", {});
-  $("demo").hidden = true;
-  $("ob-habits").innerHTML = "";
-  refresh();
-};
-
-document.querySelectorAll(".overlay").forEach((o) => o.addEventListener("click", (e) => { if (e.target === o) o.hidden = true; }));
-
-function esc(s) {
-  return String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
-}
-
 // ---------- future-self avatar: evolves with your highest level ----------
-// Lv1-2 Instagram ring · Lv3 habit badge · Lv4 gold ring · Lv5 crown · Lv6 animated rainbow ring
+// Lv1-3 ink ring · Lv3 habit badge · Lv4 gold ring · Lv5 crown · Lv6 rainbow ring
 
 function tier() {
   return Math.max(0, ...(S?.habits || []).map((h) => h.level));
@@ -452,7 +193,7 @@ function avatarPicker(el, current = {}) {
       <label class="photo-tile ${choice.photo ? "on" : ""}">
         <span class="pt-pic">${choice.photo ? `<img src="${choice.photo}" alt="">` : ico("camera")}</span>
         <span><b>${choice.photo ? "That's you!" : "Use my photo"}</b>
-          <small>${choice.photo ? "Tap to change. You'll walk your own journey map." : "Be the hero of your own journey map. Stays on this computer, never sent to AI."}</small></span>
+          <small>${choice.photo ? "Tap to change. You'll walk the road yourself." : "Walk the road as yourself. Stays on this computer, never sent to AI."}</small></span>
         <input type="file" accept="image/*" hidden>
       </label>
       <p class="or">or pick a character</p>
@@ -485,15 +226,13 @@ function shrink(file, size) {
   });
 }
 
-let readOnboardAvatar = () => ({ character: "🦊" });
-
-$("av-cancel").onclick = () => ($("avsheet").hidden = true);
 let readSheetAvatar = null;
 function openAvatarSheet() {
   readSheetAvatar = avatarPicker($("av-pick"), S.profile.avatar || {});
   $("av-err").textContent = "";
   $("avsheet").hidden = false;
 }
+$("av-cancel").onclick = () => ($("avsheet").hidden = true);
 $("av-save").onclick = async () => {
   try {
     await api("/api/avatar", readSheetAvatar());
@@ -504,47 +243,373 @@ $("av-save").onclick = async () => {
   }
 };
 
-// ---------- profile card: sidebar on desktop, header on phones ----------
+// ---------- me card ----------
 
 function renderMe() {
-  if (PLAIN) { $("me-top").innerHTML = ""; $("side").innerHTML = ""; return; }
+  if (PLAIN) return ($("me").innerHTML = "");
   const p = S.profile, t = tier();
   const total = S.habits.reduce((n, h) => n + h.checkins, 0);
   const best = Math.max(0, ...S.habits.map((h) => h.streak));
-  const chapters = S.habits.reduce((n, h) => n + Math.max(0, h.allowed_chapter + 1), 0);
-  const stats = `<div class="me-stats"><span><b>${total}</b>check-ins</span><span><b>${best}</b>streak</span><span><b>${chapters}</b>chapters</span></div>`;
-  const play = `<button class="btn play" data-play>${ico("play", "inline")} Play your next 10 years</button>`;
-  $("me-top").innerHTML = `
-    <div class="me-row">
-      <button class="me-av" data-avatar title="Change your future self">${avatarHTML(72)}</button>
-      <div class="me-info"><b>${esc(p.handle)}</b><span class="tier">${TIER_NAME[t]}</span>${stats}</div>
-    </div>${play}`;
-  $("side").innerHTML = `
-    <div class="side-card">
-      <button class="me-av big" data-avatar title="Change your future self">${avatarHTML(112)}</button>
-      <h2>${esc(p.name)} <span class="muted">in 2036</span></h2>
-      <p class="tier">${TIER_NAME[t]} · Level ${t}</p>
-      ${stats}
-      ${play}
-      <div class="side-habits">${S.habits.map((h) => `
-        <div class="sh"><span>${hico(h.key, "inline")} ${esc(h.short)}</span><span class="muted">Lv ${h.level}</span></div>
-        <div class="dots small">${Array.from({ length: 6 }, (_, i) => `<i class="${i <= h.allowed_chapter ? "on" : ""}"></i>`).join("")}</div>
-        <p class="sh-next">${h.next_milestone ? "Next: " + esc(h.next_milestone.milestone) : "Top of the ladder"}</p>`).join("")}
+  const cards = POSTS.kept.length;
+  $("me").innerHTML = `
+    <div class="me-card sketch">
+      <button class="me-av" id="me-av" title="Change who walks the road">${avatarHTML(96)}</button>
+      <div class="me-text">
+        <p class="hello">${esc(p.name)}, day ${S.day_offset + 1} on the road</p>
+        <p class="tier">${TIER_NAME[t]}</p>
+        <div class="me-stats">
+          <span><b>${total}</b>check-ins</span><span><b>${best}</b>best streak</span><span><b>${cards}</b>postcards</span>
+        </div>
+        <button class="btn play sketch" id="me-play">${ico("play", "inline")} Play your next 10 years</button>
       </div>
-      <p class="muted small">Your avatar levels up with you: ring at Lv1, habit badge at Lv3, gold at Lv4, crown at Lv5.</p>
     </div>`;
-  document.querySelectorAll("[data-avatar]").forEach((b) => (b.onclick = openAvatarSheet));
-  document.querySelectorAll("[data-play]").forEach((b) => (b.onclick = playReel));
+  $("me-av").onclick = openAvatarSheet;
+  $("me-play").onclick = playReel;
 }
 
-// ---------- story reel: the kept-going feed in date order, played like Instagram stories ----------
+// ---------- today: hold to check in ----------
+
+const amountText = (h) => (h.unit === "dollars" ? `$${h.amount}` : `${h.amount} min`);
+
+function renderToday() {
+  const L = S.level_checkins;
+  $("today").innerHTML = `
+    <div class="today-card sketch">
+      <div class="today-head"><h3>Today</h3><button class="link" id="add-habit">+ add a daily thing</button></div>
+      ${S.habits.map((h) => {
+        const prev = L[h.level - 1] || 0, next = h.next_level_at;
+        const pct = next ? Math.round(((h.checkins - prev) / (next - prev)) * 100) : 100;
+        const quest = h.quest && !PLAIN
+          ? `<p class="quest">${ico("storm", "inline")} <b>Storm ahead.</b> Check in ${h.quest.target} days in a row to clear it: ${h.quest.progress}/${h.quest.target}</p>` : "";
+        return `
+          <div class="habit-row ${h.checked_today ? "done" : ""}">
+            <span class="hr-ico">${hico(h.key)}</span>
+            <div class="hr-mid">
+              <b>${esc(h.label)} · ${amountText(h)}</b>
+              <small>${ico("flame", "inline")} ${h.streak}-day streak${PLAIN ? "" : ` · stop ${Math.max(0, h.allowed_chapter + 1)} of 6`}</small>
+              ${PLAIN ? "" : `<div class="prog"><i style="width:${pct}%"></i></div>`}
+              ${quest}
+            </div>
+            ${h.checked_today
+              ? `<span class="done-tag">${ico("check", "inline")} done</span>`
+              : `<button class="hold sketch" data-hold="${h.id}" ${busy ? "disabled" : ""}><i></i><span>Hold to check in</span></button>`}
+          </div>`;
+      }).join("")}
+    </div>`;
+  $("add-habit").onclick = openAdd;
+  $("today").querySelectorAll("[data-hold]").forEach(bindHold);
+}
+
+// press and hold ~0.9 s: a small ritual instead of a tap
+function bindHold(btn) {
+  const fill = btn.querySelector("i");
+  let t = null, start = 0;
+  const go = (e) => {
+    e.preventDefault();
+    if (busy || t) return;
+    start = performance.now();
+    btn.classList.add("holding");
+    t = setInterval(() => {
+      const p = Math.min(1, (performance.now() - start) / 900);
+      fill.style.width = `${p * 100}%`;
+      if (p >= 1) { clearInterval(t); t = null; btn.classList.remove("holding"); checkin(+btn.dataset.hold); }
+    }, 16);
+  };
+  const cancel = () => {
+    if (!t) return;
+    clearInterval(t);
+    t = null;
+    btn.classList.remove("holding");
+    fill.style.width = "0";
+  };
+  btn.addEventListener("pointerdown", go);
+  ["pointerup", "pointerleave", "pointercancel"].forEach((ev) => btn.addEventListener(ev, cancel));
+  btn.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") checkin(+btn.dataset.hold); });
+}
+
+async function checkin(id) {
+  if (busy) return;
+  busy = true;
+  roadHabit = id;
+  if (PLAIN) {
+    await api(`/api/habits/${id}/checkin${Q}`, {}).catch((err) => alert(err.message));
+    busy = false;
+    return refresh();
+  }
+  renderToday();
+  renderRoad({ transit: true });
+  const stop = animateTransit();
+  try {
+    const r = await api(`/api/habits/${id}/checkin`, {});
+    stop();
+    busy = false;
+    await refresh();
+    const post = POSTS.kept.find((p) => p.id === r.post_id);
+    if (r.kind === "level_up") {
+      const h = S.habits.find((x) => x.id === id);
+      $("lu-level").textContent = Math.max(1, h.allowed_chapter + 1);
+      $("lu-emoji").innerHTML = avatarHTML(104);
+      $("lu-title").textContent = h.allowed_milestone ? `Future you ${lower(h.allowed_milestone.milestone)}.` : "A new chapter begins.";
+      $("lu-sub").textContent = h.next_milestone ? `Next stop: ${lower(h.next_milestone.milestone)}.` : "You've reached the end of this road.";
+      $("lu-dots").innerHTML = Array.from({ length: 6 }, (_, i) =>
+        `<i class="${i <= h.allowed_chapter ? "on" : ""} ${i === h.allowed_chapter ? "now" : ""}"></i>`).join("");
+      confetti();
+      $("levelup").hidden = false;
+      $("lu-close").onclick = () => { $("levelup").hidden = true; if (post) openPostcard(post, true); };
+    } else if (post) {
+      openPostcard(post, true);
+    }
+  } catch (err) {
+    stop();
+    busy = false;
+    alert(err.message);
+    refresh();
+  }
+}
+
+// While the agents work (~5-10 s) the frontier postcard says what's happening, following the real pipeline.
+function animateTransit() {
+  const steps = ["Counting your check-ins and pace", "Story agent is writing your next chapter",
+    "Reality check: does this fit your real pace?", "Finding a photo for the moment", "Stamping the postcard"];
+  let y = +S.today.slice(0, 4), i = 0;
+  const yr = setInterval(() => {
+    y = y >= 2036 ? +S.today.slice(0, 4) : y + 1;
+    if ($("tr-year")) $("tr-year").textContent = y;
+  }, 240);
+  const st = setInterval(() => {
+    i = Math.min(i + 1, steps.length - 1);
+    const el = $("tr-step");
+    if (el) { el.classList.remove("in"); void el.offsetWidth; el.textContent = steps[i]; el.classList.add("in"); }
+  }, 1800);
+  return () => { clearInterval(yr); clearInterval(st); };
+}
+
+function confetti() {
+  const colors = ["#ffd86b", "#ef7f97", "#9ed39b", "#9cc6f0", "#c9b5f0"];
+  $("confetti").innerHTML = Array.from({ length: 40 }, () => {
+    const x = Math.random() * 100, d = 0.8 + Math.random() * 1.2, r = Math.random() * 360;
+    return `<i style="left:${x}%;background:${colors[Math.floor(Math.random() * 5)]};animation-duration:${d}s;transform:rotate(${r}deg)"></i>`;
+  }).join("");
+}
+
+// ---------- the road to 2036 ----------
+// Home → six stops (one per chapter) → 2036. Each stop shows the year you'd reach it at your
+// real pace; kept postcards are pinned above their stop, the road not taken runs below.
+
+const STOP_COLORS = ["#f7b6c2", "#ffd86b", "#9ed39b", "#9cc6f0", "#c9b5f0", "#f6a15b"];
+const KIND_LABEL = { level_up: "new stop!", life_event: "plot twist", boss: "slump", comeback: "comeback", combo: "combo" };
+const prevYears = JSON.parse(localStorage.getItem("ff-stop-years") || "{}");
+const lastPos = JSON.parse(localStorage.getItem("ff-piece") || "{}");
+
+function renderRoad(opts = {}) {
+  const wrap = $("roadwrap");
+  if (PLAIN || !S.habits.length) { wrap.hidden = true; return; }
+  wrap.hidden = false;
+  if (!S.habits.some((h) => h.id === roadHabit)) roadHabit = S.habits[0].id;
+  const h = S.habits.find((x) => x.id === roadHabit);
+
+  $("road-tabs").innerHTML = S.habits.length > 1 ? S.habits.map((x) =>
+    `<button class="${x.id === h.id ? "on" : ""}" data-road="${x.id}">${hico(x.key, "inline")} ${esc(x.short)}</button>`).join("") : "";
+  $("road-tabs").querySelectorAll("[data-road]").forEach((b) => (b.onclick = () => { roadHabit = +b.dataset.road; renderRoad(); }));
+
+  const kept = POSTS.kept.filter((p) => p.habit_id === h.id);
+  const stopped = POSTS.stopped.filter((p) => p.habit_id === h.id);
+  const frontier = Math.max(0, h.allowed_chapter + (h.next_level_at === h.checkins + 1 ? 1 : 0));
+  const was = prevYears[h.id] || [];
+
+  const cols = h.chapters.map((milestone, i) => {
+    const mine = kept.filter((p) => (p.chapter ?? 0) === i);
+    const ghost = stopped.filter((p) => (p.chapter ?? 0) === i);
+    const reached = i <= h.allowed_chapter;
+    const y = year(h.chapter_dates[i]);
+    const moved = was[i] && was[i] !== y ? (+y < +was[i] ? `<span class="moved up">↑ sooner</span>` : `<span class="moved down">↓ later</span>`) : "";
+    let pending = "";
+    if (i === frontier && !h.checked_today) {
+      pending = opts.transit && h.id === roadHabit
+        ? `<div class="postcard transit"><div class="pc-photo"><span id="tr-year">${S.today.slice(0, 4)}</span></div><p id="tr-step" class="in">Counting your check-ins and pace</p></div>`
+        : `<div class="postcard locked"><div class="pc-photo">${ico("lock")}</div><p>Hold to check in and this postcard arrives</p></div>`;
+    }
+    return `
+      <div class="stop-col ${reached ? "reached" : ""}" data-i="${i}">
+        <div class="kept-area">${pending}${postcards(mine, "kept", pending ? 1 : 2)}</div>
+        <div class="stop">
+          <span class="stop-dot" style="--c:${STOP_COLORS[i]}">${i + 1}</span>
+          <span class="stop-year">~${y} ${moved}</span>
+          <span class="stop-text">${esc(milestone)}</span>
+        </div>
+        <div class="ghost-area">${postcards(ghost, "stopped")}</div>
+      </div>`;
+  }).join("");
+
+  $("road").innerHTML = `
+    <div class="road-inner" id="road-inner">
+      <svg class="road-svg" id="road-svg" aria-hidden="true"></svg>
+      <div class="stop-col home"><div class="kept-area"></div>
+        <div class="stop"><span class="stop-dot home-dot">${ico("house")}</span><span class="stop-year">${S.today.slice(0, 4)}</span><span class="stop-text">today</span></div>
+        <div class="ghost-area"><span class="nt-label">the road not taken</span></div></div>
+      ${cols}
+      <div class="stop-col end"><div class="kept-area"></div>
+        <div class="stop"><span class="stop-dot end-dot">${ico("flag")}</span><span class="stop-year">2036</span><span class="stop-text">ten years on</span></div>
+        <div class="ghost-area"></div></div>
+      ${h.quest ? `<span class="road-storm" id="road-storm">${ico("storm")}</span>` : ""}
+      <span class="road-piece" id="road-piece">${avatarHTML(S.profile.avatar?.photo ? 54 : 48, { tier: 0 })}<b>you</b></span>
+    </div>`;
+
+  $("road").querySelectorAll("[data-post]").forEach((el) => (el.onclick = () => {
+    const [tl, id] = el.dataset.post.split(":");
+    const p = POSTS[tl].find((x) => x.id === +id);
+    if (p) openPostcard(p);
+  }));
+  $("road").querySelectorAll("[data-more]").forEach((el) => (el.onclick = () => openStack(h, +el.dataset.more, el.dataset.tl)));
+
+  prevYears[h.id] = h.chapter_dates.map(year);
+  localStorage.setItem("ff-stop-years", JSON.stringify(prevYears));
+  requestAnimationFrame(() => layoutRoad(h));
+  setTimeout(() => layoutRoad(h), 120);  // once photos/fonts settle
+  if (opts.transit) {
+    const col = $("road").querySelector(`.stop-col[data-i="${frontier}"]`);
+    col?.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
+  }
+}
+
+function postcards(list, tl, max = tl === "kept" ? 2 : 1) {
+  if (!list.length) return "";
+  const shown = list.slice(0, max);
+  const more = list.length - shown.length;
+  return shown.map((p, k) => `
+    <button class="postcard ${tl} ${k % 2 ? "tilt-r" : "tilt-l"}" data-post="${tl}:${p.id}">
+      <span class="tape"></span>
+      <div class="pc-photo">${photoHTML(p)}</div>
+      <p>${esc(p.caption)}</p>
+      <span class="pc-year">${year(p.live_date || p.future_date)}</span>
+      ${tl === "kept" && KIND_LABEL[p.kind] ? `<span class="pc-kind ${p.kind}">${KIND_LABEL[p.kind]}</span>` : ""}
+    </button>`).join("") + (more > 0 ? `<button class="more" data-more="${list[0].chapter ?? 0}" data-tl="${tl}">+${more} more</button>` : "");
+}
+
+function photoHTML(p) {
+  const fb = `<span class="fb">${hico(p.habit_key)}</span>`;
+  return p.photo ? `${fb}<img src="${p.photo.url}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">` : fb;
+}
+
+// Draw the hand-drawn road through the stop dots, then walk the piece to where you are.
+function layoutRoad(h) {
+  const inner = $("road-inner");
+  const svg = $("road-svg");
+  if (!inner || !svg) return;
+  const box = inner.getBoundingClientRect();
+  const center = (el) => { const r = el.getBoundingClientRect(); return [r.left - box.left + r.width / 2, r.top - box.top + r.height / 2]; };
+  const dots = [...inner.querySelectorAll(".stop-dot")].map(center);
+  const ghosts = [...inner.querySelectorAll(".ghost-area")].map((g) => {
+    const r = g.getBoundingClientRect();
+    return vertical() ? [r.left - box.left + 20, r.top - box.top + r.height / 2] : [r.left - box.left + r.width / 2, r.top - box.top + 26];
+  });
+  svg.setAttribute("width", inner.scrollWidth);
+  svg.setAttribute("height", inner.scrollHeight);
+  svg.innerHTML = "";
+  const rc = rough.svg(svg);
+  svg.appendChild(rc.linearPath(ghosts, { stroke: "#cfc6b8", strokeWidth: 3, roughness: 1.8, strokeLineDash: [6, 9], seed: 301 }));
+  svg.appendChild(rc.linearPath(dots, { stroke: "#e2cfae", strokeWidth: 14, roughness: 1.4, seed: 302 }));
+  svg.appendChild(rc.linearPath(dots, { stroke: "#fffaf0", strokeWidth: 2, roughness: 1, strokeLineDash: [8, 12], seed: 303 }));
+
+  // piece: between the stop you've reached and the next, by progress toward the next level
+  const L = S.level_checkins, lvl = h.level;
+  const prev = L[lvl - 1] || 0, next = L[lvl];
+  const frac = next && h.allowed_chapter + 1 === lvl ? Math.min(1, (h.checkins - prev) / (next - prev)) : 0;
+  const a = dots[Math.max(0, h.allowed_chapter + 1)], b = dots[Math.min(dots.length - 1, h.allowed_chapter + 2)];
+  const to = [a[0] + (b[0] - a[0]) * frac, a[1] + (b[1] - a[1]) * frac];
+  const walked = dots.slice(0, Math.max(0, h.allowed_chapter + 1) + 1).concat([to]);
+  svg.appendChild(rc.linearPath(walked, { stroke: "#ef7f97", strokeWidth: 5, roughness: 1.2, seed: 304 }));
+
+  const storm = $("road-storm");
+  if (storm) { storm.style.left = `${b[0]}px`; storm.style.top = `${b[1]}px`; }
+
+  const piece = $("road-piece");
+  const key = `${h.id}`;
+  const from = lastPos[key] || to;
+  const place = ([x, y]) => { piece.style.left = `${x}px`; piece.style.top = `${y}px`; };
+  if (!piece.dataset.placed) {
+    piece.dataset.placed = "1";
+    place(from);
+    if (Math.abs(from[0] - to[0]) + Math.abs(from[1] - to[1]) > 2) {
+      setTimeout(() => { piece.classList.add("moving"); place(to); setTimeout(() => piece.classList.remove("moving"), 1300); }, 90);
+    }
+  } else {
+    place(to);
+  }
+  lastPos[key] = to;
+  localStorage.setItem("ff-piece", JSON.stringify(lastPos));
+}
+
+const vertical = () => window.matchMedia("(max-width: 760px)").matches;
+let resizeT = null;
+window.addEventListener("resize", () => {
+  clearTimeout(resizeT);
+  resizeT = setTimeout(() => S?.habits?.length && !PLAIN && layoutRoad(S.habits.find((x) => x.id === roadHabit)), 150);
+});
+
+// ---------- postcard viewer ----------
+
+function whenText(p) {
+  const live = p.live_date || p.future_date;
+  const d = new Date(live + "T12:00:00");
+  const yrs = (d - new Date(S.today + "T12:00:00")) / (365 * 864e5);
+  const away = yrs < 1 ? `${Math.max(1, Math.round(yrs * 12))} months away` : `${yrs.toFixed(1).replace(".0", "")} years away`;
+  const shifted = p.live_date && year(p.live_date) !== year(p.future_date)
+    ? ` · first written for ${year(p.future_date)}, your pace moved it` : "";
+  return `${d.toLocaleDateString("en-US", { month: "long", year: "numeric" })} · ${away} at your pace${shifted}`;
+}
+
+function openPostcard(p, arrived = false) {
+  const stoppedSelf = p.timeline === "stopped";
+  const who = stoppedSelf ? S.profile.handle.replace(".2036", ".someday") : S.profile.handle;
+  const b = (p.basis || "").replace(/ ?combo:\d+/, "").trim();
+  $("pc-body").innerHTML = `
+    ${arrived ? `<p class="arrived">A postcard from ${year(p.live_date || p.future_date)} just arrived</p>` : ""}
+    <div class="pc-card ${stoppedSelf ? "stopped" : ""} ${arrived ? "flip" : ""}">
+      <span class="tape"></span>
+      <div class="pc-big-photo">${photoHTML(p)}</div>
+      <div class="pc-note">
+        <div class="pc-from">${avatarHTML(34, { gray: stoppedSelf, tier: stoppedSelf ? 0 : undefined })}<b>${esc(who)}</b><span>${esc(p.location || "")}</span></div>
+        <p class="pc-caption">${esc(p.caption)}</p>
+        ${p.comments.length ? `<div class="pc-notes">${p.comments.map((c) => `<p><b>${esc(c.handle)}</b> ${esc(c.text)}</p>`).join("")}</div>` : ""}
+        <p class="pc-meta">${ico("flame", "inline")} ${p.likes} people cheered · ${whenText(p)}</p>
+        ${!stoppedSelf && b ? `<p class="pc-meta">Reality check ✓ fits your current pace · ${b === "estimate" ? "milestone is an estimate" : esc(b)}</p>` : ""}
+        ${p.photo ? `<p class="pc-meta">Photo: <a href="${esc(p.photo.page)}" target="_blank" rel="noopener">${esc(p.photo.title || "untitled")}</a> by ${esc(p.photo.creator)}, ${esc(p.photo.license)}</p>` : ""}
+      </div>
+    </div>
+    <button class="btn sketch pc-close" id="pc-close">Back to the road</button>`;
+  $("pc").hidden = false;
+  $("pc-close").onclick = () => ($("pc").hidden = true);
+}
+
+function openStack(h, chapter, tl) {
+  const list = POSTS[tl].filter((p) => p.habit_id === h.id && (p.chapter ?? 0) === chapter);
+  $("pc-body").innerHTML = `
+    <div class="stack sketch">
+      <h2>Stop ${chapter + 1}${tl === "stopped" ? " · the road not taken" : ""}</h2>
+      <p class="muted">${esc(h.chapters[chapter])}</p>
+      <div class="stack-grid">${list.map((p, k) => `
+        <button class="postcard ${tl} ${k % 2 ? "tilt-r" : "tilt-l"}" data-post="${tl}:${p.id}"><span class="tape"></span>
+          <div class="pc-photo">${photoHTML(p)}</div><p>${esc(p.caption)}</p><span class="pc-year">${year(p.live_date || p.future_date)}</span></button>`).join("")}
+      </div>
+      <button class="btn sketch" id="pc-close">Back to the road</button>
+    </div>`;
+  $("pc").hidden = false;
+  $("pc-close").onclick = () => ($("pc").hidden = true);
+  $("pc-body").querySelectorAll("[data-post]").forEach((el) => (el.onclick = () => {
+    const [t, id] = el.dataset.post.split(":");
+    openPostcard(POSTS[t].find((x) => x.id === +id));
+  }));
+}
+
+// ---------- story reel ----------
 
 let reel = null;
 async function playReel() {
-  const posts = (await api("/api/feed?timeline=kept")).filter((p) => p.kind !== "boss")
-    .sort((a, b) => a.future_date.localeCompare(b.future_date));
+  const posts = POSTS.kept.filter((p) => p.kind !== "boss")
+    .sort((a, b) => (a.live_date || a.future_date).localeCompare(b.live_date || b.future_date));
+  if (!posts.length) return alert("Check in first. Your story starts with your first postcard.");
   const slides = [{ intro: true }, ...posts, { outro: true }];
-  if (!posts.length) return alert("Check in first. Your story starts with your first post.");
   $("reel-bars").innerHTML = slides.map(() => "<i><b></b></i>").join("");
   $("reel").hidden = false;
   reel = { slides, i: 0, timer: null };
@@ -555,9 +620,7 @@ function showSlide() {
   const { slides, i } = reel;
   const s = slides[i];
   clearTimeout(reel.timer);
-  [...$("reel-bars").children].forEach((bar, k) => {
-    bar.className = k < i ? "done" : k === i ? "now" : "";
-  });
+  [...$("reel-bars").children].forEach((bar, k) => { bar.className = k < i ? "done" : k === i ? "now" : ""; });
   const p = S.profile;
   if (s.intro) {
     $("reel-stage").innerHTML = `<div class="slide intro">${avatarHTML(120, { tier: 0 })}
@@ -566,18 +629,16 @@ function showSlide() {
     $("reel-stage").innerHTML = `<div class="slide intro">${avatarHTML(120)}
       <h1>This future is on its way.</h1><p>Check in tomorrow to write the next chapter.</p></div>`;
   } else {
-    const year = s.future_date.slice(0, 4);
     $("reel-stage").innerHTML = `
       <div class="slide">
-        ${s.photo ? `<img class="kb" src="${s.photo.url}" alt="" referrerpolicy="no-referrer">` : `<div class="kb fallback">${emojiFor(s.habit_key)}</div>`}
-        <div class="slide-year">${year}</div>
+        ${s.photo ? `<img class="kb" src="${s.photo.url}" alt="" referrerpolicy="no-referrer">` : `<div class="kb fallback">${hico(s.habit_key)}</div>`}
+        <div class="slide-year">${year(s.live_date || s.future_date)}</div>
         <div class="slide-cap"><div class="slide-who">${avatarHTML(32)}<b>${esc(p.handle)}</b><span>${esc(s.location || "")}</span></div>
           <p>${esc(s.caption)}</p></div>
       </div>`;
   }
   reel.timer = setTimeout(() => step(1), s.intro || s.outro ? 3000 : 5000);
 }
-
 function step(d) {
   if (!reel) return;
   const n = reel.i + d;
@@ -601,96 +662,77 @@ document.addEventListener("keydown", (e) => {
   if (e.key === "Escape") closeReel();
 });
 
-// ---------- journey mini-game: you (your photo or character) walk a hand-drawn trail ----------
-// Six stops = six chapters. Each check-in moves you along; a slump puts a storm on the trail.
+// ---------- menu ----------
 
-const JW = 340, JH = 250;
-const STOPS = [[30, 214], [112, 196], [204, 214], [298, 172], [242, 112], [126, 104], [196, 40]];
-const STOP_COLORS = ["#f7b6c2", "#ffd86b", "#9ed39b", "#9cc6f0", "#c9b5f0", "#f6a15b"];
-const SCENERY = [["tree", 72, 150, 30], ["tree", 300, 78, 34], ["tree", 50, 56, 26], ["tree", 330, 230, 22]];
-let journeyHabit = null;
-// remembered across reloads so the hop still plays after a refresh
-const lastPos = JSON.parse(localStorage.getItem("ff-journey-pos") || "{}");
+document.querySelectorAll(".mi[data-ico]").forEach((m) => (m.innerHTML = ico(m.dataset.ico)));
+const closeMenu = () => { $("menu").hidden = true; $("menu-btn").setAttribute("aria-expanded", "false"); };
+$("menu-btn").onclick = (e) => {
+  e.stopPropagation();
+  const open = $("menu").hidden;
+  $("menu").hidden = !open;
+  $("menu-btn").setAttribute("aria-expanded", String(open));
+};
+document.addEventListener("click", (e) => { if (!e.target.closest("#menu")) closeMenu(); });
+$("menu").addEventListener("click", closeMenu);
+$("menu-avatar").onclick = () => (S?.profile ? openAvatarSheet() : null);
+$("menu-play").onclick = () => (S?.profile ? playReel() : null);
+$("menu-reset").onclick = () => $("demo-reset").click();
 
-function piecePos(h) {
-  const L = S.level_checkins, lvl = h.level;
-  const prev = L[lvl - 1] || 0, next = L[lvl];
-  const frac = next ? Math.min(1, (h.checkins - prev) / (next - prev)) : 0;
-  const a = STOPS[Math.min(lvl, 6)], b = STOPS[Math.min(lvl + 1, 6)];
-  return [a[0] + (b[0] - a[0]) * frac, a[1] + (b[1] - a[1]) * frac];
-}
+// ---------- usage + safety ----------
 
-function renderJourney() {
-  const el = $("journey");
-  if (PLAIN || !S.habits.length) return (el.innerHTML = "");
-  if (!S.habits.some((h) => h.id === journeyHabit)) journeyHabit = S.habits[0].id;
-  const h = S.habits.find((x) => x.id === journeyHabit);
-  const photo = !!S.profile.avatar?.photo;
-  const L = S.level_checkins;
-  const next = h.next_level_at;
-  const left = next ? next - h.checkins : 0;
-  const ladderNext = h.next_milestone ? h.next_milestone.milestone : "the top of this story";
+const EVENT = {
+  overclaim_fixed: "Reality check rewrote an overclaim",
+  habit_refused: "Ladder agent refused an unsafe habit",
+  budget_block: "Daily budget cap hit",
+};
+$("usage-btn").onclick = async () => {
+  const u = await api("/api/usage");
+  $("u-today").textContent = `Today: ${u.today_tokens.toLocaleString()} of ${u.daily_cap.toLocaleString()} tokens`;
+  $("u-runs").innerHTML = u.runs.map((r) => `<tr><td>${r.t.slice(5, 16)}</td><td>${r.agents.replace(/,/g, " + ")}</td><td>${r.i}</td><td>${r.ca}</td><td>${r.o}</td></tr>`).join("");
+  $("u-events").innerHTML = u.events.map((e) => {
+    let detail = esc(e.detail);
+    try {
+      const d = JSON.parse(e.detail);
+      if (d.before) detail = `<s>${esc(d.before)}</s><br>→ ${esc(d.after)}<br><i>${esc(d.why)}</i>`;
+      else if (d.habit) detail = `“${esc(d.habit)}”<br><i>${esc(d.why)}</i>`;
+    } catch {}
+    return `<li><b>${EVENT[e.kind] || e.kind}</b> · ${e.created_at.slice(5, 16)}<br>${detail}</li>`;
+  }).join("") || "<li>Nothing yet</li>";
+  $("usage").hidden = false;
+};
+$("u-close").onclick = () => ($("usage").hidden = true);
 
-  el.innerHTML = `
-    <section class="journey">
-      <div class="j-head">
-        <h3>${esc(S.profile.name)}'s journey</h3>
-        <div class="j-tabs">${S.habits.length > 1 ? S.habits.map((x) =>
-          `<button class="${x.id === h.id ? "on" : ""}" data-j="${x.id}">${hico(x.key, "inline")} ${esc(x.short)}</button>`).join("") : ""}</div>
-      </div>
-      <div class="j-map">
-        <svg viewBox="0 0 ${JW} ${JH}" id="j-svg" aria-hidden="true"></svg>
-        ${SCENERY.map(([n, x, y, s]) => `<span class="j-deco" style="left:${(x / JW) * 100}%;top:${(y / JH) * 100}%;width:${s}px;height:${s}px">${ico(n)}</span>`).join("")}
-        <span class="j-deco home" style="left:${(STOPS[0][0] / JW) * 100}%;top:${(STOPS[0][1] / JH) * 100}%">${ico("house")}</span>
-        <span class="j-deco summit" style="left:${(STOPS[6][0] / JW) * 100}%;top:${(STOPS[6][1] / JH) * 100}%">${ico("flag")}</span>
-        ${STOPS.slice(1).map(([x, y], i) => `<span class="j-stop ${i < h.level ? "done" : i === h.level ? "next" : ""}"
-            style="left:${(x / JW) * 100}%;top:${(y / JH) * 100}%;--c:${STOP_COLORS[i]}">${i + 1}</span>`).join("")}
-        ${h.quest ? (() => {
-          // the storm sits over the next stop: it's blocked until the comeback quest is done
-          const [sx, sy] = STOPS[Math.min(h.level + 1, 6)];
-          return `<span class="j-storm" style="left:${(sx / JW) * 100}%;top:${(sy / JH) * 100}%">${ico("storm")}</span>`;
-        })() : ""}
-        <span class="j-piece" id="j-piece">${avatarHTML(photo ? 52 : 46, { tier: 0 })}<b class="j-you">you</b></span>
-      </div>
-      <p class="j-caption">${h.quest
-        ? `<b>A storm on your trail.</b> Check in ${h.quest.target} days in a row to clear it: ${h.quest.progress}/${h.quest.target}`
-        : next
-          ? `<b>${left} more check-in${left === 1 ? "" : "s"}</b> to stop ${h.level + 1}: ${esc(ladderNext)}`
-          : `<b>You reached the summit.</b> Keep going to write new chapters.`}</p>
-    </section>`;
+// ---------- demo clock ----------
 
-  drawTrail(h);
-  el.querySelectorAll("[data-j]").forEach((b) => (b.onclick = () => { journeyHabit = +b.dataset.j; renderJourney(); }));
+$("demo-btn").onclick = () => {
+  $("demo-date").textContent = S ? S.today : "";
+  $("demo-status").textContent = "";
+  $("demo").hidden = false;
+};
+$("demo-close").onclick = () => ($("demo").hidden = true);
+document.querySelectorAll("#demo [data-days]").forEach((b) => {
+  b.onclick = async () => {
+    $("demo-status").textContent = "Moving the clock…";
+    const r = await api("/api/demo/advance", { days: +b.dataset.days, rate: +b.dataset.rate });
+    $("demo-date").textContent = r.today;
+    $("demo-status").textContent = "Done. Checking for slumps and level-ups…";
+    await refresh();
+    $("demo").hidden = true;
+  };
+});
+$("demo-reset").onclick = async () => {
+  if (!confirm("Erase all habits, check-ins, and postcards?")) return;
+  await api("/api/demo/reset", {});
+  $("demo").hidden = true;
+  $("ob-habits").innerHTML = "";
+  localStorage.removeItem("ff-piece");
+  localStorage.removeItem("ff-stop-years");
+  refresh();
+};
 
-  // hop from where you were to where you are now
-  const piece = $("j-piece");
-  const to = piecePos(h);
-  const from = lastPos[h.id] || to;
-  const place = ([x, y]) => { piece.style.left = `${(x / JW) * 100}%`; piece.style.top = `${(y / JH) * 100}%`; };
-  place(from);
-  if (from[0] !== to[0] || from[1] !== to[1]) {
-    setTimeout(() => {
-      piece.classList.add("moving");
-      place(to);
-      setTimeout(() => piece.classList.remove("moving"), 1300);
-    }, 80);
-  }
-  lastPos[h.id] = to;
-  localStorage.setItem("ff-journey-pos", JSON.stringify(lastPos));
-}
+document.querySelectorAll(".overlay").forEach((o) => o.addEventListener("click", (e) => { if (e.target === o) o.hidden = true; }));
 
-function drawTrail(h) {
-  const svg = $("j-svg");
-  const rc = rough.svg(svg);
-  svg.appendChild(rc.ellipse(80, 250, 260, 120, { fill: "#e8f4dc", fillStyle: "solid", stroke: "none", seed: 201 }));
-  svg.appendChild(rc.ellipse(290, 260, 240, 160, { fill: "#dff0f7", fillStyle: "solid", stroke: "none", seed: 202 }));
-  svg.appendChild(rc.circle(300, 30, 34, { fill: "#ffe29a", fillStyle: "solid", stroke: "#2b2420", strokeWidth: 1.5, seed: 203 }));
-  // the whole trail, faint
-  svg.appendChild(rc.linearPath(STOPS, { stroke: "#d9c3a0", strokeWidth: 7, roughness: 1.6, seed: 204 }));
-  // the part you've walked, bold
-  const walked = STOPS.slice(0, Math.min(h.level, 6) + 1).concat([piecePos(h)]);
-  svg.appendChild(rc.linearPath(walked, { stroke: "#ee2a7b", strokeWidth: 4, roughness: 1.2, seed: 205 }));
-}
+// ---------- researcher bar (study mode) ----------
 
 function studyBar() {
   if (!STUDY) return;
@@ -715,11 +757,10 @@ function studyBar() {
   }));
 }
 
-const _refresh = refresh;
-refresh = async () => {
-  await _refresh();
-  if (STUDY && $("sb-date")) $("sb-date").textContent = S.profile ? `Day ${S.day_offset + 1}` : "Onboarding";
-};
-
+if (PLAIN) {  // control group: a neutral habit tracker, nothing about the future
+  document.querySelector(".logo").textContent = "Streaks";
+  document.querySelector(".tagline").hidden = true;
+  document.title = "Streaks";
+}
 studyBar();
 refresh();
