@@ -6,6 +6,8 @@ let busy = false;
 // ?mode=plain = control group for the A/B test: an ordinary streak tracker, no future feed.
 const PLAIN = new URLSearchParams(location.search).get("mode") === "plain";
 const Q = PLAIN ? "?plain=true" : "";
+// ?study=1 (opened from the study console): one habit only, and a researcher bar with the clock buttons.
+const STUDY = new URLSearchParams(location.search).get("study") === "1";
 
 const api = async (url, body, method) => {
   const res = await fetch(url, body === undefined && !method ? {} : {
@@ -53,6 +55,13 @@ function pickList(el, preselect) {
       e.preventDefault();
       const box = item.querySelector("input[type=checkbox]");
       box.checked = !box.checked;
+      if (STUDY && box.checked) {  // same single habit in both versions keeps the A/B comparison fair
+        el.querySelectorAll(".pick-item").forEach((other) => {
+          if (other === item) return;
+          other.classList.remove("on");
+          other.querySelector("input[type=checkbox]").checked = false;
+        });
+      }
       item.classList.toggle("on", box.checked);
     });
   });
@@ -305,4 +314,34 @@ function esc(s) {
   return String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 }
 
+function studyBar() {
+  if (!STUDY) return;
+  document.body.classList.add("study");
+  $("ob-habits").insertAdjacentHTML("beforebegin", '<p class="muted small">Pick one.</p>');
+  document.body.insertAdjacentHTML("beforeend", `
+    <div class="studybar">
+      <span class="who">Researcher<b id="sb-date"></b></span>
+      <button data-sb="1">Next day →</button>
+      <button data-sb="4">Skip 4 days ⏭</button>
+    </div>`);
+  document.querySelectorAll("[data-sb]").forEach((b) => (b.onclick = async () => {
+    if (busy || !S?.profile) return;
+    const label = b.textContent;
+    b.disabled = true;
+    b.textContent = "…";
+    await api("/api/demo/advance", { days: +b.dataset.sb, rate: 0 });
+    await refresh();
+    b.textContent = label;
+    b.disabled = false;
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }));
+}
+
+const _refresh = refresh;
+refresh = async () => {
+  await _refresh();
+  if (STUDY && $("sb-date")) $("sb-date").textContent = S.profile ? `Day ${S.day_offset + 1}` : "Onboarding";
+};
+
+studyBar();
 refresh();

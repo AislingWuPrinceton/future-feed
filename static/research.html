@@ -88,7 +88,7 @@ const FINAL_QS = [
   { k: "quote_ok", q: "Can I quote you anonymously in my report?", type: "choice", options: ["Yes", "No"] },
 ];
 const NAMES = { A: "Version A · plain streak tracker", B: "Version B · Future Feed" };
-const URLS = { A: "/?mode=plain", B: "/" };
+const URLS = { A: "/?mode=plain&study=1", B: "/?study=1" };
 const answers = { 1: {}, 2: {}, final: {} };
 
 function qHTML(q, group) {
@@ -126,10 +126,10 @@ function renderRounds() {
         <button class="btn primary" style="width:auto" data-open="${v}">Open ${v} in new tab</button>
       </p>
       <ol class="steps">
-        <li>They onboard with their own name, a real friend's name, and their habit.</li>
+        <li>They onboard with their own name, a real friend's name, and <b>the same one habit</b> each round.</li>
         <li>They tap <b>I did it</b> (day 1).</li>
-        <li>You: clock icon → <b>Next day</b>. They tap <b>I did it</b>.</li>
-        <li>You: clock icon → <b>Skip 4 days (slump)</b>. Let them react. They tap <b>I did it</b>.</li>
+        <li>You: black bar at the bottom → <b>Next day →</b>. They tap <b>I did it</b>.</li>
+        <li>You: black bar → <b>Skip 4 days ⏭</b>. Let them react${v === "B" ? " to the slump post" : ""}. They tap <b>I did it</b>.</li>
         <li>Say “Feel free to keep looking around. Tell me when you're done.” and start the timer.</li>
       </ol>
       <div class="row2">
@@ -194,6 +194,8 @@ async function saveRound(pos, version) {
     $(`ok-${pos}`).textContent = "Saved ✓";
     $(`round-${pos}`).classList.add("done");
     loadResults();
+    const next = pos === 1 ? $("round-2") : $("final");
+    next.scrollIntoView({ behavior: "smooth", block: "start" });
   } catch (err) {
     $(`err-${pos}`).textContent = err.message;
   }
@@ -242,7 +244,10 @@ function nextId(rows) {
   return "P" + ((nums.length ? Math.max(...nums) : 0) + 1);
 }
 
-$("next").onclick = () => location.reload();
+$("next").onclick = () => {
+  if (!$("final").classList.contains("done") && !confirm("Final questions aren't saved yet. Move on anyway?")) return;
+  location.reload();
+};
 $("pid").oninput = renderRounds;
 $("final-qs").innerHTML = FINAL_QS.map((q) => qHTML(q, "final")).join("");
 loadResults().then((rows) => { $("pid").value = nextId(rows); renderRounds(); });

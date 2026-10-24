@@ -139,3 +139,12 @@ table.usage th:nth-child(-n+2), table.usage td:nth-child(-n+2) { text-align: lef
 .events s { color: var(--muted); }
 .demo-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 14px; }
 .ring .lv { white-space: nowrap; }
+
+/* researcher bar (study mode only) */
+body.study .app { padding-bottom: 110px; }
+.studybar { position: fixed; left: 50%; transform: translateX(-50%); bottom: 14px; z-index: 15; display: flex; align-items: center; gap: 8px; background: #111; color: #fff; padding: 8px 8px 8px 16px; border-radius: 999px; box-shadow: 0 8px 24px rgba(0,0,0,.25); }
+.studybar .who { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: #aaa; margin-right: 4px; display: flex; flex-direction: column; line-height: 1.3; }
+.studybar .who b { color: #fff; font-size: 13px; letter-spacing: 0; text-transform: none; }
+.studybar button { border: 0; border-radius: 999px; padding: 10px 16px; font-weight: 700; font-size: 14px; background: #fff; color: #111; white-space: nowrap; }
+.studybar button + button { background: #f5a623; }
+.studybar button:disabled { opacity: .6; }
