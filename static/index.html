@@ -9,6 +9,7 @@
   <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
+<div class="shell">
   <main class="app">
     <header class="bar">
       <span class="logo">Future Feed</span>
@@ -30,6 +31,10 @@
       <form id="onboard-form">
         <label>Your first name<input id="ob-name" required maxlength="30" placeholder="Aisling"></label>
         <label>Your best friend's name<input id="ob-bestie" maxlength="30" placeholder="Jess"></label>
+        <div id="ob-avatar-wrap">
+          <p class="label">Pick your future self <small class="muted">(they level up with you)</small></p>
+          <div class="avpick" id="ob-avatar"></div>
+        </div>
         <p class="label">Your daily thing</p>
         <div class="pick" id="ob-habits"></div>
         <p class="err" id="ob-err"></p>
@@ -39,6 +44,7 @@
 
     <!-- game -->
     <section id="game" hidden>
+      <div class="me-top" id="me-top"></div>
       <div class="stories" id="stories"></div>
       <div id="today"></div>
 
@@ -50,6 +56,28 @@
       <div class="feed" id="feed"></div>
     </section>
   </main>
+  <aside class="side" id="side"></aside>
+</div>
+
+  <!-- story reel: your next ten years, played like Instagram stories -->
+  <div class="reel" id="reel" hidden>
+    <div class="reel-bars" id="reel-bars"></div>
+    <button class="reel-x" id="reel-x" aria-label="Close">×</button>
+    <div class="reel-stage" id="reel-stage"></div>
+    <button class="reel-nav prev" id="reel-prev" aria-label="Previous"></button>
+    <button class="reel-nav next" id="reel-next" aria-label="Next"></button>
+  </div>
+
+  <!-- change avatar -->
+  <div class="overlay" id="avsheet" hidden>
+    <div class="sheet">
+      <h2>Your future self</h2>
+      <p class="muted">Pick a character or use your photo. Your photo stays on this computer and is never sent to the AI.</p>
+      <div class="avpick" id="av-pick"></div>
+      <p class="err" id="av-err"></p>
+      <div class="row"><button class="btn" id="av-cancel">Cancel</button><button class="btn primary" id="av-save">Save</button></div>
+    </div>
+  </div>
 
   <!-- level-up celebration -->
   <div class="overlay" id="levelup" hidden>

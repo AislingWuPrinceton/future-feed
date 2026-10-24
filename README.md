@@ -48,7 +48,9 @@ You need Python 3.10 or newer and an internet connection to load the photos.
 | Daily posts | Every check-in writes a new post. The story remembers earlier posts and recurring friends. About 30% of days bring a random life event (a "plot twist"). |
 | Boss | Three or more days without a check-in brings a worried post from future you. Check in three days in a row to save the moment. |
 | Combo | Two habits at Level 3 or higher collide in one surprise post. |
-| Two timelines | Each post has a twin from the you who stopped: same date, gray photo, wistful caption. |
+| Two timelines | Each post has a twin from the you who stopped: same date, an everyday-life photo, wistful caption. |
+| Future-self avatar | Pick a character or upload a photo (kept on this computer, never sent to the AI). It evolves with your level: ring, habit badge at Lv3, gold at Lv4, crown at Lv5, animated rainbow at Lv6. |
+| Play your next 10 years | Plays your kept-going posts in date order as full-screen stories, a video-style recap. |
 
 ## Agents and tools
 

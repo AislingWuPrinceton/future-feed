@@ -30,6 +30,7 @@ async function refresh() {
   if (!onboarded) return renderOnboard();
   renderStories();
   renderToday();
+  renderMe();
   document.querySelector(".seg").hidden = PLAIN;
   if (PLAIN) {
     $("feed").innerHTML = "";
@@ -90,6 +91,8 @@ const picked = (el) => [...el.querySelectorAll(".pick-item.on")].map((i) => ({
 }));
 
 function renderOnboard() {
+  $("ob-avatar-wrap").hidden = PLAIN;
+  if (!PLAIN && !$("ob-avatar").children.length) readOnboardAvatar = avatarPicker($("ob-avatar"));
   if (PLAIN) {  // control group must not hear about the future feed
     document.querySelector(".onboard .kicker").textContent = "Daily habits";
     document.querySelector(".onboard h1").textContent = "Build a streak.";
@@ -123,6 +126,7 @@ $("onboard-form").onsubmit = async (e) => {
   if (!habits.length) return ($("ob-err").textContent = "Pick at least one daily thing.");
   try {
     await api("/api/profile", { name: $("ob-name").value, bestie: $("ob-bestie").value });
+    if (!PLAIN) await api("/api/avatar", readOnboardAvatar());
   } catch (err) {
     return ($("ob-err").textContent = err.message);
   }
@@ -215,7 +219,7 @@ async function checkin(id) {
       const h = S.habits.find((x) => x.id === id);
       const lower = (t) => t.charAt(0).toLowerCase() + t.slice(1).replace(/\.$/, "");
       $("lu-level").textContent = h.level;
-      $("lu-emoji").textContent = h.emoji;
+      $("lu-emoji").innerHTML = avatarHTML(104);
       $("lu-title").textContent = h.allowed_milestone ? `Future you ${lower(h.allowed_milestone.milestone)}.` : "A new chapter begins.";
       $("lu-sub").textContent = h.next_milestone ? `Next chapter: ${lower(h.next_milestone.milestone)}.` : "You've reached the top of this story.";
       $("lu-dots").innerHTML = Array.from({ length: 6 }, (_, i) =>
@@ -236,7 +240,7 @@ async function checkin(id) {
 function writingCard(habit) {
   return `
     <article class="post writing" id="writing">
-      <div class="ph"><span class="av"><span>${esc(S.profile.name[0] || "Y")}</span></span>
+      <div class="ph">${avatarHTML(36)}
         <span class="who">${esc(S.profile.handle)}<span class="where">traveling through time…</span></span></div>
       <div class="media warp">
         <div class="year" id="w-year">${S.today.slice(0, 4)}</div>
@@ -312,7 +316,7 @@ async function renderFeed() {
     const basis = timeline === "kept" && b ? `Reality check ✓ fits your current pace · ${b === "estimate" ? "milestone is an estimate" : esc(b)}<br>` : "";
     return `
       <article class="post ${timeline} ${p.id === newestPostId || p.id === newestPostId + 1 ? "new" : ""}">
-        <div class="ph"><span class="av"><span>${esc(prof.name[0] || "Y")}</span></span>
+        <div class="ph">${avatarHTML(36, { gray: timeline === "stopped", tier: timeline === "stopped" ? 0 : undefined })}
           <span class="who">${esc(handle)}<span class="where">${esc(p.location || "")}</span></span></div>
         <div class="media">${photo}${BADGE[p.kind] && timeline === "kept" ? `<span class="badge ${p.kind}">${BADGE[p.kind]}</span>` : ""}</div>
         <div class="acts">${HEART}${BUBBLE}${SEND}</div>
@@ -394,6 +398,178 @@ document.querySelectorAll(".overlay").forEach((o) => o.addEventListener("click",
 function esc(s) {
   return String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 }
+
+// ---------- future-self avatar: evolves with your highest level ----------
+// Lv1-2 Instagram ring · Lv3 habit badge · Lv4 gold ring · Lv5 crown · Lv6 animated rainbow ring
+
+function tier() {
+  return Math.max(0, ...(S?.habits || []).map((h) => h.level));
+}
+
+function avatarHTML(size, opts = {}) {
+  const av = S?.profile?.avatar || {};
+  const t = opts.tier ?? tier();
+  const top = [...(S?.habits || [])].sort((a, b) => b.level - a.level)[0];
+  const face = av.photo
+    ? `<img src="${av.photo}" alt="">`
+    : `<span class="face" style="font-size:${Math.round(size * 0.52)}px">${av.character || (S?.profile?.name || "Y")[0]}</span>`;
+  return `<span class="avx t${t} ${opts.gray ? "gray" : ""}" style="width:${size}px;height:${size}px">
+      <span class="avx-in">${face}</span>
+      ${t >= 3 && top && size >= 44 ? `<span class="avx-badge">${top.emoji}</span>` : ""}
+      ${t >= 5 && size >= 44 ? `<span class="avx-crown">👑</span>` : ""}
+    </span>`;
+}
+
+const TIER_NAME = ["Day zero", "Getting started", "Building", "On a roll", "Gold streaker", "Crowned", "Legend"];
+
+function avatarPicker(el, current = {}) {
+  let choice = { ...current };
+  const draw = () => {
+    el.innerHTML = (S?.avatar_characters || ["🦊", "🐼", "🐱", "🐰", "🐻", "🐨", "🐸", "🦁", "🐧", "🙂"]).map((c) =>
+      `<button type="button" class="avopt ${choice.character === c && !choice.photo ? "on" : ""}" data-c="${c}">${c}</button>`).join("") +
+      `<label class="avopt up ${choice.photo ? "on" : ""}">${choice.photo ? `<img src="${choice.photo}" alt="">` : "📷"}<input type="file" accept="image/*" hidden></label>`;
+    el.querySelectorAll("[data-c]").forEach((b) => (b.onclick = () => { choice = { character: b.dataset.c }; draw(); }));
+    el.querySelector("input[type=file]").onchange = async (e) => {
+      const file = e.target.files[0];
+      if (file) { choice = { photo: await shrink(file, 256) }; draw(); }
+    };
+  };
+  if (!choice.character && !choice.photo) choice = { character: "🦊" };
+  draw();
+  return () => choice;
+}
+
+// square-crop and shrink in the browser so only a small image is stored
+function shrink(file, size) {
+  return new Promise((ok, fail) => {
+    const img = new Image();
+    img.onload = () => {
+      const c = document.createElement("canvas");
+      c.width = c.height = size;
+      const side = Math.min(img.width, img.height);
+      c.getContext("2d").drawImage(img, (img.width - side) / 2, (img.height - side) / 2, side, side, 0, 0, size, size);
+      ok(c.toDataURL("image/jpeg", 0.82));
+    };
+    img.onerror = fail;
+    img.src = URL.createObjectURL(file);
+  });
+}
+
+let readOnboardAvatar = () => ({ character: "🦊" });
+
+$("av-cancel").onclick = () => ($("avsheet").hidden = true);
+let readSheetAvatar = null;
+function openAvatarSheet() {
+  readSheetAvatar = avatarPicker($("av-pick"), S.profile.avatar || {});
+  $("av-err").textContent = "";
+  $("avsheet").hidden = false;
+}
+$("av-save").onclick = async () => {
+  try {
+    await api("/api/avatar", readSheetAvatar());
+    $("avsheet").hidden = true;
+    refresh();
+  } catch (err) {
+    $("av-err").textContent = err.message;
+  }
+};
+
+// ---------- profile card: sidebar on desktop, header on phones ----------
+
+function renderMe() {
+  if (PLAIN) { $("me-top").innerHTML = ""; $("side").innerHTML = ""; return; }
+  const p = S.profile, t = tier();
+  const total = S.habits.reduce((n, h) => n + h.checkins, 0);
+  const best = Math.max(0, ...S.habits.map((h) => h.streak));
+  const chapters = S.habits.reduce((n, h) => n + Math.max(0, h.allowed_chapter + 1), 0);
+  const stats = `<div class="me-stats"><span><b>${total}</b>check-ins</span><span><b>${best}</b>streak</span><span><b>${chapters}</b>chapters</span></div>`;
+  const play = `<button class="btn play" data-play>▶ Play your next 10 years</button>`;
+  $("me-top").innerHTML = `
+    <div class="me-row">
+      <button class="me-av" data-avatar title="Change your future self">${avatarHTML(72)}</button>
+      <div class="me-info"><b>${esc(p.handle)}</b><span class="tier">${TIER_NAME[t]}</span>${stats}</div>
+    </div>${play}`;
+  $("side").innerHTML = `
+    <div class="side-card">
+      <button class="me-av big" data-avatar title="Change your future self">${avatarHTML(112)}</button>
+      <h2>${esc(p.name)} <span class="muted">in 2036</span></h2>
+      <p class="tier">${TIER_NAME[t]} · Level ${t}</p>
+      ${stats}
+      ${play}
+      <div class="side-habits">${S.habits.map((h) => `
+        <div class="sh"><span>${h.emoji} ${esc(h.short)}</span><span class="muted">Lv ${h.level}</span></div>
+        <div class="dots small">${Array.from({ length: 6 }, (_, i) => `<i class="${i <= h.allowed_chapter ? "on" : ""}"></i>`).join("")}</div>
+        <p class="sh-next">${h.next_milestone ? "Next: " + esc(h.next_milestone.milestone) : "Top of the ladder"}</p>`).join("")}
+      </div>
+      <p class="muted small">Your avatar levels up with you: ring at Lv1, habit badge at Lv3, gold at Lv4, crown at Lv5.</p>
+    </div>`;
+  document.querySelectorAll("[data-avatar]").forEach((b) => (b.onclick = openAvatarSheet));
+  document.querySelectorAll("[data-play]").forEach((b) => (b.onclick = playReel));
+}
+
+// ---------- story reel: the kept-going feed in date order, played like Instagram stories ----------
+
+let reel = null;
+async function playReel() {
+  const posts = (await api("/api/feed?timeline=kept")).filter((p) => p.kind !== "boss")
+    .sort((a, b) => a.future_date.localeCompare(b.future_date));
+  const slides = [{ intro: true }, ...posts, { outro: true }];
+  if (!posts.length) return alert("Check in first. Your story starts with your first post.");
+  $("reel-bars").innerHTML = slides.map(() => "<i><b></b></i>").join("");
+  $("reel").hidden = false;
+  reel = { slides, i: 0, timer: null };
+  showSlide();
+}
+
+function showSlide() {
+  const { slides, i } = reel;
+  const s = slides[i];
+  clearTimeout(reel.timer);
+  [...$("reel-bars").children].forEach((bar, k) => {
+    bar.className = k < i ? "done" : k === i ? "now" : "";
+  });
+  const p = S.profile;
+  if (s.intro) {
+    $("reel-stage").innerHTML = `<div class="slide intro">${avatarHTML(120, { tier: 0 })}
+      <h1>${esc(p.name)}, the next ten years</h1><p>${S.today.slice(0, 4)} → 2036</p></div>`;
+  } else if (s.outro) {
+    $("reel-stage").innerHTML = `<div class="slide intro">${avatarHTML(120)}
+      <h1>This future is on its way.</h1><p>Check in tomorrow to write the next chapter.</p></div>`;
+  } else {
+    const year = s.future_date.slice(0, 4);
+    $("reel-stage").innerHTML = `
+      <div class="slide">
+        ${s.photo ? `<img class="kb" src="${s.photo.url}" alt="" referrerpolicy="no-referrer">` : `<div class="kb fallback">${emojiFor(s.habit_key)}</div>`}
+        <div class="slide-year">${year}</div>
+        <div class="slide-cap"><div class="slide-who">${avatarHTML(32)}<b>${esc(p.handle)}</b><span>${esc(s.location || "")}</span></div>
+          <p>${esc(s.caption)}</p></div>
+      </div>`;
+  }
+  reel.timer = setTimeout(() => step(1), s.intro || s.outro ? 3000 : 5000);
+}
+
+function step(d) {
+  if (!reel) return;
+  const n = reel.i + d;
+  if (n < 0) return;
+  if (n >= reel.slides.length) return closeReel();
+  reel.i = n;
+  showSlide();
+}
+function closeReel() {
+  if (reel) clearTimeout(reel.timer);
+  reel = null;
+  $("reel").hidden = true;
+}
+$("reel-next").onclick = () => step(1);
+$("reel-prev").onclick = () => step(-1);
+$("reel-x").onclick = closeReel;
+document.addEventListener("keydown", (e) => {
+  if (!reel) return;
+  if (e.key === "ArrowRight") step(1);
+  if (e.key === "ArrowLeft") step(-1);
+  if (e.key === "Escape") closeReel();
+});
 
 function studyBar() {
   if (!STUDY) return;

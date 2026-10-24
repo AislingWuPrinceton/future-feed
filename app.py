@@ -170,6 +170,32 @@ def set_profile(body: ProfileIn):
     return {"ok": True}
 
 
+AVATAR_CHARACTERS = ["🦊", "🐼", "🐱", "🐰", "🐻", "🐨", "🐸", "🦁", "🐧", "🙂"]
+PHOTO_URL = re.compile(r"^data:image/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$")
+
+
+class AvatarIn(BaseModel):
+    character: str = ""
+    photo: str = ""   # small data URL made in the browser; stays on this machine, never sent to the AI
+
+
+@app.post("/api/avatar")
+def set_avatar(body: AvatarIn):
+    prof = profile()
+    if not prof:
+        raise HTTPException(400, "Create your profile first.")
+    if body.photo:
+        if not PHOTO_URL.match(body.photo) or len(body.photo) > 400_000:
+            raise HTTPException(400, "Use a JPEG or PNG under about 300 KB.")
+        prof["avatar"] = {"photo": body.photo}
+    elif body.character in AVATAR_CHARACTERS:
+        prof["avatar"] = {"character": body.character}
+    else:
+        raise HTTPException(400, "Pick one of the characters.")
+    db.set_setting("profile", prof)
+    return {"ok": True}
+
+
 @app.get("/api/state")
 def state(plain: bool = False):
     if profile() and not plain:
@@ -181,6 +207,7 @@ def state(plain: bool = False):
         "habits": [game.stats(h) for h in active_habits()],
         "templates": [{k: t[k] for k in ("key", "label", "short", "emoji", "unit", "default_amount")} for t in game.HABITS["habits"]],
         "level_checkins": game.LEVEL_CHECKINS,
+        "avatar_characters": AVATAR_CHARACTERS,
     }
 
 
