@@ -1,5 +1,7 @@
 # Future Feed
 
+Repo: https://github.com/AislingWuPrinceton/future-feed
+
 **Check in on one small habit a day. Each check-in writes the next post on your Instagram from ten years from now.**
 
 Most habit apps only record streaks, so people get bored and quit. Future Feed turns a habit into an unfolding story about your future self. Check-ins unlock new chapters, your real pace decides how far those chapters can reach, slumps trigger a "boss," and a second feed shows the you who stopped.
@@ -10,7 +12,7 @@ You need Python 3.10 or newer and an internet connection to load the photos.
 
 1. Clone the repo and enter the folder.
    ```bash
-   git clone <repo-url> future-feed
+   git clone https://github.com/AislingWuPrinceton/future-feed.git
    cd future-feed
    ```
 2. Create a virtual environment and install dependencies.
