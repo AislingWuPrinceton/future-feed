@@ -63,6 +63,13 @@ const picked = (el) => [...el.querySelectorAll(".pick-item")]
   .map((i) => ({ key: i.dataset.key, amount: +i.querySelector("input[type=number]").value }));
 
 function renderOnboard() {
+  if (PLAIN) {  // control group must not hear about the future feed
+    document.querySelector(".onboard .kicker").textContent = "Daily habits";
+    document.querySelector(".onboard h1").textContent = "Build a streak.";
+    document.querySelector(".onboard .muted").textContent = "Pick one small thing to do every day and check in each day you do it.";
+    document.querySelector("#onboard-form button[type=submit]").textContent = "Start";
+    $("ob-bestie").closest("label").hidden = true;
+  }
   if (!$("ob-habits").children.length) pickList($("ob-habits"), "guitar");
 }
 
