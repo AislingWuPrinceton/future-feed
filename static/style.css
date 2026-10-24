@@ -148,3 +148,41 @@ body.study .app { padding-bottom: 110px; }
 .studybar button { border: 0; border-radius: 999px; padding: 10px 16px; font-weight: 700; font-size: 14px; background: #fff; color: #111; white-space: nowrap; }
 .studybar button + button { background: #f5a623; }
 .studybar button:disabled { opacity: .6; }
+
+/* writing card while agents work */
+.writing .media.warp { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px;
+  background: linear-gradient(135deg, #f9ce34, #ee2a7b, #6228d7, #ee2a7b, #f9ce34); background-size: 400% 400%; animation: warp 6s ease infinite; color: #fff; }
+@keyframes warp { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
+.writing .year { font-size: 64px; font-weight: 800; letter-spacing: -2px; font-variant-numeric: tabular-nums; text-shadow: 0 4px 20px rgba(0,0,0,.2); }
+.writing .wstep { font-size: 14px; font-weight: 600; background: rgba(0,0,0,.25); padding: 6px 14px; border-radius: 999px; }
+.writing .wstep.in { animation: fadeup .4s ease; }
+@keyframes fadeup { from { opacity: 0; transform: translateY(6px); } }
+.writing .wbar { width: 60%; height: 4px; background: rgba(255,255,255,.35); border-radius: 2px; overflow: hidden; }
+.writing .wbar i { display: block; height: 100%; width: 0; background: #fff; animation: fill 9s ease-out forwards; }
+@keyframes fill { to { width: 95%; } }
+.skel { padding: 12px 14px; }
+.skel i { display: block; height: 10px; border-radius: 5px; margin: 8px 0; background: linear-gradient(90deg, #eee, #f7f7f7, #eee); background-size: 200% 100%; animation: shimmer 1.2s linear infinite; }
+@keyframes shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+
+/* habit picker v2 */
+.pick-item { display: block; cursor: pointer; }
+.pick-top { display: flex; align-items: center; gap: 10px; }
+.pick-top .cname { flex: 1; border: 0; background: none; font-size: 15px; padding: 2px 0; }
+.pick-top .amt { width: 64px; padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px; text-align: right; }
+.pick-more { display: none; margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--line); gap: 10px; }
+.pick-item.on .pick-more { display: grid; }
+.pick-more label { margin: 0; font-size: 12px; font-weight: 600; color: var(--muted); }
+.pick-more small { font-weight: 400; }
+.pick-more select, .pick-more input { display: block; width: 100%; margin-top: 4px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: #fff; font-size: 14px; color: var(--ink); font-weight: 400; }
+
+/* level-up celebration */
+.card { position: relative; overflow: hidden; }
+.lu-emoji { font-size: 64px; line-height: 1; animation: bounce 1s cubic-bezier(.2, 1.6, .4, 1); }
+@keyframes bounce { 0% { transform: scale(0) rotate(-30deg); } 100% { transform: none; } }
+.dots { display: flex; justify-content: center; gap: 6px; margin: 12px 0 4px; }
+.dots i { width: 22px; height: 6px; border-radius: 3px; background: #e5e5e5; }
+.dots i.on { background: var(--grad); }
+.dots i.now { box-shadow: 0 0 0 2px #fff, 0 0 0 3px #ee2a7b; }
+.confetti { position: absolute; inset: 0; pointer-events: none; }
+.confetti i { position: absolute; top: -10px; width: 7px; height: 12px; border-radius: 2px; opacity: .9; animation: fall linear forwards; }
+@keyframes fall { to { top: 110%; opacity: 0; } }

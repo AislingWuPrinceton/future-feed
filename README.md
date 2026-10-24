@@ -43,6 +43,7 @@ You need Python 3.10 or newer and an internet connection to load the photos.
 | Mechanic | Rule |
 |---|---|
 | Levels | Unlocked at 1, 3, 7, 14, 30, and 60 check-ins. Each level opens a new chapter, like "plays for friends" or "first open mic." |
+| Starting point and dream | Onboarding asks where you're starting (brand new → already pretty good) and your dream in a few words. Experienced people start further along the ladder, and the story steers toward your dream. |
 | Pace cap | Your real check-in rate is projected over ten years. A chapter your pace can't reach in ten years stays locked even if your level allows it. Post dates show *when* you'd get there at this pace. |
 | Daily posts | Every check-in writes a new post. The story remembers earlier posts and recurring friends. About 30% of days bring a random life event (a "plot twist"). |
 | Boss | Three or more days without a check-in brings a worried post from future you. Check in three days in a row to save the moment. |
@@ -56,7 +57,8 @@ You need Python 3.10 or newer and an internet connection to load the photos.
 | 1 | Game engine (Python, `game.py`) | Levels, streaks, ten-year projection, which milestone is allowed, boss and quest state. No AI. |
 | 2 | Story agent (`gpt-6-luna`) | Writes the next post and its "stopped" twin, continuing the story and cast. Returns a photo query and the claims it makes. |
 | 3 | Reality-check agent (`gpt-6-luna`) | Compares the post with the allowed milestone and rewrites anything that overclaims. |
-| 4 | Photo tool | Picks the best-matching Creative Commons photo from a local Openverse library (`data/photos.json`) and credits it. |
+| 4 | Photo tool | Picks the best-matching Creative Commons photo from a local Openverse library (`data/photos.json`) and credits it. The stopped timeline gets an everyday-life photo instead. |
+| 5 | Ladder agent (`gpt-6-luna`) | For a custom habit ("Something else"), designs a 6-step milestone ladder in practice hours, or refuses unsafe "habits" (e.g. checking an ex's profile, extreme calorie restriction). Its photos are fetched from Openverse once. |
 
 ## Data and sources (`data/habits.json`)
 
@@ -70,6 +72,7 @@ You need Python 3.10 or newer and an internet connection to load the photos.
 ## Safety built in
 
 - **Overclaiming:** the reality-check agent rewrites captions that exceed your real pace. Every rewrite, with before and after text, is shown in the **Safety log** (chart icon).
+- **Unsafe habits:** the Ladder agent refuses harmful custom habits, and refusals are logged in the Safety log.
 - **Prompt injection:** names you type are treated as data. Handles are sanitized and lengths are capped.
 - **Runaway cost:** each call has an output cap and a daily token cap (`FUTUREFEED_DAILY_TOKEN_CAP`), with one check-in per habit per day.
 - **Tone:** the stopped timeline is wistful, never shaming.

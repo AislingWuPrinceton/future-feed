@@ -41,35 +41,53 @@ async function refresh() {
 
 // ---------- onboarding / add habit ----------
 
+const START = ["Brand new", "Tried it a little", "Comfortable with basics", "Already pretty good"];
+
+function pickItem(t, on) {
+  const custom = t.key === "custom";
+  return `
+    <div class="pick-item ${on ? "on" : ""}" data-key="${t.key}">
+      <div class="pick-top">
+        <span class="em">${t.emoji}</span>
+        ${custom ? `<input class="cname" maxlength="40" placeholder="Something else: meditate, draw, piano…">` : `<span class="name">${t.label}</span>`}
+        <input type="number" class="amt" min="1" max="240" value="${t.default_amount}" aria-label="amount">
+        <span class="unit">${t.unit === "dollars" ? "$ / day" : "min / day"}</span>
+      </div>
+      <div class="pick-more">
+        <label>Where are you starting?
+          <select class="lvl">${START.map((x, i) => `<option value="${i}">${x}</option>`).join("")}</select></label>
+        <label>Your dream, in a few words <small>(optional)</small>
+          <input class="goal" maxlength="100" placeholder="${custom ? "e.g. finish a 10-day retreat" : t.goal_hint || "e.g. play at my sister's wedding"}"></label>
+      </div>
+    </div>`;
+}
+
 function pickList(el, preselect) {
-  el.innerHTML = S.templates.map((t) => `
-    <label class="pick-item ${t.key === preselect ? "on" : ""}" data-key="${t.key}">
-      <input type="checkbox" hidden ${t.key === preselect ? "checked" : ""}>
-      <span class="em">${t.emoji}</span><span class="name">${t.label}</span>
-      <input type="number" min="1" max="240" value="${t.default_amount}" aria-label="amount">
-      <span class="unit">${t.unit === "dollars" ? "$ / day" : "min / day"}</span>
-    </label>`).join("");
+  const all = [...S.templates, { key: "custom", label: "Something else", emoji: "✨", unit: "minutes", default_amount: 15 }];
+  el.innerHTML = all.map((t) => pickItem(t, t.key === preselect)).join("");
   el.querySelectorAll(".pick-item").forEach((item) => {
     item.addEventListener("click", (e) => {
-      if (e.target.type === "number") return;
-      e.preventDefault();
-      const box = item.querySelector("input[type=checkbox]");
-      box.checked = !box.checked;
-      if (STUDY && box.checked) {  // same single habit in both versions keeps the A/B comparison fair
-        el.querySelectorAll(".pick-item").forEach((other) => {
-          if (other === item) return;
-          other.classList.remove("on");
-          other.querySelector("input[type=checkbox]").checked = false;
-        });
+      if (e.target.closest("input, select, label")) {
+        if (e.target.classList.contains("cname") && !item.classList.contains("on")) select(el, item, true);
+        return;
       }
-      item.classList.toggle("on", box.checked);
+      select(el, item, !item.classList.contains("on"));
     });
   });
 }
 
-const picked = (el) => [...el.querySelectorAll(".pick-item")]
-  .filter((i) => i.querySelector("input[type=checkbox]").checked)
-  .map((i) => ({ key: i.dataset.key, amount: +i.querySelector("input[type=number]").value }));
+function select(el, item, on) {
+  if (STUDY && on) el.querySelectorAll(".pick-item").forEach((o) => o !== item && o.classList.remove("on"));  // one habit per round keeps A/B fair
+  item.classList.toggle("on", on);
+}
+
+const picked = (el) => [...el.querySelectorAll(".pick-item.on")].map((i) => ({
+  key: i.dataset.key,
+  amount: +i.querySelector(".amt").value,
+  start_level: +i.querySelector(".lvl").value,
+  goal: i.querySelector(".goal").value.trim(),
+  name: i.querySelector(".cname")?.value.trim() || "",
+}));
 
 function renderOnboard() {
   if (PLAIN) {  // control group must not hear about the future feed
@@ -82,17 +100,34 @@ function renderOnboard() {
   if (!$("ob-habits").children.length) pickList($("ob-habits"), "guitar");
 }
 
+// Adds each picked habit; a custom one waits on the Ladder agent and may be refused for safety.
+async function addHabits(list, errEl, btn) {
+  const label = btn.textContent;
+  btn.disabled = true;
+  const errors = [];
+  for (const h of list) {
+    btn.textContent = h.key === "custom" ? "Designing your path…" : "Adding…";
+    if (h.key === "custom" && !h.name) { errors.push("Name your custom daily thing."); continue; }
+    try { await api("/api/habits", h); } catch (err) { errors.push(err.message); }
+  }
+  btn.disabled = false;
+  btn.textContent = label;
+  errEl.textContent = errors.join(" ");
+  return errors.length < list.length;
+}
+
 $("onboard-form").onsubmit = async (e) => {
   e.preventDefault();
   const habits = picked($("ob-habits"));
+  if (!$("ob-name").value.trim()) return ($("ob-err").textContent = "Tell us your first name.");
   if (!habits.length) return ($("ob-err").textContent = "Pick at least one daily thing.");
   try {
     await api("/api/profile", { name: $("ob-name").value, bestie: $("ob-bestie").value });
-    for (const h of habits) await api("/api/habits", h);
-    refresh();
   } catch (err) {
-    $("ob-err").textContent = err.message;
+    return ($("ob-err").textContent = err.message);
   }
+  const btn = document.querySelector("#onboard-form button[type=submit]");
+  if (await addHabits(habits, $("ob-err"), btn)) refresh();
 };
 
 function openAdd() {
@@ -104,13 +139,10 @@ function openAdd() {
 }
 $("add-cancel").onclick = () => ($("add").hidden = true);
 $("add-save").onclick = async () => {
-  try {
-    for (const h of picked($("add-habits"))) await api("/api/habits", h);
-    $("add").hidden = true;
-    refresh();
-  } catch (err) {
-    $("add-err").textContent = err.message;
-  }
+  const list = picked($("add-habits"));
+  if (!list.length) return ($("add-err").textContent = "Pick something to add.");
+  if (await addHabits(list, $("add-err"), $("add-save")) && !$("add-err").textContent) $("add").hidden = true;
+  refresh();
 };
 
 // ---------- stories + today ----------
@@ -170,27 +202,76 @@ async function checkin(id) {
   }
   timeline = "kept";
   syncSeg();
-  $("feed").insertAdjacentHTML("afterbegin", `<p class="thinking" id="writing">Writing your future</p>`);
+  $("feed").insertAdjacentHTML("afterbegin", writingCard(habit));
+  const stop = animateWriting();
   $("feed").querySelector(".locked")?.remove();
   try {
     const r = await api(`/api/habits/${id}/checkin`, {});
     newestPostId = r.post_id;
+    stop();
     busy = false;
     await refresh();
     if (r.kind === "level_up") {
       const h = S.habits.find((x) => x.id === id);
+      const lower = (t) => t.charAt(0).toLowerCase() + t.slice(1).replace(/\.$/, "");
       $("lu-level").textContent = h.level;
-      $("lu-title").textContent = h.allowed_milestone ? `Future you ${h.allowed_milestone.milestone}.` : "A new chapter begins.";
-      $("lu-sub").textContent = h.next_milestone ? `Next: ${h.next_milestone.milestone}.` : "You've reached the top of this story.";
+      $("lu-emoji").textContent = h.emoji;
+      $("lu-title").textContent = h.allowed_milestone ? `Future you ${lower(h.allowed_milestone.milestone)}.` : "A new chapter begins.";
+      $("lu-sub").textContent = h.next_milestone ? `Next chapter: ${lower(h.next_milestone.milestone)}.` : "You've reached the top of this story.";
+      $("lu-dots").innerHTML = Array.from({ length: 6 }, (_, i) =>
+        `<i class="${i <= h.allowed_chapter ? "on" : ""} ${i === h.allowed_chapter ? "now" : ""}"></i>`).join("");
+      confetti();
       $("levelup").hidden = false;
     }
   } catch (err) {
+    stop();
     busy = false;
     $("writing")?.remove();
     alert(err.message);
     refresh();
   }
 }
+// While the agents work (~5-10 s): a post-shaped card, a year counter rolling forward,
+// and status lines that follow the real pipeline (game engine -> story -> reality check -> photo).
+function writingCard(habit) {
+  return `
+    <article class="post writing" id="writing">
+      <div class="ph"><span class="av"><span>${esc(S.profile.name[0] || "Y")}</span></span>
+        <span class="who">${esc(S.profile.handle)}<span class="where">traveling through time…</span></span></div>
+      <div class="media warp">
+        <div class="year" id="w-year">${S.today.slice(0, 4)}</div>
+        <div class="wstep" id="w-step">Counting your ${esc(habit.short.toLowerCase())} check-ins</div>
+        <div class="wbar"><i></i></div>
+      </div>
+      <div class="skel"><i style="width:40%"></i><i style="width:90%"></i><i style="width:70%"></i></div>
+    </article>`;
+}
+
+function animateWriting() {
+  const steps = ["Counting your check-ins and pace", "Story agent is writing your next chapter",
+    "Reality check: does this fit your real pace?", "Finding a photo for the moment", "Almost there"];
+  let year = +S.today.slice(0, 4), i = 0;
+  const yr = setInterval(() => {
+    year = year >= 2036 ? +S.today.slice(0, 4) : year + 1;
+    const el = $("w-year");
+    if (el) el.textContent = year;
+  }, 260);
+  const st = setInterval(() => {
+    i = Math.min(i + 1, steps.length - 1);
+    const el = $("w-step");
+    if (el) { el.classList.remove("in"); void el.offsetWidth; el.textContent = steps[i]; el.classList.add("in"); }
+  }, 1800);
+  return () => { clearInterval(yr); clearInterval(st); };
+}
+
+function confetti() {
+  const colors = ["#f9ce34", "#ee2a7b", "#6228d7", "#0095f6", "#1a9c5b"];
+  $("confetti").innerHTML = Array.from({ length: 40 }, () => {
+    const x = Math.random() * 100, d = 0.8 + Math.random() * 1.2, r = Math.random() * 360;
+    return `<i style="left:${x}%;background:${colors[Math.floor(Math.random() * 5)]};animation-duration:${d}s;transform:rotate(${r}deg)"></i>`;
+  }).join("");
+}
+
 $("lu-close").onclick = () => ($("levelup").hidden = true);
 
 // ---------- feed ----------

@@ -20,7 +20,16 @@ app = FastAPI(title="Future Feed")
 db.init()
 app.mount("/static", StaticFiles(directory=os.path.join(ROOT, "static")), name="static")
 
+
+@app.middleware("http")
+async def revalidate_static(request, call_next):
+    response = await call_next(request)
+    if request.url.path.startswith("/static/"):
+        response.headers["Cache-Control"] = "no-cache"
+    return response
+
 HANDLE = re.compile(r"[^a-z0-9._]")
+NO_CACHE = {"Cache-Control": "no-cache"}  # always revalidate pages so testers never see a stale version
 
 
 def clean_handle(text, fallback):
@@ -56,15 +65,16 @@ def generate_post(habit, kind, life_event="", combo_with=None):
     nxt = st["next_milestone"]["milestone"] if st["next_milestone"] else "none"
 
     if kind in ("boss", "comeback"):
-        at_risk_chapter = min(ch + 1, len(game.TEMPLATES[habit["key"]]["chapters"]) - 1)
-        future = game.future_date_for(st, at_risk_chapter, salt=st["checkins"])
+        at_risk_chapter = min(ch + 1, len(game.template_for(habit)["chapters"]) - 1)
+        future = game.future_date_for(st, habit, at_risk_chapter, salt=st["checkins"])
     else:
-        future = game.future_date_for(st, max(ch, 0), salt=st["checkins"])
+        future = game.future_date_for(st, habit, max(ch, 0), salt=st["checkins"])
 
     context = {
         "profile": {"name": prof["name"], "handle": prof["handle"]},
         "cast": prof["cast"],
-        "habit": {"label": st["label"], "daily_amount": f"{st['amount']} {st['unit']}"},
+        "habit": {"label": st["label"], "daily_amount": f"{st['amount']} {st['unit']}",
+                  "started_as": START_LEVELS[st["start_level"]], "personal_goal": st["goal"]},
         "post_kind": kind,
         "future_date": future,
         "allowed_milestone": allowed,
@@ -93,7 +103,11 @@ def generate_post(habit, kind, life_event="", combo_with=None):
     with db.connect() as c:
         used = [json.loads(r["photo"])["url"] for r in c.execute("SELECT photo FROM posts WHERE photo IS NOT NULL")
                 if r["photo"] and r["photo"] != "null"]
-    photo = agents.find_photo(s["photo_query"], habit["key"], avoid=used)
+    custom_pool = game.template_for(habit).get("photos") if habit.get("custom") else None
+    anchor = game.template_for(habit)["short"].lower() if custom_pool else None
+    photo = agents.find_photo(s["photo_query"], habit["key"], avoid=used, pool=custom_pool, anchor=anchor)
+    # The you who stopped lives a different day: an everyday scene without the habit.
+    stopped_photo = agents.find_photo(s["stopped_photo_query"], "life", avoid=used)
     basis = st["allowed_milestone"]["basis"] if allowed_ok(st) else ""
     rng = random.Random(run_id)
     likes = rng.randint(12, 30) + 18 * max(ch, 0) + (40 if kind in ("level_up", "comeback", "combo") else 0)
@@ -112,7 +126,7 @@ def generate_post(habit, kind, life_event="", combo_with=None):
             (habit["id"], "stopped", kind, st["level"], future, s["stopped_caption"], "",
              json.dumps([{"handle": prof["cast"][0]["handle"], "text": s["stopped_comment"]}] if s["stopped_comment"] else [],
                         ensure_ascii=False),
-             max(3, likes // 6), json.dumps(photo), "", game.today().isoformat(), run_id))
+             max(3, likes // 6), json.dumps(stopped_photo), "", game.today().isoformat(), run_id))
         post_id = cur.lastrowid
     return {"post_id": post_id, "kind": kind, "usage": db.run_usage(run_id),
             "fixed": not check["passes"], "problem": check["problem"]}
@@ -170,22 +184,69 @@ def state(plain: bool = False):
     }
 
 
+START_LEVELS = ["brand new to it", "has tried it a little", "already comfortable with the basics", "already pretty good"]
+
+
 class HabitIn(BaseModel):
     key: str
     amount: int
+    start_level: int = 0
+    goal: str = ""
+    name: str = ""   # only for key == "custom"
+
+
+def make_custom(body):
+    """Ladder agent designs milestones for a habit we have no data for, or refuses an unsafe one."""
+    name = body.name.strip()[:40]
+    if not name:
+        raise HTTPException(400, "Name your daily thing.")
+    run_id = uuid.uuid4().hex[:12]
+    try:
+        lad = agents.build_ladder(run_id, name, body.amount)
+    except agents.BudgetExceeded as e:
+        raise HTTPException(429, str(e))
+    if not lad["allowed"]:
+        db.log_event(run_id, "habit_refused", json.dumps({"habit": name, "why": lad["refusal"]}))
+        raise HTTPException(400, lad["refusal"] or "That one isn't something Future Feed can help with.")
+    chapters, last = [], 0
+    for ch in lad["chapters"][:6]:  # keep only a sane, strictly increasing ladder
+        needs = float(ch["needs"])
+        if needs > last and needs <= 20000:
+            chapters.append({"needs": round(needs, 1), "milestone": ch["milestone"][:160],
+                             "basis": ("AI estimate: " + ch["basis"])[:120]})
+            last = needs
+    if len(chapters) < 3:
+        db.log_event(run_id, "ladder_rejected", json.dumps(lad["chapters"])[:500])
+        raise HTTPException(502, "Couldn't build a sensible plan for that one. Try wording it differently.")
+    template = {"key": "custom", "label": lad["label"][:40] or name, "short": (lad["short"] or name)[:14],
+                "emoji": lad["emoji"][:4] or "✨", "unit": "minutes", "measure": "hours",
+                "chapters": chapters, "sources": ["Milestones designed by the Ladder agent (estimates)."],
+                "photos": agents.fetch_photos(lad["photo_queries"])}
+    return template
 
 
 @app.post("/api/habits")
 def add_habit(body: HabitIn):
+    if body.key == "custom":
+        if not 1 <= body.amount <= 240 or not 0 <= body.start_level < len(START_LEVELS):
+            raise HTTPException(400, "Pick an amount between 1 and 240.")
+        template = make_custom(body)
+        with db.connect() as c:
+            c.execute("INSERT INTO habits (key, amount, started_on, start_level, goal, custom) VALUES (?,?,?,?,?,?)",
+                      ("custom-" + uuid.uuid4().hex[:6], body.amount, game.today().isoformat(), body.start_level,
+                       body.goal.strip()[:100], json.dumps(template, ensure_ascii=False)))
+        return {"ok": True, "label": template["label"]}
     if body.key not in game.TEMPLATES:
         raise HTTPException(400, "Unknown habit.")
     if not 1 <= body.amount <= 240:
         raise HTTPException(400, "Pick an amount between 1 and 240.")
     if any(h["key"] == body.key for h in active_habits()):
         raise HTTPException(400, "You're already tracking that one.")
+    if not 0 <= body.start_level < len(START_LEVELS):
+        raise HTTPException(400, "Unknown starting level.")
     with db.connect() as c:
-        c.execute("INSERT INTO habits (key, amount, started_on) VALUES (?,?,?)",
-                  (body.key, body.amount, game.today().isoformat()))
+        c.execute("INSERT INTO habits (key, amount, started_on, start_level, goal) VALUES (?,?,?,?,?)",
+                  (body.key, body.amount, game.today().isoformat(), body.start_level, body.goal.strip()[:100]))
     return {"ok": True}
 
 
@@ -353,12 +414,12 @@ def survey_csv():
 
 @app.get("/research")
 def research():
-    return FileResponse(os.path.join(ROOT, "static", "research.html"))
+    return FileResponse(os.path.join(ROOT, "static", "research.html"), headers=NO_CACHE)
 
 
 @app.get("/")
 def index():
-    return FileResponse(os.path.join(ROOT, "static", "index.html"))
+    return FileResponse(os.path.join(ROOT, "static", "index.html"), headers=NO_CACHE)
 
 
 if __name__ == "__main__":

@@ -19,6 +19,8 @@ SCENES = {
                 "morning run", "running track", "half marathon", "running group", "finish line"],
     "reading": ["reading book", "book club", "library", "bookstore", "books coffee",
                 "reading park", "bookshelf", "reading window", "used books", "reading train"],
+    "life": ["watching tv couch", "scrolling phone bed", "office desk night", "rainy window", "takeout food",
+             "subway commute", "laptop late night", "empty park bench", "coffee alone", "city street night"],
     "saving": ["piggy bank", "travel japan", "beach vacation", "new apartment keys", "road trip",
                "coffee shop laptop", "mountain hiking trip", "airport travel", "home office", "savings jar"],
 }
@@ -57,6 +59,10 @@ def collect(habit, queries):
 
 
 POOL = ThreadPoolExecutor(max_workers=10)
-pool = {habit: collect(habit, queries) for habit, queries in SCENES.items()}
+# Optional args rebuild only some sets, e.g. `python scripts/build_photo_pool.py life`; others are kept.
+import sys
+only = sys.argv[1:] or list(SCENES)
+pool = json.loads(OUT.read_text()) if OUT.exists() else {}
+pool.update({habit: collect(habit, SCENES[habit]) for habit in only})
 OUT.write_text(json.dumps(pool, ensure_ascii=False, indent=1))
 print("wrote", {k: len(v) for k, v in pool.items()})

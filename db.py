@@ -76,6 +76,10 @@ def init():
     DATA.mkdir(exist_ok=True)
     with connect() as c:
         c.executescript(SCHEMA)
+        cols = {r["name"] for r in c.execute("PRAGMA table_info(habits)")}
+        for col, ddl in (("start_level", "INTEGER DEFAULT 0"), ("goal", "TEXT DEFAULT ''"), ("custom", "TEXT")):
+            if col not in cols:
+                c.execute(f"ALTER TABLE habits ADD COLUMN {col} {ddl}")
 
 
 @contextmanager

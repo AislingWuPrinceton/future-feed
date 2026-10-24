@@ -38,6 +38,18 @@ def value_at(template, amount, adherence, years):
     raise ValueError(m)
 
 
+def template_for(habit):
+    """Built-in habits come from data/habits.json; custom ones carry an AI-built ladder in the db."""
+    if habit.get("custom"):
+        return json.loads(habit["custom"])
+    return TEMPLATES[habit["key"]]
+
+
+def baseline(template, start_level):
+    """What you already have before day 1: the threshold of the last chapter you've already reached."""
+    return template["chapters"][start_level - 1]["needs"] if start_level else 0
+
+
 def years_to(template, amount, adherence, needs):
     if adherence <= 0:
         return None
@@ -51,7 +63,8 @@ def years_to(template, amount, adherence, needs):
 
 def stats(habit):
     """Everything the UI and the agents need to know about one habit, today."""
-    t = TEMPLATES[habit["key"]]
+    t = template_for(habit)
+    start = habit.get("start_level") or 0
     now = today()
     with db.connect() as c:
         days = [date.fromisoformat(r["day"]) for r in
@@ -69,10 +82,11 @@ def stats(habit):
 
     level = sum(1 for n in LEVEL_CHECKINS if len(days) >= n)
     next_at = next((n for n in LEVEL_CHECKINS if len(days) < n), None)
-    projected = value_at(t, habit["amount"], adherence, YEARS)
+    projected = baseline(t, start) + value_at(t, habit["amount"], adherence, YEARS)
     chapters = t["chapters"]
     reachable = max([i for i, ch in enumerate(chapters) if ch["needs"] <= projected], default=-1)
-    allowed = min(level - 1, reachable)  # story can't run ahead of check-ins OR of real pace
+    # story can't run ahead of check-ins OR of real pace; experienced people start further along
+    allowed = min(start + level - 1, reachable)
     gap = (now - days[-1]).days if days else None
 
     quest_progress = 0
@@ -88,16 +102,17 @@ def stats(habit):
         "allowed_chapter": allowed,
         "allowed_milestone": chapters[allowed] if allowed >= 0 else None,
         "next_milestone": chapters[allowed + 1] if allowed + 1 < len(chapters) else None,
-        "capped_by_pace": level - 1 > reachable,
+        "capped_by_pace": start + level - 1 > reachable,
+        "start_level": start, "goal": habit.get("goal") or "", "custom": bool(habit.get("custom")),
         "quest": dict(quest) | {"progress": quest_progress} if quest else None,
     }
 
 
-def future_date_for(st, chapter_index, salt=0):
+def future_date_for(st, habit, chapter_index, salt=0):
     """When, at the current pace, you'd actually reach this chapter."""
-    t = TEMPLATES[st["key"]]
-    needs = t["chapters"][max(chapter_index, 0)]["needs"]
-    yrs = years_to(t, st["amount"], max(st["adherence"], 0.05), needs) or YEARS
+    t = template_for(habit)
+    needs = t["chapters"][max(chapter_index, 0)]["needs"] - baseline(t, habit.get("start_level") or 0)
+    yrs = years_to(t, st["amount"], max(st["adherence"], 0.05), max(needs, 0)) or YEARS
     yrs = max(yrs, 0.25)
     d = today() + timedelta(days=int(yrs * 365) + (salt * 17) % 40)
     return d.isoformat()
