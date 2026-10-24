@@ -97,8 +97,10 @@ def init():
         for col, ddl in (("start_level", "INTEGER DEFAULT 0"), ("goal", "TEXT DEFAULT ''"), ("custom", "TEXT")):
             if col not in cols:
                 c.execute(f"ALTER TABLE habits ADD COLUMN {col} {ddl}")
-        if "chapter" not in {r["name"] for r in c.execute("PRAGMA table_info(posts)")}:
-            c.execute("ALTER TABLE posts ADD COLUMN chapter INTEGER")
+        post_cols = {r["name"] for r in c.execute("PRAGMA table_info(posts)")}
+        for col in ("chapter INTEGER", "letter TEXT", "postmark TEXT"):
+            if col.split()[0] not in post_cols:
+                c.execute(f"ALTER TABLE posts ADD COLUMN {col}")
 
 
 @contextmanager

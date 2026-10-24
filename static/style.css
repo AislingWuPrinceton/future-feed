@@ -362,3 +362,159 @@ body.study .page { padding-bottom: 120px; }
 .add-btn { padding: 6px 12px; font-size: 13px; box-shadow: 2px 2px 0 var(--ink); background: var(--yellow); }
 .ok-msg { color: #3c8a3a; font-size: 13px; margin: 0; min-height: 0; }
 #another-custom { justify-self: start; margin-top: 2px; }
+
+/* ---------- postcard: a real two-sided card ---------- */
+.pc-big { max-width: 460px; }
+.pc3d { width: min(440px, 88vw); perspective: 1600px; cursor: pointer; --rx: 0deg; --ry: 0deg; --gx: 50%; --gy: 50%; }
+.pc-inner { display: grid; transform-style: preserve-3d; transition: transform .9s cubic-bezier(.3, 1.25, .45, 1);
+  transform: rotateX(var(--rx)) rotateY(var(--ry)); }
+.pc-inner.flipped { transform: rotateX(var(--rx)) rotateY(calc(180deg + var(--ry))); }
+.pc-face { grid-area: 1 / 1; position: relative; background: #fff; padding: 12px 12px 16px; backface-visibility: hidden; -webkit-backface-visibility: hidden;
+  box-shadow: 4px 10px 30px rgba(0,0,0,.28); }
+.pc-face::after { content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: radial-gradient(circle at var(--gx) var(--gy), rgba(255,255,255,.35), transparent 45%); mix-blend-mode: soft-light; }
+.pc-face.back { transform: rotateY(180deg); display: grid; grid-template-columns: 1.25fr 1fr; gap: 12px; padding: 20px 18px;
+  background: #fffdf6 repeating-linear-gradient(transparent 0 31px, #e6dcc9 31px 32px); }
+.pc3d.stopped .pc-big-photo, .pc3d.stopped .pc-face.back { filter: grayscale(1); }
+.turn-hint { position: absolute; right: 12px; bottom: 8px; font-family: var(--hand); font-size: 18px; color: var(--muted); animation: nudge 2.4s ease-in-out infinite; }
+@keyframes nudge { 0%, 70%, 100% { transform: none; } 80% { transform: rotate(-6deg); } 90% { transform: rotate(5deg); } }
+.pc-letter { border-right: 2px solid #e6dcc9; padding-right: 12px; display: flex; align-items: center; }
+.pc-letter p { font-family: var(--hand); font-size: 23px; line-height: 32px; color: #2b3a67; margin: 0; }
+.pc-right { display: flex; flex-direction: column; align-items: flex-end; gap: 10px; position: relative; }
+.stamp { width: 84px; padding: 6px; background: #fff; transform: rotate(4deg);
+  -webkit-mask: radial-gradient(circle 4px at 4px 4px, transparent 98%, #000) -4px -4px / 12px 12px;
+  mask: radial-gradient(circle 4px at 4px 4px, transparent 98%, #000) -4px -4px / 12px 12px; filter: drop-shadow(1px 2px 2px rgba(0,0,0,.2)); }
+.stamp-in { aspect-ratio: 1; background: #fff4e0; border: 1.5px solid var(--ink); display: flex; align-items: center; justify-content: center; overflow: hidden; }
+.stamp-in img { width: 100%; height: 100%; object-fit: cover; }
+.stamp-in .ico { width: 70%; height: 70%; }
+.stamp span { display: block; text-align: center; font-family: var(--hand); font-size: 16px; font-weight: 700; color: var(--pink); }
+.postmark { position: absolute; right: 48px; top: 50px; width: 104px; transform: rotate(-14deg); opacity: .78; pointer-events: none; }
+.postmark svg { width: 100%; overflow: visible; }
+.postmark circle { fill: none; stroke: #6b3a5a; stroke-width: 2.2; }
+.postmark text { fill: #6b3a5a; font: 700 10px "Nunito", sans-serif; letter-spacing: 1px; }
+.postmark .pm-date { font-size: 12px; }
+.postmark .waves { position: absolute; left: 70px; top: 30px; width: 120px; }
+.postmark .waves path { fill: none; stroke: #6b3a5a; stroke-width: 2; }
+.address { margin-top: auto; width: 100%; font-family: var(--hand); font-size: 21px; color: #2b3a67; }
+.address p { margin: 0; border-bottom: 1.5px solid #cbbfa8; line-height: 30px; }
+.pc-actions { display: flex; gap: 10px; margin-top: 18px; }
+
+/* ---------- envelope arrival ---------- */
+.envelope { position: relative; width: min(440px, 88vw); height: 270px; margin-top: 150px; animation: drop .6s cubic-bezier(.2, 1.3, .4, 1); }
+@keyframes drop { from { transform: translateY(-80vh) rotate(-12deg); } }
+.env-back, .env-front, .env-flap { position: absolute; left: 0; right: 0; }
+.env-back { inset: 0; background: #f1dfc2; border: 2px solid var(--ink); border-radius: 6px; }
+.env-front { bottom: 0; height: 100%; background: #f6e7cf; border: 2px solid var(--ink); border-radius: 6px; z-index: 3;
+  clip-path: polygon(0 28%, 50% 62%, 100% 28%, 100% 100%, 0 100%); }
+.env-flap { top: 0; height: 58%; background: #ecd4ad; border: 2px solid var(--ink); z-index: 4; transform-origin: top; transition: transform .5s ease-in, z-index 0s .25s;
+  clip-path: polygon(0 0, 100% 0, 50% 100%); }
+.env-seal { position: absolute; left: 50%; top: 46%; width: 44px; height: 44px; transform: translate(-50%, -50%); z-index: 5; transition: opacity .2s; }
+.env-seal .ico { width: 100%; height: 100%; }
+.env-card { position: absolute; left: 4%; right: 4%; top: 6%; z-index: 2; transform: scale(.9); transition: transform .75s cubic-bezier(.3, 1.2, .5, 1); }
+.env-card .pc3d { width: 100%; pointer-events: none; }
+.envelope.open .env-flap { transform: rotateX(180deg); z-index: 1; }
+.envelope.open .env-seal { opacity: 0; }
+.envelope.out .env-card { transform: translateY(-62%) scale(.95); }
+.envelope.done { height: auto; margin-top: 0; }
+.envelope.done .env-back, .envelope.done .env-front, .envelope.done .env-flap { animation: slideaway .5s ease-in forwards; }
+.envelope.done .env-card { position: relative; left: 0; right: 0; top: 0; transform: none; animation: settle .55s cubic-bezier(.3, 1.4, .5, 1); }
+.envelope.done .env-card .pc3d { pointer-events: auto; }
+@keyframes slideaway { to { transform: translateY(60vh) rotate(8deg); opacity: 0; } }
+@keyframes settle { from { transform: translateY(-40px) scale(.96) rotate(-2deg); } }
+.arrived { animation: fadeup .5s ease .2s both; }
+
+/* ---------- motion & delight ---------- */
+@keyframes fadein { from { opacity: 0; } }
+
+/* opening */
+.intro { position: fixed; inset: 0; z-index: 60; display: flex; align-items: center; justify-content: center; text-align: center;
+  background-color: var(--paper); background-image: radial-gradient(rgba(43, 36, 32, .07) 1px, transparent 1.2px); background-size: 22px 22px;
+  transition: opacity .7s ease, transform .7s ease; }
+.intro.bye { opacity: 0; transform: scale(1.04); pointer-events: none; }
+.intro p { margin: 0; font-family: var(--hand); clip-path: inset(0 100% 0 0); animation: write 1s cubic-bezier(.6, .1, .3, 1) forwards; }
+.intro .i1 { font-size: clamp(54px, 9vw, 96px); font-weight: 700; line-height: 1; }
+.intro .i2 { font-size: clamp(26px, 4vw, 40px); color: var(--muted); animation-delay: .7s; }
+.intro .i3 { font-size: clamp(22px, 3vw, 30px); color: var(--pink); animation-delay: 1.3s; margin-top: 10px; }
+@keyframes write { to { clip-path: inset(0 0 0 0); } }
+
+/* road reveal after the opening */
+.roadwrap.reveal .stop-dot { animation: popdot .45s cubic-bezier(.2, 1.6, .4, 1) calc(var(--ci, 0) * .14s + .4s) both; }
+.roadwrap.reveal .stop-year, .roadwrap.reveal .stop-text { animation: fadeup .5s ease calc(var(--ci, 0) * .14s + .6s) both; }
+.roadwrap.reveal .kept-area .postcard { animation: dropin .7s cubic-bezier(.2, 1.3, .4, 1) calc(var(--ci, 0) * .14s + 1s) both; }
+.roadwrap.reveal .ghost-area .postcard { animation: fadein .8s ease calc(var(--ci, 0) * .14s + 1.4s) both; }
+.roadwrap.reveal .road-piece { animation: piecein .7s cubic-bezier(.2, 1.6, .4, 1) 2.2s both; }
+@keyframes popdot { from { transform: scale(0) rotate(-40deg); } }
+@keyframes dropin { from { transform: translateY(-120px) rotate(-14deg); opacity: 0; } }
+@keyframes piecein { from { transform: translate(-50%, -220%) scale(.4); opacity: 0; } }
+
+/* postcards: lift, 3D tilt toward the cursor, a moving glare, a wiggling tape */
+.postcard { --rot: 0deg; --tx: 0deg; --ty: 0deg; --gx: 50%; --gy: 30%;
+  transform: perspective(800px) rotate(var(--rot)) rotateX(var(--tx)) rotateY(var(--ty));
+  transition: transform .35s cubic-bezier(.3, 1.4, .5, 1), box-shadow .3s; }
+.postcard.tilt-l { --rot: -3deg; transform: perspective(800px) rotate(var(--rot)) rotateX(var(--tx)) rotateY(var(--ty)); }
+.postcard.tilt-r { --rot: 2.5deg; transform: perspective(800px) rotate(var(--rot)) rotateX(var(--tx)) rotateY(var(--ty)); }
+.postcard:not(.locked):not(.transit):hover { z-index: 8; transform: perspective(800px) translateY(-12px) scale(1.08) rotateX(var(--tx)) rotateY(var(--ty));
+  box-shadow: 0 2px 0 rgba(0,0,0,.04), 8px 18px 28px rgba(43, 36, 32, .28); transition: transform .12s ease-out, box-shadow .3s; }
+.postcard::after { content: ""; position: absolute; inset: 0; pointer-events: none; opacity: 0; transition: opacity .3s;
+  background: radial-gradient(circle at var(--gx) var(--gy), rgba(255,255,255,.55), transparent 50%); }
+.postcard:hover::after { opacity: 1; }
+.postcard:hover .tape { animation: tapewiggle .5s ease; }
+@keyframes tapewiggle { 30% { transform: translateX(-50%) rotate(4deg); } 60% { transform: translateX(-50%) rotate(-7deg); } }
+.postcard.locked:hover { animation: notyet .4s ease; }
+@keyframes notyet { 25% { transform: rotate(-4deg); } 50% { transform: rotate(2deg); } 75% { transform: rotate(-3deg); } }
+.postcard .pc-photo img { transition: transform .5s ease; }
+.postcard:hover .pc-photo img { transform: scale(1.08); }
+
+/* stops: grow, spin a little, show a tooltip card */
+.stop { position: relative; }
+.stop-dot { transition: transform .3s cubic-bezier(.2, 1.6, .4, 1); cursor: default; }
+.stop:hover .stop-dot { transform: scale(1.25) rotate(-12deg); }
+.stop-tip { position: absolute; bottom: calc(100% - 4px); left: 50%; width: 210px; transform: translate(-50%, 8px) scale(.9); opacity: 0; pointer-events: none;
+  background: var(--card); border: 2px solid var(--ink); border-radius: var(--wobble-sm); padding: 10px 12px; text-align: left; z-index: 20;
+  box-shadow: 4px 5px 0 rgba(43, 36, 32, .15); transition: opacity .2s, transform .25s cubic-bezier(.2, 1.5, .4, 1); font-size: 13px; line-height: 1.4; }
+.stop-tip b { display: block; font-family: var(--hand); font-size: 22px; }
+.stop-tip i { display: block; font-style: normal; color: var(--pink); font-weight: 800; font-size: 12px; margin-top: 4px; }
+.stop:hover .stop-tip { opacity: 1; transform: translate(-50%, 0) scale(1); }
+.stop-col { transition: background .3s; border-radius: 22px; }
+.stop-col:not(.home):not(.end):hover { background: rgba(255, 216, 107, .12); }
+
+/* the walker talks when you hover it */
+.road-piece { pointer-events: auto; cursor: default; }
+.road-piece .say { position: absolute; bottom: 100%; left: 50%; transform: translate(-50%, 6px) scale(.8); white-space: nowrap; opacity: 0;
+  background: var(--card); border: 2px solid var(--ink); border-radius: 14px; padding: 4px 10px; font-family: var(--hand); font-size: 19px;
+  transition: opacity .2s, transform .25s cubic-bezier(.2, 1.5, .4, 1); pointer-events: none; }
+.road-piece:hover .say { opacity: 1; transform: translate(-50%, -6px) scale(1); }
+.road-piece:hover .avx { animation: hop .4s ease-in-out 2; }
+
+/* buttons lift and their sketchy outline wobbles */
+.btn, .hold, .menu-btn, .road-tabs button { transition: transform .15s ease, box-shadow .15s ease, background .2s; }
+.btn:hover:not(:disabled), .hold:hover:not(:disabled), .menu-btn:hover { transform: translate(-2px, -2px); box-shadow: 5px 5px 0 var(--ink); animation: wobble 1.2s ease-in-out infinite; }
+.btn.play:hover { box-shadow: 5px 5px 0 var(--pink); }
+@keyframes wobble { 50% { border-radius: 15px 225px 15px 255px / 255px 15px 225px 15px; } }
+.road-tabs button:hover { transform: translateY(-2px) rotate(-1.5deg); }
+
+/* icons wiggle when their row is hovered */
+.habit-row:hover .hr-ico .ico, .pick-item:hover .em .ico, .menu button:hover .mi .ico { animation: wiggle-ico .5s ease; }
+@keyframes wiggle-ico { 25% { transform: rotate(-12deg) scale(1.1); } 60% { transform: rotate(9deg) scale(1.1); } }
+.me-av { position: relative; transition: transform .3s cubic-bezier(.2, 1.6, .4, 1); }
+.me-av:hover { transform: rotate(-6deg) scale(1.05); }
+.me-av::after { content: "change ✎"; position: absolute; left: 50%; bottom: -8px; transform: translateX(-50%); font-family: var(--hand); font-size: 17px;
+  background: var(--ink); color: #fff; border-radius: 8px; padding: 0 8px; opacity: 0; transition: opacity .2s; white-space: nowrap; }
+.me-av:hover::after { opacity: 1; }
+.me-card, .today-card { transition: transform .4s cubic-bezier(.2, 1.4, .4, 1); }
+.me-card:hover { transform: rotate(0deg) translateY(-2px); }
+.today-card:hover { transform: rotate(0deg) translateY(-2px); }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+}
+/* keep the card inside the envelope until it's fully out */
+.envelope:not(.done) .env-card { height: 92%; overflow: hidden; }
+.envelope:not(.done) .env-card .turn-hint { display: none; }
+@media (max-width: 760px) {
+  .pc-face.back { grid-template-columns: 1fr 92px; padding: 16px 12px; }
+  .pc-letter p { font-size: 20px; line-height: 28px; }
+  .postmark { right: 20px; top: 70px; width: 84px; }
+  .address { font-size: 17px; }
+  .envelope { height: 220px; margin-top: 120px; }
+}

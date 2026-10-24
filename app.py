@@ -77,6 +77,7 @@ def compose_post(habit, kind, st, life_event="", combo_with=None):
         "habit": {"label": st["label"], "daily_amount": f"{st['amount']} {st['unit']}",
                   "started_as": START_LEVELS[st["start_level"]], "personal_goal": st["goal"]},
         "post_kind": kind,
+        "today": game.today().isoformat(),
         "future_date": future,
         "allowed_milestone": allowed,
         "next_milestone_not_reached": nxt,
@@ -108,7 +109,8 @@ def compose_post(habit, kind, st, life_event="", combo_with=None):
     combo_tag = f"combo:{combo_with['habit_id']}" if combo_with else ""
     return {
         "run_id": run_id, "kind": kind, "level": st["level"], "chapter": post_chapter, "future": future,
-        "caption": caption, "location": s["location"][:60], "comments": s["comments"][:3], "likes": likes,
+        "caption": caption, "location": s["location"][:60],
+        "letter": s["letter"][:400], "postmark": s["postmark"][:24].upper(), "comments": s["comments"][:3], "likes": likes,
         "photo": photo, "basis": (basis + " " + combo_tag).strip(),
         "stopped_caption": s["stopped_caption"], "stopped_photo": stopped_photo,
         "stopped_comments": [{"handle": prof["cast"][0]["handle"], "text": s["stopped_comment"]}] if s["stopped_comment"] else [],
@@ -129,9 +131,10 @@ def store_post(habit, d):
     cols = "habit_id, timeline, kind, level, chapter, future_date, caption, location, comments, likes, photo, basis, created_day, run_id"
     today = game.today().isoformat()
     with db.connect() as c:
-        cur = c.execute(f"INSERT INTO posts ({cols}) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        cur = c.execute(f"INSERT INTO posts ({cols}, letter, postmark) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                         (habit["id"], "kept", d["kind"], d["level"], d["chapter"], d["future"], d["caption"], d["location"],
-                         json.dumps(d["comments"], ensure_ascii=False), d["likes"], json.dumps(d["photo"]), d["basis"], today, d["run_id"]))
+                         json.dumps(d["comments"], ensure_ascii=False), d["likes"], json.dumps(d["photo"]), d["basis"], today, d["run_id"],
+                         d.get("letter", ""), d.get("postmark", "")))
         c.execute(f"INSERT INTO posts ({cols}) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                   (habit["id"], "stopped", d["kind"], d["level"], d["chapter"], d["future"], d["stopped_caption"], "",
                    json.dumps(d["stopped_comments"], ensure_ascii=False), max(3, d["likes"] // 6),

@@ -49,6 +49,7 @@ You need Python 3.10 or newer and an internet connection to load the photos.
 | Boss | Three or more days without a check-in brings a worried post from future you. Check in three days in a row to save the moment. |
 | Combo | Two habits at Level 3 or higher collide in one surprise post. |
 | Instant postcards | Opening the app pre-writes the postcard your next check-in will produce (same day, same check-in count, same event, chosen deterministically), so the reveal is instant. A draft that doesn't match is discarded and the postcard is written live. |
+| Postcards are real cards | New postcards arrive in an envelope that opens; tap a card to turn it over. The back holds a short handwritten letter from future-you, a stamp, and a postmark. |
 | Two timelines | Each post has a twin from the you who stopped: same date, an everyday-life photo, wistful caption. |
 | Future-self avatar | Pick a character or upload a photo (kept on this computer, never sent to the AI). It evolves with your level: ring, habit badge at Lv3, gold at Lv4, crown at Lv5, animated rainbow at Lv6. |
 | Play your next 10 years | Plays your kept-going posts in date order as full-screen stories, a video-style recap. |

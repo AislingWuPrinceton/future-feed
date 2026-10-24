@@ -1,5 +1,6 @@
 import { renderAll, ico, HABIT_ICON, CHARACTER_ICON } from "./icons.js";
 import rough from "./vendor/rough.esm.js";
+import { sfx, buzz } from "./sound.js";
 
 const $ = (id) => document.getElementById(id);
 renderAll();
@@ -51,7 +52,9 @@ async function refresh() {
   }
   renderMe();
   renderToday();
+  if (wantIntro) playIntro();
   renderRoad();
+  if (!PLAIN && !refresh.counted) { countUp($("me")); refresh.counted = true; }
   if (STUDY && $("sb-date")) $("sb-date").textContent = `Day ${S.day_offset + 1}`;
 }
 
@@ -327,10 +330,11 @@ function bindHold(btn) {
     if (busy || t) return;
     start = performance.now();
     btn.classList.add("holding");
+    sfx.charge();
     t = setInterval(() => {
       const p = Math.min(1, (performance.now() - start) / 900);
       fill.style.width = `${p * 100}%`;
-      if (p >= 1) { clearInterval(t); t = null; btn.classList.remove("holding"); checkin(+btn.dataset.hold); }
+      if (p >= 1) { clearInterval(t); t = null; btn.classList.remove("holding"); buzz(15); sfx.pop(); checkin(+btn.dataset.hold); }
     }, 16);
   };
   const cancel = () => {
@@ -375,6 +379,8 @@ async function checkin(id) {
       $("lu-dots").innerHTML = Array.from({ length: 6 }, (_, i) =>
         `<i class="${i <= h.allowed_chapter ? "on" : ""} ${i === h.allowed_chapter ? "now" : ""}"></i>`).join("");
       confetti();
+      sfx.chime();
+      buzz([20, 60, 20, 60, 40]);
       $("levelup").hidden = false;
       $("lu-close").onclick = () => { $("levelup").hidden = true; if (post) openPostcard(post, true); };
     } else if (post) {
@@ -451,12 +457,13 @@ function renderRoad(opts = {}) {
         : `<div class="postcard locked"><div class="pc-photo">${ico("lock")}</div><p>Hold to check in and this postcard arrives</p></div>`;
     }
     return `
-      <div class="stop-col ${reached ? "reached" : ""}" data-i="${i}">
+      <div class="stop-col ${reached ? "reached" : ""}" data-i="${i}" style="--ci:${i + 1}">
         <div class="kept-area">${pending}${postcards(mine, "kept", pending ? 1 : 2)}</div>
         <div class="stop">
           <span class="stop-dot" style="--c:${STOP_COLORS[i]}">${i + 1}</span>
           <span class="stop-year">~${y} ${moved}</span>
           <span class="stop-text">${esc(milestone)}</span>
+          <span class="stop-tip"><b>Stop ${i + 1} · ~${y}</b>${esc(milestone)}<i>${mine.length ? `${mine.length} postcard${mine.length > 1 ? "s" : ""} from here` : reached ? "reached" : `${Math.max(0, i - h.allowed_chapter)} stop${i - h.allowed_chapter === 1 ? "" : "s"} ahead`}</i></span>
         </div>
         <div class="ghost-area">${postcards(ghost, "stopped")}</div>
       </div>`;
@@ -473,7 +480,7 @@ function renderRoad(opts = {}) {
         <div class="stop"><span class="stop-dot end-dot">${ico("flag")}</span><span class="stop-year">2036</span><span class="stop-text">ten years on</span></div>
         <div class="ghost-area"></div></div>
       ${h.quest ? `<span class="road-storm" id="road-storm">${ico("storm")}</span>` : ""}
-      <span class="road-piece" id="road-piece">${avatarHTML(S.profile.avatar?.photo ? 54 : 48, { tier: 0 })}<b>you</b></span>
+      <span class="road-piece" id="road-piece">${avatarHTML(S.profile.avatar?.photo ? 54 : 48, { tier: 0 })}<b>you</b><span class="say" id="piece-say"></span></span>
     </div>`;
 
   $("road").querySelectorAll("[data-post]").forEach((el) => (el.onclick = () => {
@@ -486,7 +493,8 @@ function renderRoad(opts = {}) {
   prevYears[h.id] = h.chapter_dates.map(year);
   localStorage.setItem("ff-stop-years", JSON.stringify(prevYears));
   requestAnimationFrame(() => layoutRoad(h));
-  setTimeout(() => layoutRoad(h), 120);  // once photos/fonts settle
+  setTimeout(() => { layoutRoad(h); if (wantIntro) revealRoad(); }, 120);  // once photos/fonts settle
+  bindRoadHover();
   if (opts.transit) {
     const col = $("road").querySelector(`.stop-col[data-i="${frontier}"]`);
     col?.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
@@ -580,26 +588,104 @@ function whenText(p) {
   return `${d.toLocaleDateString("en-US", { month: "long", year: "numeric" })} · ${away} at your pace${shifted}`;
 }
 
-function openPostcard(p, arrived = false) {
+// A postcard is a real card: photo and caption on the front; a handwritten letter from
+// future-you, a stamp, and a postmark on the back. New ones arrive in an envelope.
+
+function letterOf(p) {
+  if (p.letter) return p.letter;
+  const y = year(p.live_date || p.future_date);
+  return `Dear ${S.profile.name} of ${S.today.slice(0, 4)}, this is where today's small step led. Keep going. — you, ${y}`;
+}
+
+function postmarkOf(p) {
+  const d = new Date((p.live_date || p.future_date) + "T12:00:00");
+  const place = (p.postmark || p.location || "SOMEWHERE AHEAD").toUpperCase().slice(0, 18);
+  return { place, date: d.toLocaleDateString("en-US", { month: "short", year: "numeric" }).toUpperCase() };
+}
+
+function cardHTML(p) {
   const stoppedSelf = p.timeline === "stopped";
   const who = stoppedSelf ? S.profile.handle.replace(".2036", ".someday") : S.profile.handle;
   const b = (p.basis || "").replace(/ ?combo:\d+/, "").trim();
-  $("pc-body").innerHTML = `
-    ${arrived ? `<p class="arrived">A postcard from ${year(p.live_date || p.future_date)} just arrived</p>` : ""}
-    <div class="pc-card ${stoppedSelf ? "stopped" : ""} ${arrived ? "flip" : ""}">
-      <span class="tape"></span>
-      <div class="pc-big-photo">${photoHTML(p)}</div>
-      <div class="pc-note">
-        <div class="pc-from">${avatarHTML(34, { gray: stoppedSelf, tier: stoppedSelf ? 0 : undefined })}<b>${esc(who)}</b><span>${esc(p.location || "")}</span></div>
-        <p class="pc-caption">${esc(p.caption)}</p>
-        ${p.comments.length ? `<div class="pc-notes">${p.comments.map((c) => `<p><b>${esc(c.handle)}</b> ${esc(c.text)}</p>`).join("")}</div>` : ""}
-        <p class="pc-meta">${ico("flame", "inline")} ${p.likes} people cheered · ${whenText(p)}</p>
-        ${!stoppedSelf && b ? `<p class="pc-meta">Reality check ✓ fits your current pace · ${b === "estimate" ? "milestone is an estimate" : esc(b)}</p>` : ""}
-        ${p.photo ? `<p class="pc-meta">Photo: <a href="${esc(p.photo.page)}" target="_blank" rel="noopener">${esc(p.photo.title || "untitled")}</a> by ${esc(p.photo.creator)}, ${esc(p.photo.license)}</p>` : ""}
+  const pm = postmarkOf(p);
+  const stampFace = S.profile.avatar?.photo && !stoppedSelf ? `<img src="${S.profile.avatar.photo}" alt="">` : iconOfPost(p);
+  return `
+    <div class="pc3d ${stoppedSelf ? "stopped" : ""}" id="pc3d">
+      <div class="pc-inner" id="pc-inner">
+        <div class="pc-face front">
+          <span class="tape"></span>
+          <div class="pc-big-photo">${photoHTML(p)}</div>
+          <div class="pc-note">
+            <div class="pc-from">${avatarHTML(34, { gray: stoppedSelf, tier: stoppedSelf ? 0 : undefined })}<b>${esc(who)}</b><span>${esc(p.location || "")}</span></div>
+            <p class="pc-caption">${esc(p.caption)}</p>
+            ${p.comments.length ? `<div class="pc-notes">${p.comments.map((c) => `<p><b>${esc(c.handle)}</b> ${esc(c.text)}</p>`).join("")}</div>` : ""}
+            <p class="pc-meta">${ico("flame", "inline")} ${p.likes} people cheered · ${whenText(p)}</p>
+            ${!stoppedSelf && b ? `<p class="pc-meta">Reality check ✓ fits your current pace · ${b === "estimate" ? "milestone is an estimate" : esc(b)}</p>` : ""}
+            ${p.photo ? `<p class="pc-meta">Photo: <a href="${esc(p.photo.page)}" target="_blank" rel="noopener">${esc(p.photo.title || "untitled")}</a> by ${esc(p.photo.creator)}, ${esc(p.photo.license)}</p>` : ""}
+          </div>
+          <span class="turn-hint">tap to turn over ↻</span>
+        </div>
+        <div class="pc-face back">
+          <div class="pc-letter"><p>${esc(stoppedSelf ? p.caption : letterOf(p))}</p></div>
+          <div class="pc-right">
+            <div class="stamp"><div class="stamp-in">${stampFace}</div><span>${year(p.live_date || p.future_date)}</span></div>
+            <div class="postmark"><svg viewBox="0 0 120 120" aria-hidden="true">
+                <defs><path id="pm-arc-${p.id}" d="M60 60 m-44 0 a44 44 0 1 1 88 0 a44 44 0 1 1 -88 0"/></defs>
+                <circle cx="60" cy="60" r="54" /><circle cx="60" cy="60" r="34" />
+                <text><textPath href="#pm-arc-${p.id}" startOffset="2%">${esc(pm.place)} · ${esc(pm.place)} ·</textPath></text>
+                <text x="60" y="66" text-anchor="middle" class="pm-date">${esc(pm.date)}</text></svg>
+              <svg class="waves" viewBox="0 0 160 40" aria-hidden="true"><path d="M0 8 Q20 0 40 8 T80 8 T120 8 T160 8 M0 20 Q20 12 40 20 T80 20 T120 20 T160 20 M0 32 Q20 24 40 32 T80 32 T120 32 T160 32"/></svg>
+            </div>
+            <div class="address"><p>To: ${esc(S.profile.name)}</p><p>${S.today.slice(0, 4)}, the start of the road</p></div>
+          </div>
+        </div>
       </div>
-    </div>
-    <button class="btn sketch pc-close" id="pc-close">Back to the road</button>`;
-  $("pc").hidden = false;
+    </div>`;
+}
+
+function bindFlip() {
+  const inner = $("pc-inner");
+  const flip = () => { inner.classList.toggle("flipped"); sfx.paper(); };
+  $("pc3d").onclick = (e) => { if (!e.target.closest("a")) flip(); };
+  $("pc-turn").onclick = (e) => { e.stopPropagation(); flip(); };
+  // a little 3D tilt toward the cursor
+  const card = $("pc3d");
+  card.onpointermove = (e) => {
+    const r = card.getBoundingClientRect();
+    const x = (e.clientX - r.left) / r.width - 0.5, y = (e.clientY - r.top) / r.height - 0.5;
+    card.style.setProperty("--rx", `${-y * 8}deg`);
+    card.style.setProperty("--ry", `${x * 10}deg`);
+    card.style.setProperty("--gx", `${(x + 0.5) * 100}%`);
+    card.style.setProperty("--gy", `${(y + 0.5) * 100}%`);
+  };
+  card.onpointerleave = () => { card.style.setProperty("--rx", "0deg"); card.style.setProperty("--ry", "0deg"); };
+}
+
+function openPostcard(p, arrived = false) {
+  const head = arrived ? `<p class="arrived">A postcard from ${year(p.live_date || p.future_date)} just arrived</p>` : "";
+  const actions = `<div class="pc-actions"><button class="btn sketch" id="pc-turn">Turn it over ↻</button><button class="btn sketch" id="pc-close">Back to the road</button></div>`;
+  if (!arrived) {
+    $("pc-body").innerHTML = head + cardHTML(p) + actions;
+    $("pc").hidden = false;
+    sfx.paper();
+  } else {
+    // envelope drops in, flap opens, the card slides out and settles
+    $("pc-body").innerHTML = `${head}
+      <div class="envelope" id="env">
+        <div class="env-back"></div>
+        <div class="env-card">${cardHTML(p)}</div>
+        <div class="env-front"></div>
+        <div class="env-flap"></div>
+        <div class="env-seal">${ico("heart")}</div>
+      </div>${actions}`;
+    $("pc").hidden = false;
+    const env = $("env");
+    sfx.paper();
+    setTimeout(() => { env.classList.add("open"); sfx.paper(); }, 650);
+    setTimeout(() => { env.classList.add("out"); }, 1150);
+    setTimeout(() => { env.classList.add("done"); sfx.stamp(); buzz([10, 40, 10]); }, 1900);
+  }
+  bindFlip();
   $("pc-close").onclick = () => ($("pc").hidden = true);
 }
 
@@ -698,6 +784,10 @@ $("menu").addEventListener("click", closeMenu);
 $("menu-avatar").onclick = () => (S?.profile ? openAvatarSheet() : null);
 $("menu-play").onclick = () => (S?.profile ? playReel() : null);
 $("menu-add").onclick = () => (S?.profile ? openAdd() : null);
+$("menu-intro").onclick = () => { if (!S?.profile) return; sessionStorage.removeItem("ff-intro"); wantIntro = true; window.scrollTo({ top: 0 }); playIntro(); renderRoad(); };
+const soundLabel = () => ($("menu-sound").querySelector("b").textContent = sfx.muted ? "Sound: off" : "Sound: on");
+$("menu-sound").onclick = (e) => { e.stopPropagation(); sfx.toggle(); soundLabel(); if (!sfx.muted) sfx.pop(); };
+soundLabel();
 $("menu-reset").onclick = () => $("demo-reset").click();
 
 // ---------- usage + safety ----------
@@ -754,6 +844,88 @@ $("demo-reset").onclick = async () => {
 
 document.querySelectorAll(".overlay").forEach((o) => o.addEventListener("click", (e) => { if (e.target === o) o.hidden = true; }));
 
+// ---------- motion & delight ----------
+
+// Opening: a handwritten hello, then the road draws itself and the postcards drop in.
+let wantIntro = !sessionStorage.getItem("ff-intro") && !PLAIN;
+function playIntro() {
+  if (!wantIntro || !S?.profile) { wantIntro = false; return; }
+  sessionStorage.setItem("ff-intro", "1");
+  const el = document.createElement("div");
+  el.className = "intro";
+  el.innerHTML = `<div class="intro-in">
+      <p class="i1">Hi ${esc(S.profile.name)}.</p>
+      <p class="i2">Your future self has been writing to you.</p>
+      <p class="i3">${S.today.slice(0, 4)} → 2036</p></div>`;
+  document.body.appendChild(el);
+  sfx.paper();
+  setTimeout(() => el.classList.add("bye"), 2300);
+  setTimeout(() => el.remove(), 3000);
+}
+
+function revealRoad() {
+  wantIntro = false;
+  const wrap = $("roadwrap");
+  wrap.classList.remove("reveal");
+  void wrap.offsetWidth;
+  wrap.classList.add("reveal");
+  // draw every solid road stroke from start to end, like a pen
+  $("road-svg").querySelectorAll("path").forEach((p, i) => {
+    if (p.getAttribute("stroke-dasharray")) { p.style.animation = "fadein 1s 1.4s both"; return; }
+    const len = p.getTotalLength();
+    p.style.strokeDasharray = len;
+    p.style.strokeDashoffset = len;
+    p.style.transition = `stroke-dashoffset 1.6s cubic-bezier(.6, .1, .3, 1) ${0.25 + (i % 3) * 0.15}s`;
+    requestAnimationFrame(() => (p.style.strokeDashoffset = 0));
+  });
+  setTimeout(() => wrap.classList.remove("reveal"), 3600);
+}
+
+// Hover: postcards tilt toward the cursor; the walker talks; stops show a tooltip card.
+const CHEERS = ["Day {d}! Look how far we've come.", "One more step and the next postcard is ours.",
+  "{n}, I can see stop {s} from here.", "Small steps. Big road.", "Future us says thanks.", "Hold the button. I'll walk."];
+function bindRoadHover() {
+  const road = $("road");
+  if (road.dataset.bound) return;
+  road.dataset.bound = "1";
+  road.addEventListener("pointermove", (e) => {
+    const card = e.target.closest(".postcard:not(.locked):not(.transit)");
+    if (!card) return;
+    const r = card.getBoundingClientRect();
+    const x = (e.clientX - r.left) / r.width - 0.5, y = (e.clientY - r.top) / r.height - 0.5;
+    card.style.setProperty("--tx", `${-y * 14}deg`);
+    card.style.setProperty("--ty", `${x * 16}deg`);
+    card.style.setProperty("--gx", `${(x + 0.5) * 100}%`);
+    card.style.setProperty("--gy", `${(y + 0.5) * 100}%`);
+  });
+  road.addEventListener("pointerout", (e) => {
+    const card = e.target.closest(".postcard");
+    if (card && !card.contains(e.relatedTarget)) { card.style.setProperty("--tx", "0deg"); card.style.setProperty("--ty", "0deg"); }
+  });
+  road.addEventListener("pointerover", (e) => {
+    const piece = e.target.closest(".road-piece");
+    if (!piece || piece.contains(e.relatedTarget)) return;
+    const h = S.habits.find((x) => x.id === roadHabit);
+    const line = CHEERS[Math.floor(Math.random() * CHEERS.length)]
+      .replace("{d}", S.day_offset + 1).replace("{n}", S.profile.name).replace("{s}", Math.min(6, (h?.allowed_chapter ?? 0) + 2));
+    $("piece-say").textContent = line;
+    sfx.tick();
+  });
+}
+
+// numbers count up when the card appears
+function countUp(root) {
+  root.querySelectorAll(".me-stats b").forEach((b) => {
+    const end = +b.textContent, t0 = performance.now();
+    const step = () => {
+      const k = Math.min(1, (performance.now() - t0) / 700);
+      b.textContent = Math.round(end * (1 - Math.pow(1 - k, 3)));
+      if (k < 1) requestAnimationFrame(step);
+    };
+    step();
+  });
+}
+
 // ---------- researcher bar (study mode) ----------
 
 function studyBar() {
@@ -784,5 +956,7 @@ if (PLAIN) {  // control group: a neutral habit tracker, nothing about the futur
   document.querySelector(".tagline").hidden = true;
   document.title = "Streaks";
 }
+// ?dev exposes a couple of functions for testing animations without spending a check-in
+if (new URLSearchParams(location.search).has("dev")) window.ff = { openPostcard, posts: () => POSTS };
 studyBar();
 refresh();
