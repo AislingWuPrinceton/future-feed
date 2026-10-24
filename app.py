@@ -3,6 +3,7 @@ import json
 import os
 import random
 import re
+import threading
 import uuid
 
 import uvicorn
@@ -56,8 +57,8 @@ def recent_posts(habit_id, n=6):
 
 # ---------- the post pipeline: story -> reality check -> photo ----------
 
-def generate_post(habit, kind, life_event="", combo_with=None):
-    st = game.stats(habit)
+def compose_post(habit, kind, st, life_event="", combo_with=None):
+    """Story agent -> reality check -> photo safety agent. Returns everything needed to store the post later."""
     prof = profile()
     run_id = uuid.uuid4().hex[:12]
     ch = st["allowed_chapter"]
@@ -83,22 +84,13 @@ def generate_post(habit, kind, life_event="", combo_with=None):
         "combo_with": combo_with or {},
         "recent_posts": recent_posts(habit["id"]),
     }
-    try:
-        s = agents.story(run_id, context)
-        caption = s["caption"]
-        check = agents.reality_check(run_id, caption, s["claims"], allowed, nxt)
-    except agents.BudgetExceeded as e:
-        raise HTTPException(429, str(e))
+    s = agents.story(run_id, context)
+    caption = s["caption"]
+    check = agents.reality_check(run_id, caption, s["claims"], allowed, nxt)
     if not check["passes"] and check["fixed_caption"].strip():
         db.log_event(run_id, "overclaim_fixed",
                      json.dumps({"before": caption, "after": check["fixed_caption"], "why": check["problem"]}))
         caption = check["fixed_caption"]
-
-    if s["new_character_handle"].strip() and len(prof["cast"]) < 8:
-        prof["cast"].append({"name": s["new_character_name"][:30],
-                             "handle": clean_handle(s["new_character_handle"], "friend"),
-                             "relation": s["new_character_relation"][:40]})
-        db.set_setting("profile", prof)
 
     with db.connect() as c:
         used = [json.loads(r["photo"])["url"] for r in c.execute("SELECT photo FROM posts WHERE photo IS NOT NULL")
@@ -107,31 +99,122 @@ def generate_post(habit, kind, life_event="", combo_with=None):
     # prefer photos whose title/tags actually mention the habit (avoids odd off-topic stock shots)
     anchor = game.template_for(habit)["short"].lower() if custom_pool else \
         {"guitar": "guitar", "running": "run", "reading": "book", "spanish": None, "saving": None}.get(habit["key"])
-    photo = agents.find_photo(s["photo_query"], habit["key"], avoid=used, pool=custom_pool, anchor=anchor)
+    photo = agents.pick_photo(run_id, s["photo_query"], habit["key"], avoid=used, pool=custom_pool, anchor=anchor)
     # The you who stopped lives a different day: an everyday scene without the habit.
-    stopped_photo = agents.find_photo(s["stopped_photo_query"], "life", avoid=used)
-    basis = st["allowed_milestone"]["basis"] if allowed_ok(st) else ""
+    stopped_photo = agents.pick_photo(run_id, s["stopped_photo_query"], "life", avoid=used)
     rng = random.Random(run_id)
     likes = rng.randint(12, 30) + 18 * max(ch, 0) + (40 if kind in ("level_up", "comeback", "combo") else 0)
+    basis = st["allowed_milestone"]["basis"] if allowed_ok(st) else ""
     combo_tag = f"combo:{combo_with['habit_id']}" if combo_with else ""
+    return {
+        "run_id": run_id, "kind": kind, "level": st["level"], "chapter": post_chapter, "future": future,
+        "caption": caption, "location": s["location"][:60], "comments": s["comments"][:3], "likes": likes,
+        "photo": photo, "basis": (basis + " " + combo_tag).strip(),
+        "stopped_caption": s["stopped_caption"], "stopped_photo": stopped_photo,
+        "stopped_comments": [{"handle": prof["cast"][0]["handle"], "text": s["stopped_comment"]}] if s["stopped_comment"] else [],
+        "new_character": {"name": s["new_character_name"], "handle": s["new_character_handle"],
+                          "relation": s["new_character_relation"]},
+        "fixed": not check["passes"], "problem": check["problem"],
+    }
 
+
+def store_post(habit, d):
+    """Save a composed post (and its road-not-taken twin)."""
+    prof = profile()
+    nc = d["new_character"]
+    if nc["handle"].strip() and len(prof["cast"]) < 8 and not any(c["name"] == nc["name"] for c in prof["cast"]):
+        prof["cast"].append({"name": nc["name"][:30], "handle": clean_handle(nc["handle"], "friend"),
+                             "relation": nc["relation"][:40]})
+        db.set_setting("profile", prof)
+    cols = "habit_id, timeline, kind, level, chapter, future_date, caption, location, comments, likes, photo, basis, created_day, run_id"
+    today = game.today().isoformat()
     with db.connect() as c:
-        cur = c.execute(
-            "INSERT INTO posts (habit_id, timeline, kind, level, chapter, future_date, caption, location, comments, likes, photo, basis, created_day, run_id) "
-            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
-            (habit["id"], "kept", kind, st["level"], post_chapter, future, caption, s["location"][:60],
-             json.dumps(s["comments"][:3], ensure_ascii=False), likes, json.dumps(photo),
-             (basis + " " + combo_tag).strip(), game.today().isoformat(), run_id))
-        c.execute(
-            "INSERT INTO posts (habit_id, timeline, kind, level, chapter, future_date, caption, location, comments, likes, photo, basis, created_day, run_id) "
-            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
-            (habit["id"], "stopped", kind, st["level"], post_chapter, future, s["stopped_caption"], "",
-             json.dumps([{"handle": prof["cast"][0]["handle"], "text": s["stopped_comment"]}] if s["stopped_comment"] else [],
-                        ensure_ascii=False),
-             max(3, likes // 6), json.dumps(stopped_photo), "", game.today().isoformat(), run_id))
+        cur = c.execute(f"INSERT INTO posts ({cols}) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                        (habit["id"], "kept", d["kind"], d["level"], d["chapter"], d["future"], d["caption"], d["location"],
+                         json.dumps(d["comments"], ensure_ascii=False), d["likes"], json.dumps(d["photo"]), d["basis"], today, d["run_id"]))
+        c.execute(f"INSERT INTO posts ({cols}) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                  (habit["id"], "stopped", d["kind"], d["level"], d["chapter"], d["future"], d["stopped_caption"], "",
+                   json.dumps(d["stopped_comments"], ensure_ascii=False), max(3, d["likes"] // 6),
+                   json.dumps(d["stopped_photo"]), "", today, d["run_id"]))
         post_id = cur.lastrowid
-    return {"post_id": post_id, "kind": kind, "usage": db.run_usage(run_id),
-            "fixed": not check["passes"], "problem": check["problem"]}
+    return {"post_id": post_id, "kind": d["kind"], "usage": db.run_usage(d["run_id"]),
+            "fixed": d["fixed"], "problem": d["problem"]}
+
+
+def generate_post(habit, kind, life_event="", combo_with=None):
+    try:
+        return store_post(habit, compose_post(habit, kind, game.stats(habit), life_event, combo_with))
+    except agents.BudgetExceeded as e:
+        raise HTTPException(429, str(e))
+
+
+# ---------- pre-writing: tomorrow's postcard is composed while you look at today's road ----------
+
+PREGEN = {}                 # (habit_id, day, checkins) -> threading.Event while a draft is being written
+PREGEN_LOCK = threading.Lock()
+
+
+def plan_checkin(habit, before, after):
+    """What kind of post the next check-in produces. Deterministic per habit and day, so a draft
+    written in advance and the real check-in agree."""
+    if after["quest"] and after["quest"]["progress"] >= after["quest"]["target"]:
+        return "comeback", "", None
+    if after["level"] > before["level"]:
+        return "level_up", "", None
+    partner = next((game.stats(h) for h in active_habits()
+                    if h["id"] != habit["id"] and game.stats(h)["level"] >= 3), None)
+    if partner and after["level"] >= 3:
+        with db.connect() as c:
+            seen = c.execute("SELECT 1 FROM posts WHERE kind = 'combo' AND (basis LIKE ? OR habit_id = ?)",
+                             (f"%combo:{habit['id']}%", partner["id"])).fetchone()
+        if not seen:
+            return "combo", "", {"habit_id": partner["id"], "label": partner["label"],
+                                 "milestone": partner["allowed_milestone"]["milestone"] if partner["allowed_milestone"] else ""}
+    rng = random.Random(f"{habit['id']}-{game.today().isoformat()}")
+    if rng.random() < 0.3:
+        return "life_event", rng.choice(game.HABITS["life_events"]), None
+    return "daily", "", None
+
+
+def pregen(habit):
+    before = game.stats(habit)
+    if before["checked_today"]:
+        return
+    key = (habit["id"], game.today().isoformat(), before["checkins"])
+    with PREGEN_LOCK:
+        if key in PREGEN:
+            return
+        with db.connect() as c:
+            if c.execute("SELECT 1 FROM drafts WHERE habit_id=? AND day=? AND checkins=?", key).fetchone():
+                return
+        PREGEN[key] = threading.Event()
+    try:
+        after = game.stats(habit, assume_checkin=True)
+        kind, event, combo = plan_checkin(habit, before, after)
+        d = compose_post(habit, kind, after, event, combo)
+        with db.connect() as c:
+            c.execute("INSERT OR REPLACE INTO drafts (habit_id, day, checkins, kind, payload) VALUES (?,?,?,?,?)",
+                      (*key, kind, json.dumps(d, ensure_ascii=False)))
+    except Exception as e:  # a failed draft just means the check-in writes it live
+        db.log_event("", "pregen_failed", f"{habit['id']}: {type(e).__name__}")
+    finally:
+        PREGEN.pop(key).set()
+
+
+def start_pregen():
+    for h in active_habits():
+        threading.Thread(target=pregen, args=(h,), daemon=True).start()
+
+
+def take_draft(habit, checkins, kind):
+    key = (habit["id"], game.today().isoformat(), checkins)
+    ev = PREGEN.get(key)
+    if ev:
+        ev.wait(timeout=25)  # already being written: wait for it instead of paying twice
+    with db.connect() as c:
+        row = c.execute("SELECT * FROM drafts WHERE habit_id=? AND day=? AND checkins=?", key).fetchone()
+        c.execute("DELETE FROM drafts WHERE habit_id=?", (habit["id"],))
+    return json.loads(row["payload"]) if row and row["kind"] == kind else None
 
 
 def allowed_ok(st):
@@ -214,6 +297,7 @@ def with_chapter_dates(h):
 def state(plain: bool = False):
     if profile() and not plain:
         detect_slumps()
+        start_pregen()
     return {
         "profile": profile(),
         "today": game.today().isoformat(),
@@ -260,9 +344,10 @@ def make_custom(body):
         db.log_event(run_id, "ladder_rejected", json.dumps(lad["chapters"])[:500])
         raise HTTPException(502, "Couldn't build a sensible plan for that one. Try wording it differently.")
     template = {"key": "custom", "label": lad["label"][:40] or name, "short": (lad["short"] or name)[:14],
+                "icon": lad["icon"] if lad["icon"] in game.ICONS else "custom",
                 "emoji": lad["emoji"][:4] or "✨", "unit": "minutes", "measure": "hours",
                 "chapters": chapters, "sources": ["Milestones designed by the Ladder agent (estimates)."],
-                "photos": agents.fetch_photos(lad["photo_queries"])}
+                "photos": [p for p in agents.fetch_photos(lad["photo_queries"]) if agents.keyword_ok(p)]}
     return template
 
 
@@ -305,27 +390,17 @@ def checkin(habit_id: int, plain: bool = False):
     if plain:  # control group for the A/B test: a normal habit tracker, no future feed, no AI
         return {"post_id": None, "kind": "plain", "usage": [], "level_before": before["level"], "level_after": after["level"]}
 
-    kind, event, combo = "daily", "", None
-    if after["quest"] and after["quest"]["progress"] >= after["quest"]["target"]:
+    kind, event, combo = plan_checkin(habit, before, after)
+    if kind == "comeback":
         with db.connect() as c:
             c.execute("UPDATE quests SET status = 'done' WHERE id = ?", (after["quest"]["id"],))
-        kind = "comeback"
-    elif after["level"] > before["level"]:
-        kind = "level_up"
+    draft = take_draft(habit, before["checkins"], kind)
+    if draft:
+        result = store_post(habit, draft)
+        result["prewritten"] = True
     else:
-        partner = next((game.stats(h) for h in active_habits()
-                        if h["id"] != habit_id and game.stats(h)["level"] >= 3), None)
-        if partner and after["level"] >= 3:
-            with db.connect() as c:
-                seen = c.execute("SELECT 1 FROM posts WHERE kind = 'combo' AND (basis LIKE ? OR habit_id = ?)",
-                                 (f"%combo:{habit_id}%", partner["id"])).fetchone()
-            if not seen:
-                kind = "combo"
-                combo = {"habit_id": partner["id"], "label": partner["label"],
-                         "milestone": partner["allowed_milestone"]["milestone"] if partner["allowed_milestone"] else ""}
-        if kind == "daily" and random.random() < 0.3:
-            kind, event = "life_event", random.choice(game.HABITS["life_events"])
-    result = generate_post(habit, kind, life_event=event, combo_with=combo)
+        result = generate_post(habit, kind, life_event=event, combo_with=combo)
+        result["prewritten"] = False
     return {**result, "level_before": before["level"], "level_after": after["level"]}
 
 
@@ -390,7 +465,7 @@ def demo_advance(body: DaysIn):
 @app.post("/api/demo/reset")
 def demo_reset():
     with db.connect() as c:
-        for t in ("settings", "habits", "checkins", "posts", "quests"):
+        for t in ("settings", "habits", "checkins", "posts", "quests", "drafts"):
             c.execute(f"DELETE FROM {t}")
     return {"ok": True}
 

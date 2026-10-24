@@ -55,6 +55,91 @@ const DRAW = {
     rc.rectangle(17, 52, 6, 7, o(C.pink, { seed: 30 })), rc.rectangle(36, 52, 6, 7, o(C.pink, { seed: 31 })),
     rc.circle(41, 34, 3.5, ink({ seed: 32 })), rc.line(25, 25, 34, 25, line({ strokeWidth: 2.5, seed: 33 })),
   ],
+  dance: (rc) => [
+    rc.path("M10 40 Q10 26 22 26 L30 26 Q34 34 44 36 L54 38 Q60 40 58 46 L56 50 L12 50 Q10 46 10 40 Z", o(C.pink, { seed: 130 })),
+    rc.line(22, 26, 18, 8, line({ stroke: C.rose, strokeWidth: 2.5, seed: 131 })), rc.line(30, 26, 40, 8, line({ stroke: C.rose, strokeWidth: 2.5, seed: 132 })),
+    rc.ellipse(34, 50, 50, 6, o(C.rose, { seed: 133 })),
+    rc.path("M48 10 L48 22 M48 10 L56 8 L56 20", line({ fill: "none", seed: 134 })), rc.circle(46, 23, 5, ink({ seed: 135 })), rc.circle(54, 21, 5, ink({ seed: 136 })),
+  ],
+  music: (rc) => [
+    rc.path("M22 46 L22 14 L50 8 L50 40", line({ fill: "none", strokeWidth: 3, seed: 137 })),
+    rc.line(22, 20, 50, 14, line({ strokeWidth: 3, seed: 138 })),
+    rc.ellipse(16, 47, 14, 10, o(C.lilac, { seed: 139 })), rc.ellipse(44, 41, 14, 10, o(C.lilac, { seed: 140 })),
+  ],
+  lotus: (rc) => [
+    rc.path("M32 12 Q42 26 32 46 Q22 26 32 12 Z", o(C.pink, { seed: 141 })),
+    rc.path("M32 46 Q14 40 10 22 Q26 26 32 46 Z", o(C.rose, { seed: 142 })),
+    rc.path("M32 46 Q50 40 54 22 Q38 26 32 46 Z", o(C.rose, { seed: 143 })),
+    rc.ellipse(32, 50, 46, 9, o(C.green, { seed: 144 })),
+  ],
+  palette: (rc) => [
+    rc.path("M32 8 Q58 8 58 32 Q58 46 46 44 Q38 42 40 50 Q42 58 32 58 Q6 58 6 32 Q6 8 32 8 Z", o(C.tan, { seed: 145 })),
+    rc.circle(20, 24, 9, o(C.rose, { seed: 146 })), rc.circle(34, 18, 9, o(C.yellow, { seed: 147 })),
+    rc.circle(46, 26, 9, o(C.blue, { seed: 148 })), rc.circle(18, 40, 9, o(C.green, { seed: 149 })),
+  ],
+  pencil: (rc) => [
+    rc.rectangle(10, 12, 32, 44, o(C.cream, { seed: 150 })),
+    rc.line(16, 24, 36, 24, line({ seed: 151 })), rc.line(16, 32, 36, 32, line({ seed: 152 })), rc.line(16, 40, 30, 40, line({ seed: 153 })),
+    rc.polygon([[44, 8], [54, 14], [36, 46], [28, 48], [30, 40]], o(C.yellow, { seed: 154 })),
+    rc.polygon([[30, 40], [36, 46], [28, 48]], ink({ seed: 155 })),
+  ],
+  dumbbell: (rc) => [
+    rc.rectangle(18, 29, 28, 6, o(C.gray, { seed: 156 })),
+    rc.rectangle(8, 18, 10, 28, o(C.blue, { seed: 157 })), rc.rectangle(46, 18, 10, 28, o(C.blue, { seed: 158 })),
+    rc.rectangle(3, 23, 6, 18, o(C.dark, { seed: 159 })), rc.rectangle(55, 23, 6, 18, o(C.dark, { seed: 160 })),
+  ],
+  piano: (rc) => [
+    rc.rectangle(6, 16, 52, 36, o(C.white, { seed: 161 })),
+    ...[15, 24, 33, 42, 51].map((x, i) => rc.line(x, 16, x, 52, line({ strokeWidth: 1.4, seed: 162 + i }))),
+    ...[12, 21, 37, 46].map((x, i) => rc.rectangle(x, 16, 6, 20, ink({ seed: 168 + i }))),
+  ],
+  pan: (rc) => [
+    rc.ellipse(26, 36, 40, 26, o(C.dark, { seed: 172 })),
+    rc.ellipse(26, 35, 30, 17, o(C.gray, { seed: 173 })),
+    rc.rectangle(44, 33, 18, 5, o(C.brown, { seed: 174 })),
+    rc.ellipse(24, 34, 12, 8, o(C.yellow, { seed: 175 })),
+    rc.path("M20 18 Q16 12 20 6 M28 18 Q24 12 28 6", line({ fill: "none", stroke: C.gray, seed: 176 })),
+  ],
+  sprout: (rc) => [
+    rc.path("M16 40 L48 40 L44 58 L20 58 Z", o(C.orange, { seed: 177 })),
+    rc.line(32, 40, 32, 22, line({ stroke: "#4a8a3a", strokeWidth: 3, seed: 178 })),
+    rc.path("M32 26 Q18 24 14 10 Q28 10 32 26 Z", o(C.green, { seed: 179 })),
+    rc.path("M32 22 Q44 22 50 8 Q36 8 32 22 Z", o(C.green, { seed: 180 })),
+  ],
+  laptop: (rc) => [
+    rc.rectangle(12, 12, 40, 28, o(C.sky, { seed: 181 })),
+    rc.path("M6 46 L58 46 L54 52 L10 52 Z", o(C.gray, { seed: 182 })),
+    rc.path("M24 22 L18 26 L24 30 M40 22 L46 26 L40 30", line({ fill: "none", strokeWidth: 2.4, seed: 183 })),
+  ],
+  bike: (rc) => [
+    rc.circle(16, 42, 22, o(C.white, { seed: 184 })), rc.circle(48, 42, 22, o(C.white, { seed: 185 })),
+    rc.path("M16 42 L26 24 L42 24 L48 42 M26 24 L34 42 L42 24 M24 18 L30 18", line({ fill: "none", stroke: C.rose, strokeWidth: 2.6, seed: 186 })),
+    rc.line(42, 24, 44, 16, line({ seed: 187 })),
+  ],
+  wave: (rc) => [
+    rc.path("M4 26 Q14 16 24 26 Q34 36 44 26 Q54 16 60 24 L60 58 L4 58 Z", o(C.blue, { seed: 188 })),
+    rc.path("M4 42 Q14 34 24 42 Q34 50 44 42 Q54 34 60 40", line({ fill: "none", stroke: C.white, strokeWidth: 3, seed: 189 })),
+  ],
+  drop: (rc) => [
+    rc.path("M32 6 Q50 30 48 42 Q46 58 32 58 Q18 58 16 42 Q14 30 32 6 Z", o(C.blue, { seed: 190 })),
+    rc.path("M24 42 Q24 50 30 52", line({ fill: "none", stroke: C.white, strokeWidth: 3, seed: 191 })),
+  ],
+  moon: (rc) => [
+    rc.path("M40 8 Q18 12 18 34 Q18 56 42 56 Q54 56 58 46 Q36 50 32 32 Q30 16 40 8 Z", o(C.yellow, { seed: 192 })),
+    rc.path("M48 14 L50 20 L56 22 L50 24 L48 30 L46 24 L40 22 L46 20 Z", o(C.lilac, { seed: 193 })),
+  ],
+  heart: (rc) => [
+    rc.path("M32 56 Q8 40 8 24 Q8 10 20 10 Q28 10 32 18 Q36 10 44 10 Q56 10 56 24 Q56 40 32 56 Z", o(C.rose, { seed: 194 })),
+  ],
+  sun: (rc) => [
+    rc.circle(32, 32, 26, o(C.yellow, { seed: 195 })),
+    ...[[32, 4, 32, 14], [32, 50, 32, 60], [4, 32, 14, 32], [50, 32, 60, 32], [12, 12, 19, 19], [45, 45, 52, 52], [52, 12, 45, 19], [12, 52, 19, 45]]
+      .map(([a, b, c, d], i) => rc.line(a, b, c, d, line({ strokeWidth: 2.5, seed: 196 + i }))),
+  ],
+  chat: (rc) => [
+    rc.path("M8 13 Q8 6 15 6 L49 6 Q56 6 56 13 L56 35 Q56 42 49 42 L28 42 L16 54 L19 42 L15 42 Q8 42 8 35 Z", o(C.sky, { seed: 210 })),
+    rc.circle(22, 24, 6, ink({ seed: 211 })), rc.circle(32, 24, 6, ink({ seed: 212 })), rc.circle(42, 24, 6, ink({ seed: 213 })),
+  ],
   custom: (rc) => [
     rc.path("M32 4 L37 25 L58 30 L37 35 L32 58 L27 35 L6 30 L27 25 Z", o(C.yellow, { seed: 34 })),
     rc.path("M52 6 L54 12 L60 14 L54 16 L52 22 L50 16 L44 14 L50 12 Z", o(C.lilac, { seed: 35 })),

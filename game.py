@@ -45,6 +45,29 @@ def template_for(habit):
     return TEMPLATES[habit["key"]]
 
 
+ICONS = ["guitar", "spanish", "chat", "running", "reading", "saving", "dance", "music", "lotus", "palette", "pencil",
+         "dumbbell", "piano", "pan", "sprout", "laptop", "bike", "wave", "drop", "moon", "heart", "sun", "camera", "custom"]
+ICON_WORDS = [("dance", "danc ballet salsa tango hip-hop"), ("piano", "piano keyboard"),
+              ("music", "sing song violin drum ukulele cello flute music"), ("lotus", "meditat yoga breath mindful stretch"),
+              ("palette", "paint draw sketch art watercolor"), ("pencil", "writ journal diary poem blog novel"),
+              ("dumbbell", "gym lift workout push-up pushup strength exercise squat"), ("pan", "cook bake meal recipe"),
+              ("sprout", "garden plant"), ("laptop", "code coding program python leetcode"), ("bike", "bike cycl"),
+              ("wave", "swim surf"), ("drop", "water hydrat drink"), ("moon", "sleep bed"), ("heart", "gratitude kind love family call"),
+              ("sun", "wake morning sunrise early"), ("camera", "photo camera"), ("reading", "read book"),
+              ("running", "run jog walk step hike"), ("saving", "save money budget invest"),
+              ("chat", "english french chinese japanese korean german italian language speak vocab duolingo")]
+
+
+def icon_for(template, habit_key):
+    """Built-ins use their own icon; custom habits use the one the Ladder agent picked, or a keyword guess."""
+    if template.get("icon") in ICONS:
+        return template["icon"]
+    if habit_key in TEMPLATES:
+        return habit_key
+    label = template.get("label", "").lower()
+    return next((icon for icon, words in ICON_WORDS if any(w in label for w in words.split())), "custom")
+
+
 def baseline(template, start_level):
     """What you already have before day 1: the threshold of the last chapter you've already reached."""
     return template["chapters"][start_level - 1]["needs"] if start_level else 0
@@ -61,8 +84,10 @@ def years_to(template, amount, adherence, needs):
     return None
 
 
-def stats(habit):
-    """Everything the UI and the agents need to know about one habit, today."""
+def stats(habit, assume_checkin=False):
+    """Everything the UI and the agents need to know about one habit, today.
+
+    assume_checkin=True answers "what if they check in today?", used to pre-write tomorrow's postcard."""
     t = template_for(habit)
     start = habit.get("start_level") or 0
     now = today()
@@ -70,6 +95,8 @@ def stats(habit):
         days = [date.fromisoformat(r["day"]) for r in
                 c.execute("SELECT day FROM checkins WHERE habit_id = ? ORDER BY day", (habit["id"],))]
         quest = c.execute("SELECT * FROM quests WHERE habit_id = ? AND status = 'active'", (habit["id"],)).fetchone()
+    if assume_checkin and now not in days:
+        days.append(now)
     checked = set(days)
     started = date.fromisoformat(habit["started_on"])
     span = max(1, (now - started).days + 1)
@@ -95,6 +122,7 @@ def stats(habit):
         quest_progress = min(streak, (now - date.fromisoformat(quest["started_day"])).days + 1)
     return {
         "id": habit["id"], "key": habit["key"], "label": t["label"], "short": t["short"], "emoji": t["emoji"],
+        "icon": icon_for(t, habit["key"]),
         "amount": habit["amount"], "unit": t["unit"], "measure": t["measure"],
         "checkins": len(days), "checked_today": now in checked, "streak": streak, "gap": gap,
         "adherence": round(adherence, 3), "level": level, "next_level_at": next_at,

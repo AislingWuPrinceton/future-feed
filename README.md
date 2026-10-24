@@ -48,6 +48,7 @@ You need Python 3.10 or newer and an internet connection to load the photos.
 | Daily posts | Every check-in writes a new post. The story remembers earlier posts and recurring friends. About 30% of days bring a random life event (a "plot twist"). |
 | Boss | Three or more days without a check-in brings a worried post from future you. Check in three days in a row to save the moment. |
 | Combo | Two habits at Level 3 or higher collide in one surprise post. |
+| Instant postcards | Opening the app pre-writes the postcard your next check-in will produce (same day, same check-in count, same event, chosen deterministically), so the reveal is instant. A draft that doesn't match is discarded and the postcard is written live. |
 | Two timelines | Each post has a twin from the you who stopped: same date, an everyday-life photo, wistful caption. |
 | Future-self avatar | Pick a character or upload a photo (kept on this computer, never sent to the AI). It evolves with your level: ring, habit badge at Lv3, gold at Lv4, crown at Lv5, animated rainbow at Lv6. |
 | Play your next 10 years | Plays your kept-going posts in date order as full-screen stories, a video-style recap. |
@@ -61,6 +62,7 @@ You need Python 3.10 or newer and an internet connection to load the photos.
 | 2 | Story agent (`gpt-6-luna`) | Writes the next post and its "stopped" twin, continuing the story and cast. Returns a photo query and the claims it makes. |
 | 3 | Reality-check agent (`gpt-6-luna`) | Compares the post with the allowed milestone and rewrites anything that overclaims. |
 | 4 | Photo tool | Picks the best-matching Creative Commons photo from a local Openverse library (`data/photos.json`) and credits it. The stopped timeline gets an everyday-life photo instead. |
+| 4b | Photo safety agent (`gpt-6-luna`, vision) | Looks at each candidate photo once (cached by URL) and rejects nudity, underwear or hosiery, suggestive framing, body close-ups, violence, and horror. A keyword filter runs first. Rejections are logged. `scripts/vet_photos.py` pre-vets the whole library (19 of 230 removed). |
 | 5 | Ladder agent (`gpt-6-luna`) | For a custom habit ("Something else"), designs a 6-step milestone ladder in practice hours, or refuses unsafe "habits" (e.g. checking an ex's profile, extreme calorie restriction). Its photos are fetched from Openverse once. |
 
 ## Data and sources (`data/habits.json`)
@@ -76,6 +78,7 @@ You need Python 3.10 or newer and an internet connection to load the photos.
 ## Safety built in
 
 - **Overclaiming:** the reality-check agent rewrites captions that exceed your real pace. Every rewrite, with before and after text, is shown in the **Safety log** (chart icon).
+- **Unsafe photos:** keyword filter plus the photo safety agent (vision) on every photo before it's shown.
 - **Unsafe habits:** the Ladder agent refuses harmful custom habits, and refusals are logged in the Safety log.
 - **Prompt injection:** names you type are treated as data. Handles are sanitized and lengths are capped.
 - **Runaway cost:** each call has an output cap and a daily token cap (`FUTUREFEED_DAILY_TOKEN_CAP`), with one check-in per habit per day.

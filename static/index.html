@@ -17,6 +17,7 @@
     <span class="bar-actions">
       <button class="menu-btn sketch" id="menu-btn" aria-haspopup="true" aria-expanded="false">Menu <span class="caret">▾</span></button>
       <div class="menu sketch" id="menu" hidden>
+        <button id="menu-add"><span class="mi" data-ico="sprout"></span><span><b>Add a daily thing</b><small>Start another habit, or several</small></span></button>
         <button id="menu-avatar"><span class="mi" data-ico="camera"></span><span><b>Your future self</b><small>Change your photo or character</small></span></button>
         <button id="menu-play"><span class="mi" data-ico="play"></span><span><b>Play your next 10 years</b><small>All your postcards as a story</small></span></button>
         <button id="demo-btn"><span class="mi" data-ico="flame"></span><span><b>Time travel (demo)</b><small>Skip days to see level-ups and slumps fast</small></span></button>
@@ -109,7 +110,8 @@
       <h2>Add a daily thing</h2>
       <div class="pick" id="add-habits"></div>
       <p class="err" id="add-err"></p>
-      <div class="row"><button class="btn sketch" id="add-cancel">Cancel</button><button class="btn primary sketch" id="add-save">Add</button></div>
+      <p class="ok-msg" id="add-ok"></p>
+      <div class="row"><button class="btn sketch" id="add-cancel">Done</button><button class="btn primary sketch" id="add-save">Add</button></div>
     </div>
   </div>
 

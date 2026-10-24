@@ -62,6 +62,22 @@ CREATE TABLE IF NOT EXISTS survey (
     answers TEXT NOT NULL,
     created_at TEXT DEFAULT (datetime('now', 'localtime'))
 );
+CREATE TABLE IF NOT EXISTS photo_checks (
+    url TEXT PRIMARY KEY,
+    safe INTEGER NOT NULL,
+    reason TEXT,
+    checked_at TEXT DEFAULT (datetime('now', 'localtime'))
+);
+CREATE TABLE IF NOT EXISTS drafts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    habit_id INTEGER NOT NULL,
+    day TEXT NOT NULL,
+    checkins INTEGER NOT NULL,
+    kind TEXT NOT NULL,
+    payload TEXT NOT NULL,
+    created_at TEXT DEFAULT (datetime('now', 'localtime')),
+    UNIQUE (habit_id, day, checkins)
+);
 CREATE TABLE IF NOT EXISTS events (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     run_id TEXT,
@@ -75,6 +91,7 @@ CREATE TABLE IF NOT EXISTS events (
 def init():
     DATA.mkdir(exist_ok=True)
     with connect() as c:
+        c.execute("PRAGMA journal_mode=WAL")  # background threads (pre-writing, photo checks) write concurrently
         c.executescript(SCHEMA)
         cols = {r["name"] for r in c.execute("PRAGMA table_info(habits)")}
         for col, ddl in (("start_level", "INTEGER DEFAULT 0"), ("goal", "TEXT DEFAULT ''"), ("custom", "TEXT")):
@@ -86,7 +103,7 @@ def init():
 
 @contextmanager
 def connect():
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(DB_PATH, timeout=30)  # wait for other writers instead of failing
     conn.row_factory = sqlite3.Row
     try:
         yield conn
@@ -132,3 +149,14 @@ def run_usage(run_id):
         rows = c.execute("SELECT agent, input_tokens, cached_tokens, output_tokens FROM usage WHERE run_id = ? ORDER BY id",
                          (run_id,)).fetchall()
     return [dict(r) for r in rows]
+
+
+def photo_verdict(url):
+    with connect() as c:
+        row = c.execute("SELECT safe, reason FROM photo_checks WHERE url = ?", (url,)).fetchone()
+    return (bool(row["safe"]), row["reason"]) if row else None
+
+
+def save_photo_verdict(url, safe, reason):
+    with connect() as c:
+        c.execute("INSERT OR REPLACE INTO photo_checks (url, safe, reason) VALUES (?,?,?)", (url, int(safe), reason[:200]))

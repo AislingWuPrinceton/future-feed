@@ -4,6 +4,9 @@ import rough from "./vendor/rough.esm.js";
 const $ = (id) => document.getElementById(id);
 renderAll();
 const hico = (key, cls = "") => ico(HABIT_ICON(key), cls);
+// a habit's own icon (custom habits get one picked by the Ladder agent)
+const hIcon = (h, cls = "") => ico(h?.icon || HABIT_ICON(h?.key || ""), cls);
+const iconOfPost = (p) => hIcon(S.habits.find((h) => h.id === p.habit_id) || { key: p.habit_key });
 
 let S = null;            // latest /api/state
 let POSTS = { kept: [], stopped: [] };
@@ -40,6 +43,7 @@ async function refresh() {
   $("onboard").hidden = onboarded;
   $("game").hidden = !onboarded;
   $("menu-avatar").hidden = $("menu-play").hidden = PLAIN || !onboarded;
+  $("menu-add").hidden = !onboarded;
   if (!onboarded) return renderOnboard();
   if (!PLAIN) {
     const [kept, stopped] = await Promise.all([api("/api/feed?timeline=kept"), api("/api/feed?timeline=stopped")]);
@@ -151,15 +155,29 @@ function openAdd() {
   const have = new Set(S.habits.map((h) => h.key));
   pickList($("add-habits"));
   $("add-habits").querySelectorAll(".pick-item").forEach((i) => { if (have.has(i.dataset.key)) i.remove(); });
+  $("add-habits").insertAdjacentHTML("beforeend", `<button type="button" class="link" id="another-custom">+ another thing of my own</button>`);
+  $("another-custom").onclick = () => {
+    $("another-custom").insertAdjacentHTML("beforebegin", pickItem({ key: "custom", unit: "minutes", default_amount: 15 }, true));
+    const item = $("another-custom").previousElementSibling;
+    item.addEventListener("click", (e) => { if (!e.target.closest("input, select, label")) selectPick($("add-habits"), item, !item.classList.contains("on")); });
+    item.querySelector(".cname").focus();
+  };
   $("add-err").textContent = "";
+  $("add-ok").textContent = "";
   $("add").hidden = false;
 }
 $("add-cancel").onclick = () => ($("add").hidden = true);
 $("add-save").onclick = async () => {
   const list = picked($("add-habits"));
   if (!list.length) return ($("add-err").textContent = "Pick something to add.");
-  if (await addHabits(list, $("add-err"), $("add-save")) && !$("add-err").textContent) $("add").hidden = true;
-  refresh();
+  const before = new Set(S.habits.map((h) => h.id));
+  await addHabits(list, $("add-err"), $("add-save"));
+  await refresh();
+  const added = S.habits.filter((h) => !before.has(h.id));
+  if (added.length && !$("add-err").textContent) { $("add").hidden = true; return; }
+  if (added.length) $("add-ok").textContent = `Added: ${added.map((h) => h.short).join(", ")}.`;
+  openAdd();  // keep going: the list now hides what you already have
+  $("add-ok").textContent = added.length ? `Added: ${added.map((h) => h.short).join(", ")}.` : "";
 };
 
 // ---------- future-self avatar: evolves with your highest level ----------
@@ -178,7 +196,7 @@ function avatarHTML(size, opts = {}) {
     : `<span class="face">${ico(CHARACTER_ICON[av.character] || "person")}</span>`;
   return `<span class="avx t${t} ${opts.gray ? "gray" : ""}" style="width:${size}px;height:${size}px">
       <span class="avx-in">${face}</span>
-      ${t >= 3 && top && size >= 44 ? `<span class="avx-badge">${hico(top.key)}</span>` : ""}
+      ${t >= 3 && top && size >= 44 ? `<span class="avx-badge">${hIcon(top)}</span>` : ""}
       ${t >= 5 && size >= 44 ? `<span class="avx-crown">${ico("crown")}</span>` : ""}
     </span>`;
 }
@@ -275,7 +293,7 @@ function renderToday() {
   const L = S.level_checkins;
   $("today").innerHTML = `
     <div class="today-card sketch">
-      <div class="today-head"><h3>Today</h3><button class="link" id="add-habit">+ add a daily thing</button></div>
+      <div class="today-head"><h3>Today</h3><button class="btn add-btn sketch" id="add-habit">+ Add a daily thing</button></div>
       ${S.habits.map((h) => {
         const prev = L[h.level - 1] || 0, next = h.next_level_at;
         const pct = next ? Math.round(((h.checkins - prev) / (next - prev)) * 100) : 100;
@@ -283,7 +301,7 @@ function renderToday() {
           ? `<p class="quest">${ico("storm", "inline")} <b>Storm ahead.</b> Check in ${h.quest.target} days in a row to clear it: ${h.quest.progress}/${h.quest.target}</p>` : "";
         return `
           <div class="habit-row ${h.checked_today ? "done" : ""}">
-            <span class="hr-ico">${hico(h.key)}</span>
+            <span class="hr-ico">${hIcon(h)}</span>
             <div class="hr-mid">
               <b>${esc(h.label)} · ${amountText(h)}</b>
               <small>${ico("flame", "inline")} ${h.streak}-day streak${PLAIN ? "" : ` · stop ${Math.max(0, h.allowed_chapter + 1)} of 6`}</small>
@@ -340,7 +358,10 @@ async function checkin(id) {
   renderRoad({ transit: true });
   const stop = animateTransit();
   try {
+    const t0 = performance.now();
     const r = await api(`/api/habits/${id}/checkin`, {});
+    // pre-written postcards come back instantly; keep the "in transit" moment for a beat anyway
+    await new Promise((ok) => setTimeout(ok, Math.max(0, 1400 - (performance.now() - t0))));
     stop();
     busy = false;
     await refresh();
@@ -409,7 +430,7 @@ function renderRoad(opts = {}) {
   const h = S.habits.find((x) => x.id === roadHabit);
 
   $("road-tabs").innerHTML = S.habits.length > 1 ? S.habits.map((x) =>
-    `<button class="${x.id === h.id ? "on" : ""}" data-road="${x.id}">${hico(x.key, "inline")} ${esc(x.short)}</button>`).join("") : "";
+    `<button class="${x.id === h.id ? "on" : ""}" data-road="${x.id}">${hIcon(x, "inline")} ${esc(x.short)}</button>`).join("") : "";
   $("road-tabs").querySelectorAll("[data-road]").forEach((b) => (b.onclick = () => { roadHabit = +b.dataset.road; renderRoad(); }));
 
   const kept = POSTS.kept.filter((p) => p.habit_id === h.id);
@@ -487,7 +508,7 @@ function postcards(list, tl, max = tl === "kept" ? 2 : 1) {
 }
 
 function photoHTML(p) {
-  const fb = `<span class="fb">${hico(p.habit_key)}</span>`;
+  const fb = `<span class="fb">${iconOfPost(p)}</span>`;
   return p.photo ? `${fb}<img src="${p.photo.url}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">` : fb;
 }
 
@@ -631,7 +652,7 @@ function showSlide() {
   } else {
     $("reel-stage").innerHTML = `
       <div class="slide">
-        ${s.photo ? `<img class="kb" src="${s.photo.url}" alt="" referrerpolicy="no-referrer">` : `<div class="kb fallback">${hico(s.habit_key)}</div>`}
+        ${s.photo ? `<img class="kb" src="${s.photo.url}" alt="" referrerpolicy="no-referrer">` : `<div class="kb fallback">${iconOfPost(s)}</div>`}
         <div class="slide-year">${year(s.live_date || s.future_date)}</div>
         <div class="slide-cap"><div class="slide-who">${avatarHTML(32)}<b>${esc(p.handle)}</b><span>${esc(s.location || "")}</span></div>
           <p>${esc(s.caption)}</p></div>
@@ -676,6 +697,7 @@ document.addEventListener("click", (e) => { if (!e.target.closest("#menu")) clos
 $("menu").addEventListener("click", closeMenu);
 $("menu-avatar").onclick = () => (S?.profile ? openAvatarSheet() : null);
 $("menu-play").onclick = () => (S?.profile ? playReel() : null);
+$("menu-add").onclick = () => (S?.profile ? openAdd() : null);
 $("menu-reset").onclick = () => $("demo-reset").click();
 
 // ---------- usage + safety ----------
