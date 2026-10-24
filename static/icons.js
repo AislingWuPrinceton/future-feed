@@ -145,6 +145,26 @@ const DRAW = {
     rc.path("M32 4 Q46 20 48 34 Q50 56 32 58 Q14 56 16 38 Q18 28 26 22 Q26 32 32 34 Q30 18 32 4 Z", o(C.orange, { seed: 111 })),
     rc.path("M32 30 Q42 40 40 48 Q38 56 32 56 Q24 55 25 46 Q27 38 32 30 Z", o(C.yellow, { seed: 112 })),
   ],
+  house: (rc) => [
+    rc.polygon([[8, 30], [32, 8], [56, 30]], o(C.rose, { seed: 115 })),
+    rc.rectangle(14, 30, 36, 26, o(C.cream, { seed: 116 })),
+    rc.rectangle(27, 40, 10, 16, o(C.brown, { seed: 117 })),
+  ],
+  flag: (rc) => [
+    rc.line(18, 6, 18, 60, line({ strokeWidth: 3, seed: 118 })),
+    rc.path("M18 8 L54 16 L18 28 Z", o(C.rose, { seed: 119 })),
+    rc.ellipse(18, 59, 26, 7, o(C.green, { seed: 120 })),
+  ],
+  tree: (rc) => [
+    rc.rectangle(28, 38, 8, 20, o(C.brown, { seed: 121 })),
+    rc.circle(32, 26, 34, o(C.green, { seed: 122 })),
+  ],
+  storm: (rc) => [
+    rc.ellipse(24, 28, 30, 22, o(C.gray, { seed: 123 })), rc.ellipse(40, 24, 32, 26, o(C.gray, { seed: 124 })),
+    rc.ellipse(32, 34, 46, 18, o(C.gray, { seed: 125 })),
+    rc.path("M32 40 L26 52 L33 52 L28 62", line({ stroke: "#e3a400", strokeWidth: 3, fill: "none", seed: 126 })),
+    rc.line(16, 44, 13, 52, line({ stroke: C.blue, seed: 127 })), rc.line(46, 44, 43, 52, line({ stroke: C.blue, seed: 128 })),
+  ],
   check: (rc) => [rc.path("M10 34 L26 50 L56 14", line({ fill: "none", strokeWidth: 5, seed: 113 }))],
   play: (rc) => [rc.polygon([[18, 10], [54, 32], [18, 54]], o(C.white, { seed: 114 }))],
 };

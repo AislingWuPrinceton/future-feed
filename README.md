@@ -28,7 +28,7 @@ You need Python 3.10 or newer and an internet connection to load the photos.
    ```
 5. Open http://localhost:8000, enter your name, pick a habit, and tap **I did it**.
 
-**Try a month in two minutes:** the clock button in the top bar opens **Demo controls**:
+**Try a month in two minutes:** open **Menu → Time travel (demo)**:
 - **Next day** checks in again tomorrow.
 - **Skip 4 days** triggers a slump boss and a 3-day comeback quest.
 - **Fast-forward 2 weeks** checks in on about 85% of days and jumps levels.
@@ -51,6 +51,7 @@ You need Python 3.10 or newer and an internet connection to load the photos.
 | Two timelines | Each post has a twin from the you who stopped: same date, an everyday-life photo, wistful caption. |
 | Future-self avatar | Pick a character or upload a photo (kept on this computer, never sent to the AI). It evolves with your level: ring, habit badge at Lv3, gold at Lv4, crown at Lv5, animated rainbow at Lv6. |
 | Play your next 10 years | Plays your kept-going posts in date order as full-screen stories, a video-style recap. |
+| Journey map | A hand-drawn trail with 6 stops (one per chapter). Your photo or character is the game piece and hops forward on every check-in. A slump puts a storm over the next stop until the comeback quest is done. |
 
 ## Agents and tools
 

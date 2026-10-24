@@ -14,12 +14,13 @@
     <header class="bar">
       <span class="logo">Future Feed</span>
       <span class="bar-actions">
-        <button class="icon" id="demo-btn" title="Demo controls" aria-label="Demo controls">
-          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
-        </button>
-        <button class="icon" id="usage-btn" title="AI usage and safety log" aria-label="AI usage">
-          <svg viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>
-        </button>
+        <button class="menu-btn" id="menu-btn" aria-haspopup="true" aria-expanded="false">Menu <span class="caret">▾</span></button>
+        <div class="menu" id="menu" hidden>
+          <button id="menu-avatar"><span class="mi" data-ico="camera"></span><span><b>Your future self</b><small>Change your photo or character</small></span></button>
+          <button id="demo-btn"><span class="mi" data-ico="flame"></span><span><b>Time travel (demo)</b><small>Skip days to see level-ups and slumps fast</small></span></button>
+          <button id="usage-btn"><span class="mi" data-ico="check"></span><span><b>AI usage &amp; safety log</b><small>Tokens per post, and what the safety checks caught</small></span></button>
+          <button id="menu-reset" class="danger"><span class="mi" data-ico="lock"></span><span><b>Start over</b><small>Erase habits, check-ins, and posts</small></span></button>
+        </div>
       </span>
     </header>
 
@@ -49,6 +50,7 @@
       <div class="me-top" id="me-top"></div>
       <div class="stories" id="stories"></div>
       <div id="today"></div>
+      <div id="journey"></div>
 
       <div class="seg" id="timeline">
         <button data-tl="kept" class="on">You, kept going</button>

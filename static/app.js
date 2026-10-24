@@ -1,4 +1,5 @@
 import { renderAll, ico, HABIT_ICON, CHARACTER_ICON } from "./icons.js";
+import rough from "./vendor/rough.esm.js";
 
 const $ = (id) => document.getElementById(id);
 renderAll();
@@ -34,7 +35,9 @@ async function refresh() {
   if (!onboarded) return renderOnboard();
   renderStories();
   renderToday();
+  renderJourney();
   renderMe();
+  $("menu-avatar").hidden = PLAIN;
   document.querySelector(".seg").hidden = PLAIN;
   if (PLAIN) {
     $("feed").innerHTML = "";
@@ -203,6 +206,7 @@ async function checkin(id) {
   busy = true;
   renderToday();
   const habit = S.habits.find((h) => h.id === id);
+  journeyHabit = id;
   if (PLAIN) {
     await api(`/api/habits/${id}/checkin${Q}`, {}).catch((err) => alert(err.message));
     busy = false;
@@ -355,6 +359,20 @@ const EVENT = {
   overclaim_fixed: "Reality check rewrote an overclaim",
   budget_block: "Daily budget cap hit",
 };
+// ---------- menu ----------
+document.querySelectorAll(".mi[data-ico]").forEach((m) => (m.innerHTML = ico(m.dataset.ico)));
+const closeMenu = () => { $("menu").hidden = true; $("menu-btn").setAttribute("aria-expanded", "false"); };
+$("menu-btn").onclick = (e) => {
+  e.stopPropagation();
+  const open = $("menu").hidden;
+  $("menu").hidden = !open;
+  $("menu-btn").setAttribute("aria-expanded", String(open));
+};
+document.addEventListener("click", (e) => { if (!e.target.closest("#menu")) closeMenu(); });
+$("menu").addEventListener("click", closeMenu);
+$("menu-avatar").onclick = () => (S?.profile ? openAvatarSheet() : null);
+$("menu-reset").onclick = () => $("demo-reset").click();
+
 $("usage-btn").onclick = async () => {
   const u = await api("/api/usage");
   $("u-today").textContent = `Today: ${u.today_tokens.toLocaleString()} of ${u.daily_cap.toLocaleString()} tokens`;
@@ -429,9 +447,17 @@ const TIER_NAME = ["Day zero", "Getting started", "Building", "On a roll", "Gold
 function avatarPicker(el, current = {}) {
   let choice = { ...current };
   const draw = () => {
-    el.innerHTML = (S?.avatar_characters || ["🦊", "🐼", "🐱", "🐰", "🐻", "🐨", "🐸", "🦁", "🐧", "🙂"]).map((c) =>
-      `<button type="button" class="avopt ${choice.character === c && !choice.photo ? "on" : ""}" data-c="${c}">${ico(CHARACTER_ICON[c])}</button>`).join("") +
-      `<label class="avopt up ${choice.photo ? "on" : ""}">${choice.photo ? `<img src="${choice.photo}" alt="">` : ico("camera")}<input type="file" accept="image/*" hidden></label>`;
+    const chars = S?.avatar_characters || ["🦊", "🐼", "🐱", "🐰", "🐻", "🐨", "🐸", "🦁", "🐧", "🙂"];
+    el.innerHTML = `
+      <label class="photo-tile ${choice.photo ? "on" : ""}">
+        <span class="pt-pic">${choice.photo ? `<img src="${choice.photo}" alt="">` : ico("camera")}</span>
+        <span><b>${choice.photo ? "That's you!" : "Use my photo"}</b>
+          <small>${choice.photo ? "Tap to change. You'll walk your own journey map." : "Be the hero of your own journey map. Stays on this computer, never sent to AI."}</small></span>
+        <input type="file" accept="image/*" hidden>
+      </label>
+      <p class="or">or pick a character</p>
+      <div class="avgrid">${chars.map((c) =>
+        `<button type="button" class="avopt ${choice.character === c && !choice.photo ? "on" : ""}" data-c="${c}">${ico(CHARACTER_ICON[c])}</button>`).join("")}</div>`;
     el.querySelectorAll("[data-c]").forEach((b) => (b.onclick = () => { choice = { character: b.dataset.c }; draw(); }));
     el.querySelector("input[type=file]").onchange = async (e) => {
       const file = e.target.files[0];
@@ -574,6 +600,97 @@ document.addEventListener("keydown", (e) => {
   if (e.key === "ArrowLeft") step(-1);
   if (e.key === "Escape") closeReel();
 });
+
+// ---------- journey mini-game: you (your photo or character) walk a hand-drawn trail ----------
+// Six stops = six chapters. Each check-in moves you along; a slump puts a storm on the trail.
+
+const JW = 340, JH = 250;
+const STOPS = [[30, 214], [112, 196], [204, 214], [298, 172], [242, 112], [126, 104], [196, 40]];
+const STOP_COLORS = ["#f7b6c2", "#ffd86b", "#9ed39b", "#9cc6f0", "#c9b5f0", "#f6a15b"];
+const SCENERY = [["tree", 72, 150, 30], ["tree", 300, 78, 34], ["tree", 50, 56, 26], ["tree", 330, 230, 22]];
+let journeyHabit = null;
+// remembered across reloads so the hop still plays after a refresh
+const lastPos = JSON.parse(localStorage.getItem("ff-journey-pos") || "{}");
+
+function piecePos(h) {
+  const L = S.level_checkins, lvl = h.level;
+  const prev = L[lvl - 1] || 0, next = L[lvl];
+  const frac = next ? Math.min(1, (h.checkins - prev) / (next - prev)) : 0;
+  const a = STOPS[Math.min(lvl, 6)], b = STOPS[Math.min(lvl + 1, 6)];
+  return [a[0] + (b[0] - a[0]) * frac, a[1] + (b[1] - a[1]) * frac];
+}
+
+function renderJourney() {
+  const el = $("journey");
+  if (PLAIN || !S.habits.length) return (el.innerHTML = "");
+  if (!S.habits.some((h) => h.id === journeyHabit)) journeyHabit = S.habits[0].id;
+  const h = S.habits.find((x) => x.id === journeyHabit);
+  const photo = !!S.profile.avatar?.photo;
+  const L = S.level_checkins;
+  const next = h.next_level_at;
+  const left = next ? next - h.checkins : 0;
+  const ladderNext = h.next_milestone ? h.next_milestone.milestone : "the top of this story";
+
+  el.innerHTML = `
+    <section class="journey">
+      <div class="j-head">
+        <h3>${esc(S.profile.name)}'s journey</h3>
+        <div class="j-tabs">${S.habits.length > 1 ? S.habits.map((x) =>
+          `<button class="${x.id === h.id ? "on" : ""}" data-j="${x.id}">${hico(x.key, "inline")} ${esc(x.short)}</button>`).join("") : ""}</div>
+      </div>
+      <div class="j-map">
+        <svg viewBox="0 0 ${JW} ${JH}" id="j-svg" aria-hidden="true"></svg>
+        ${SCENERY.map(([n, x, y, s]) => `<span class="j-deco" style="left:${(x / JW) * 100}%;top:${(y / JH) * 100}%;width:${s}px;height:${s}px">${ico(n)}</span>`).join("")}
+        <span class="j-deco home" style="left:${(STOPS[0][0] / JW) * 100}%;top:${(STOPS[0][1] / JH) * 100}%">${ico("house")}</span>
+        <span class="j-deco summit" style="left:${(STOPS[6][0] / JW) * 100}%;top:${(STOPS[6][1] / JH) * 100}%">${ico("flag")}</span>
+        ${STOPS.slice(1).map(([x, y], i) => `<span class="j-stop ${i < h.level ? "done" : i === h.level ? "next" : ""}"
+            style="left:${(x / JW) * 100}%;top:${(y / JH) * 100}%;--c:${STOP_COLORS[i]}">${i + 1}</span>`).join("")}
+        ${h.quest ? (() => {
+          // the storm sits over the next stop: it's blocked until the comeback quest is done
+          const [sx, sy] = STOPS[Math.min(h.level + 1, 6)];
+          return `<span class="j-storm" style="left:${(sx / JW) * 100}%;top:${(sy / JH) * 100}%">${ico("storm")}</span>`;
+        })() : ""}
+        <span class="j-piece" id="j-piece">${avatarHTML(photo ? 52 : 46, { tier: 0 })}<b class="j-you">you</b></span>
+      </div>
+      <p class="j-caption">${h.quest
+        ? `<b>A storm on your trail.</b> Check in ${h.quest.target} days in a row to clear it: ${h.quest.progress}/${h.quest.target}`
+        : next
+          ? `<b>${left} more check-in${left === 1 ? "" : "s"}</b> to stop ${h.level + 1}: ${esc(ladderNext)}`
+          : `<b>You reached the summit.</b> Keep going to write new chapters.`}</p>
+    </section>`;
+
+  drawTrail(h);
+  el.querySelectorAll("[data-j]").forEach((b) => (b.onclick = () => { journeyHabit = +b.dataset.j; renderJourney(); }));
+
+  // hop from where you were to where you are now
+  const piece = $("j-piece");
+  const to = piecePos(h);
+  const from = lastPos[h.id] || to;
+  const place = ([x, y]) => { piece.style.left = `${(x / JW) * 100}%`; piece.style.top = `${(y / JH) * 100}%`; };
+  place(from);
+  if (from[0] !== to[0] || from[1] !== to[1]) {
+    setTimeout(() => {
+      piece.classList.add("moving");
+      place(to);
+      setTimeout(() => piece.classList.remove("moving"), 1300);
+    }, 80);
+  }
+  lastPos[h.id] = to;
+  localStorage.setItem("ff-journey-pos", JSON.stringify(lastPos));
+}
+
+function drawTrail(h) {
+  const svg = $("j-svg");
+  const rc = rough.svg(svg);
+  svg.appendChild(rc.ellipse(80, 250, 260, 120, { fill: "#e8f4dc", fillStyle: "solid", stroke: "none", seed: 201 }));
+  svg.appendChild(rc.ellipse(290, 260, 240, 160, { fill: "#dff0f7", fillStyle: "solid", stroke: "none", seed: 202 }));
+  svg.appendChild(rc.circle(300, 30, 34, { fill: "#ffe29a", fillStyle: "solid", stroke: "#2b2420", strokeWidth: 1.5, seed: 203 }));
+  // the whole trail, faint
+  svg.appendChild(rc.linearPath(STOPS, { stroke: "#d9c3a0", strokeWidth: 7, roughness: 1.6, seed: 204 }));
+  // the part you've walked, bold
+  const walked = STOPS.slice(0, Math.min(h.level, 6) + 1).concat([piecePos(h)]);
+  svg.appendChild(rc.linearPath(walked, { stroke: "#ee2a7b", strokeWidth: 4, roughness: 1.2, seed: 205 }));
+}
 
 function studyBar() {
   if (!STUDY) return;

@@ -104,7 +104,9 @@ def generate_post(habit, kind, life_event="", combo_with=None):
         used = [json.loads(r["photo"])["url"] for r in c.execute("SELECT photo FROM posts WHERE photo IS NOT NULL")
                 if r["photo"] and r["photo"] != "null"]
     custom_pool = game.template_for(habit).get("photos") if habit.get("custom") else None
-    anchor = game.template_for(habit)["short"].lower() if custom_pool else None
+    # prefer photos whose title/tags actually mention the habit (avoids odd off-topic stock shots)
+    anchor = game.template_for(habit)["short"].lower() if custom_pool else \
+        {"guitar": "guitar", "running": "run", "reading": "book", "spanish": None, "saving": None}.get(habit["key"])
     photo = agents.find_photo(s["photo_query"], habit["key"], avoid=used, pool=custom_pool, anchor=anchor)
     # The you who stopped lives a different day: an everyday scene without the habit.
     stopped_photo = agents.find_photo(s["stopped_photo_query"], "life", avoid=used)
