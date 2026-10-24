@@ -1,0 +1,249 @@
+{
+ "note": "Milestone thresholds are what the Reality-Check agent enforces. Where no authoritative source exists, the threshold is labeled 'estimate'.",
+ "level_checkins": [
+  1,
+  3,
+  7,
+  14,
+  30,
+  60
+ ],
+ "habits": [
+  {
+   "key": "guitar",
+   "label": "Play guitar",
+   "emoji": "🎸",
+   "unit": "minutes",
+   "default_amount": 10,
+   "measure": "hours",
+   "chapters": [
+    {
+     "needs": 5,
+     "milestone": "can play a few open chords cleanly and strum a simple song at home",
+     "basis": "estimate"
+    },
+    {
+     "needs": 30,
+     "milestone": "plays a full easy song for friends at a small gathering",
+     "basis": "estimate"
+    },
+    {
+     "needs": 100,
+     "milestone": "jams with another musician regularly and can pick up simple songs by ear",
+     "basis": "estimate"
+    },
+    {
+     "needs": 250,
+     "milestone": "performs 2-3 songs at a local open mic",
+     "basis": "estimate"
+    },
+    {
+     "needs": 450,
+     "milestone": "plays a short set at a close friend's wedding or big party",
+     "basis": "estimate"
+    },
+    {
+     "needs": 600,
+     "milestone": "writes and performs an original song in front of an audience",
+     "basis": "estimate"
+    }
+   ],
+   "sources": [
+    "No single authoritative hours-to-skill source for guitar; thresholds are conservative estimates."
+   ],
+   "short": "Guitar"
+  },
+  {
+   "key": "spanish",
+   "label": "Learn Spanish",
+   "emoji": "🇪🇸",
+   "unit": "minutes",
+   "default_amount": 15,
+   "measure": "hours",
+   "chapters": [
+    {
+     "needs": 10,
+     "milestone": "orders food and asks for directions in simple Spanish",
+     "basis": "estimate"
+    },
+    {
+     "needs": 60,
+     "milestone": "has short small-talk conversations with a Spanish-speaking neighbor",
+     "basis": "estimate"
+    },
+    {
+     "needs": 200,
+     "milestone": "follows a Spanish TV show with Spanish subtitles",
+     "basis": "estimate"
+    },
+    {
+     "needs": 400,
+     "milestone": "travels a week in a Spanish-speaking country handling everyday situations without a translation app",
+     "basis": "estimate"
+    },
+    {
+     "needs": 750,
+     "milestone": "holds a real work meeting in Spanish (professional working proficiency)",
+     "basis": "FSI: Spanish is Category I, about 30 weeks / 600-750 class hours of intensive training for professional working proficiency"
+    },
+    {
+     "needs": 1200,
+     "milestone": "speaks fluently and comfortably in most situations; makes close Spanish-speaking friends",
+     "basis": "estimate: FSI hours are full-time classroom hours; self-study is usually slower"
+    }
+   ],
+   "sources": [
+    "U.S. Department of State, Foreign Service Institute, Foreign Language Training: https://www.state.gov/foreign-language-training/"
+   ],
+   "short": "Spanish"
+  },
+  {
+   "key": "running",
+   "label": "Go running",
+   "emoji": "🏃",
+   "unit": "minutes",
+   "default_amount": 20,
+   "measure": "hours",
+   "chapters": [
+    {
+     "needs": 3,
+     "milestone": "runs one mile without stopping",
+     "basis": "estimate"
+    },
+    {
+     "needs": 15,
+     "milestone": "finishes a first 5K race",
+     "basis": "NHS Couch to 5K: 9 weeks, 3 runs a week of about 30 minutes"
+    },
+    {
+     "needs": 60,
+     "milestone": "finishes a 10K",
+     "basis": "estimate"
+    },
+    {
+     "needs": 200,
+     "milestone": "finishes a half marathon",
+     "basis": "estimate"
+    },
+    {
+     "needs": 500,
+     "milestone": "finishes a full marathon",
+     "basis": "estimate"
+    },
+    {
+     "needs": 800,
+     "milestone": "is the one friends ask to start running with; leads a weekend running group",
+     "basis": "estimate"
+    }
+   ],
+   "sources": [
+    "CDC: adults need 150 minutes of moderate activity a week: https://www.cdc.gov/physical-activity-basics/guidelines/adults.html",
+    "NHS Couch to 5K: https://www.nhs.uk/live-well/exercise/running-and-aerobic-exercises/get-running-with-couch-to-5k/"
+   ],
+   "short": "Running"
+  },
+  {
+   "key": "reading",
+   "label": "Read",
+   "emoji": "📚",
+   "unit": "minutes",
+   "default_amount": 20,
+   "measure": "books",
+   "words_per_minute": 238,
+   "words_per_book": 80000,
+   "chapters": [
+    {
+     "needs": 1,
+     "milestone": "finishes the first book in a long time",
+     "basis": "238 wpm (Brysbaert 2019); 80,000-word book (assumption)"
+    },
+    {
+     "needs": 10,
+     "milestone": "has a favorite author and recommends books to friends",
+     "basis": "same"
+    },
+    {
+     "needs": 25,
+     "milestone": "joins or starts a book club",
+     "basis": "same"
+    },
+    {
+     "needs": 60,
+     "milestone": "is known as the friend with the best book recommendations",
+     "basis": "same"
+    },
+    {
+     "needs": 120,
+     "milestone": "has read 120+ books; writes thoughtful reviews people follow",
+     "basis": "same"
+    },
+    {
+     "needs": 200,
+     "milestone": "has read about 200 books; reading has shaped a career or big life decision",
+     "basis": "same"
+    }
+   ],
+   "sources": [
+    "Brysbaert, M. (2019). How many words do we read per minute? Journal of Memory and Language: average silent reading 238 wpm (non-fiction)."
+   ],
+   "short": "Reading"
+  },
+  {
+   "key": "saving",
+   "label": "Save money",
+   "emoji": "💰",
+   "unit": "dollars",
+   "default_amount": 5,
+   "measure": "dollars",
+   "annual_return": 0.04,
+   "chapters": [
+    {
+     "needs": 100,
+     "milestone": "has a small cushion for surprise expenses",
+     "basis": "compound-interest math"
+    },
+    {
+     "needs": 1000,
+     "milestone": "handles a $1,000 surprise bill without stress",
+     "basis": "compound-interest math"
+    },
+    {
+     "needs": 5000,
+     "milestone": "pays cash for a dream trip",
+     "basis": "compound-interest math"
+    },
+    {
+     "needs": 10000,
+     "milestone": "has a solid emergency fund and sleeps better",
+     "basis": "compound-interest math"
+    },
+    {
+     "needs": 20000,
+     "milestone": "has a meaningful down-payment or career-change fund",
+     "basis": "compound-interest math, 4% annual return assumed"
+    },
+    {
+     "needs": 30000,
+     "milestone": "has real financial freedom to say no to a bad job",
+     "basis": "compound-interest math, 4% annual return assumed"
+    }
+   ],
+   "sources": [
+    "Future value of daily deposits at an assumed 4% annual return (an assumption, not financial advice)."
+   ],
+   "short": "Saving"
+  }
+ ],
+ "life_events": [
+  "moved to a new city for a job",
+  "adopted a dog",
+  "had the busiest month of the year at work",
+  "went on a trip with old friends",
+  "a sibling had a baby",
+  "started a new job",
+  "rainy week stuck at home",
+  "a friend's birthday party",
+  "visited parents for the holidays",
+  "bad week: caught the flu"
+ ]
+}

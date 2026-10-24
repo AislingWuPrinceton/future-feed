@@ -1,0 +1,78 @@
+# Future Feed
+
+**Check in on one small habit a day. Each check-in writes the next post on your Instagram from ten years from now.**
+
+Most habit apps only record streaks, so people get bored and quit. Future Feed turns a habit into an unfolding story about your future self. Check-ins unlock new chapters, your real pace decides how far those chapters can reach, slumps trigger a "boss," and a second feed shows the you who stopped.
+
+## Run it locally (about 3 minutes)
+
+You need Python 3.10 or newer and an internet connection to load the photos.
+
+1. Clone the repo and enter the folder.
+   ```bash
+   git clone <repo-url> future-feed
+   cd future-feed
+   ```
+2. Create a virtual environment and install dependencies.
+   ```bash
+   python3 -m venv .venv
+   source .venv/bin/activate        # Windows: .venv\Scripts\activate
+   pip install -r requirements.txt
+   ```
+3. Provide the API key. The app reads `.env` from this folder first, then from the folder one level up. It needs `PORTKEY_API_KEY`. See `.env.example`.
+4. Start the app.
+   ```bash
+   python app.py
+   ```
+5. Open http://localhost:8000, enter your name, pick a habit, and tap **I did it**.
+
+**Try a month in two minutes:** the clock button in the top bar opens **Demo controls**:
+- **Next day** checks in again tomorrow.
+- **Skip 4 days** triggers a slump boss and a 3-day comeback quest.
+- **Fast-forward 2 weeks** checks in on about 85% of days and jumps levels.
+- **Reset everything** starts over.
+
+**A/B test mode:** http://localhost:8000/?mode=plain is the control group. It's an ordinary streak tracker with no feed and no AI. Give testers either version on their own device or a fresh copy, then compare check-in rates and motivation.
+
+## How it plays
+
+| Mechanic | Rule |
+|---|---|
+| Levels | Unlocked at 1, 3, 7, 14, 30, and 60 check-ins. Each level opens a new chapter, like "plays for friends" or "first open mic." |
+| Pace cap | Your real check-in rate is projected over ten years. A chapter your pace can't reach in ten years stays locked even if your level allows it. Post dates show *when* you'd get there at this pace. |
+| Daily posts | Every check-in writes a new post. The story remembers earlier posts and recurring friends. About 30% of days bring a random life event (a "plot twist"). |
+| Boss | Three or more days without a check-in brings a worried post from future you. Check in three days in a row to save the moment. |
+| Combo | Two habits at Level 3 or higher collide in one surprise post. |
+| Two timelines | Each post has a twin from the you who stopped: same date, gray photo, wistful caption. |
+
+## Agents and tools
+
+| Step | Who | What |
+|---|---|---|
+| 1 | Game engine (Python, `game.py`) | Levels, streaks, ten-year projection, which milestone is allowed, boss and quest state. No AI. |
+| 2 | Story agent (`gpt-6-luna`) | Writes the next post and its "stopped" twin, continuing the story and cast. Returns a photo query and the claims it makes. |
+| 3 | Reality-check agent (`gpt-6-luna`) | Compares the post with the allowed milestone and rewrites anything that overclaims. |
+| 4 | Photo tool | Picks the best-matching Creative Commons photo from a local Openverse library (`data/photos.json`) and credits it. |
+
+## Data and sources (`data/habits.json`)
+
+- Spanish: U.S. State Department FSI. Spanish is Category I, about 30 weeks or 600–750 class hours to professional working proficiency. https://www.state.gov/foreign-language-training/
+- Running: CDC, 150 minutes a week of moderate activity (https://www.cdc.gov/physical-activity-basics/guidelines/adults.html), and the NHS Couch to 5K plan.
+- Reading: Brysbaert (2019), an average silent reading speed of 238 words per minute. Books are assumed to be 80,000 words.
+- Saving: future value of daily deposits at an assumed 4% annual return. This is math, not financial advice.
+- Guitar milestones have no authoritative hours source, so they are conservative estimates and labeled that way in the app.
+- Photos: Openverse (https://openverse.org), Creative Commons licensed and credited on every post. Rebuild the library with `python scripts/build_photo_pool.py`.
+
+## Safety built in
+
+- **Overclaiming:** the reality-check agent rewrites captions that exceed your real pace. Every rewrite, with before and after text, is shown in the **Safety log** (chart icon).
+- **Prompt injection:** names you type are treated as data. Handles are sanitized and lengths are capped.
+- **Runaway cost:** each call has an output cap and a daily token cap (`FUTUREFEED_DAILY_TOKEN_CAP`), with one check-in per habit per day.
+- **Tone:** the stopped timeline is wistful, never shaming.
+
+## Tests
+
+```bash
+pip install -r requirements-dev.txt
+python tests/run_flow.py      # onboarding, level-ups, slump boss, comeback (resets the local db)
+```

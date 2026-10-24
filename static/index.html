@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Future Feed</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Grand+Hotel&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <main class="app">
+    <header class="bar">
+      <span class="logo">Future Feed</span>
+      <span class="bar-actions">
+        <button class="icon" id="demo-btn" title="Demo controls" aria-label="Demo controls">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+        </button>
+        <button class="icon" id="usage-btn" title="AI usage and safety log" aria-label="AI usage">
+          <svg viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>
+        </button>
+      </span>
+    </header>
+
+    <!-- onboarding -->
+    <section class="onboard" id="onboard" hidden>
+      <p class="kicker">It's 2036.</p>
+      <h1>Meet the you who<br>kept going.</h1>
+      <p class="muted">Pick one small thing to do every day. Each check-in writes the next post on your Instagram ten years from now.</p>
+      <form id="onboard-form">
+        <label>Your first name<input id="ob-name" required maxlength="30" placeholder="Aisling"></label>
+        <label>Your best friend's name<input id="ob-bestie" maxlength="30" placeholder="Jess"></label>
+        <p class="label">Your daily thing</p>
+        <div class="pick" id="ob-habits"></div>
+        <p class="err" id="ob-err"></p>
+        <button class="btn primary" type="submit">Show me 2036</button>
+      </form>
+    </section>
+
+    <!-- game -->
+    <section id="game" hidden>
+      <div class="stories" id="stories"></div>
+      <div id="today"></div>
+
+      <div class="seg" id="timeline">
+        <button data-tl="kept" class="on">You, kept going</button>
+        <button data-tl="stopped">You, if you stopped</button>
+      </div>
+
+      <div class="feed" id="feed"></div>
+    </section>
+  </main>
+
+  <!-- level-up celebration -->
+  <div class="overlay" id="levelup" hidden>
+    <div class="card pop">
+      <p class="kicker">Level <span id="lu-level"></span> unlocked</p>
+      <h2 id="lu-title"></h2>
+      <p class="muted" id="lu-sub"></p>
+      <button class="btn primary" id="lu-close">See the post</button>
+    </div>
+  </div>
+
+  <!-- add habit -->
+  <div class="overlay" id="add" hidden>
+    <div class="sheet">
+      <h2>Add a daily thing</h2>
+      <div class="pick" id="add-habits"></div>
+      <p class="err" id="add-err"></p>
+      <div class="row"><button class="btn" id="add-cancel">Cancel</button><button class="btn primary" id="add-save">Add</button></div>
+    </div>
+  </div>
+
+  <!-- usage + safety -->
+  <div class="overlay" id="usage" hidden>
+    <div class="sheet">
+      <h2>AI usage</h2>
+      <p class="muted" id="u-today"></p>
+      <table class="usage"><thead><tr><th>Time</th><th>Agents</th><th>In</th><th>Cached</th><th>Out</th></tr></thead><tbody id="u-runs"></tbody></table>
+      <h2 class="mt">Safety log</h2>
+      <ul class="events" id="u-events"></ul>
+      <button class="btn" id="u-close">Close</button>
+    </div>
+  </div>
+
+  <!-- demo -->
+  <div class="overlay" id="demo" hidden>
+    <div class="sheet">
+      <h2>Demo controls</h2>
+      <p class="muted">Move the app's clock so a month of play fits into a few minutes. App date: <b id="demo-date"></b></p>
+      <div class="demo-grid">
+        <button class="btn" data-days="1" data-rate="0">Next day</button>
+        <button class="btn" data-days="4" data-rate="0">Skip 4 days (slump)</button>
+        <button class="btn" data-days="14" data-rate="0.85">Fast-forward 2 weeks</button>
+        <button class="btn danger" id="demo-reset">Reset everything</button>
+      </div>
+      <p class="muted small" id="demo-status"></p>
+      <button class="btn" id="demo-close">Close</button>
+    </div>
+  </div>
+
+  <script type="module" src="/static/app.js"></script>
+</body>
+</html>

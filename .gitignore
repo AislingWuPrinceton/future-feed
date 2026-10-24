@@ -1,0 +1,5 @@
+.env
+.venv/
+__pycache__/
+data/futurefeed.db
+.DS_Store
