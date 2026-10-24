@@ -1,0 +1,251 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Future Feed · Study console</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <style>
+    body { background: #f4f4f4; }
+    .wrap { max-width: 760px; margin: 0 auto; padding: 24px 18px 80px; }
+    .box { background: #fff; border: 1px solid var(--line); border-radius: 14px; padding: 18px 20px; margin-top: 16px; }
+    .box h2 { margin-bottom: 4px; }
+    .box.done { opacity: .55; }
+    .row2 { display: flex; gap: 10px; flex-wrap: wrap; align-items: end; }
+    .row2 label { flex: 1; min-width: 160px; font-size: 13px; font-weight: 600; }
+    input[type=text], input[type=number], textarea { width: 100%; padding: 9px 10px; border: 1px solid var(--line); border-radius: 8px; font: inherit; margin-top: 5px; }
+    textarea { min-height: 64px; }
+    ol.steps { padding-left: 20px; line-height: 1.8; font-size: 14px; margin: 10px 0; }
+    .say { background: #f0f7ff; border-left: 3px solid var(--blue); padding: 8px 12px; font-size: 14px; margin: 10px 0; border-radius: 0 8px 8px 0; }
+    .q { margin: 16px 0 6px; font-size: 15px; font-weight: 600; }
+    .q small { display: block; font-weight: 400; color: var(--muted); font-size: 12px; margin-top: 2px; }
+    .scale { display: flex; gap: 6px; flex-wrap: wrap; }
+    .scale button { min-width: 42px; padding: 9px 12px; border: 1px solid var(--line); border-radius: 8px; background: #fff; font-weight: 600; }
+    .scale button.on { background: var(--ink); color: #fff; border-color: var(--ink); }
+    .ends { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); max-width: 340px; margin-top: 3px; }
+    .timer { font-size: 28px; font-weight: 700; font-variant-numeric: tabular-nums; min-width: 80px; }
+    .hand { background: #fff7e6; border: 1px dashed #f0b44c; border-radius: 10px; padding: 10px 12px; margin-top: 16px; font-size: 14px; }
+    .tag { display: inline-block; background: var(--ink); color: #fff; border-radius: 6px; padding: 2px 8px; font-size: 12px; font-weight: 700; margin-left: 6px; }
+    table.res { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 10px; }
+    table.res th, table.res td { border-bottom: 1px solid var(--line); padding: 6px 4px; text-align: center; }
+    .sum { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-top: 10px; }
+    .sum div { background: #f7f7f7; border-radius: 10px; padding: 10px 12px; font-size: 12px; color: var(--muted); }
+    .sum b { display: block; font-size: 18px; color: var(--ink); margin-top: 3px; }
+    .ok { color: #1a9c5b; font-weight: 600; font-size: 13px; margin-left: 8px; }
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <span class="logo">Future Feed</span> <span class="tag">STUDY CONSOLE</span>
+  <p class="muted">For you, the researcher. Keep this tab open; the app opens in a second tab. Answers are saved here and survive "Reset everything".</p>
+
+  <div class="box" id="setup">
+    <h2>1 · Participant</h2>
+    <div class="row2">
+      <label>Participant ID<input type="text" id="pid"></label>
+      <label>Their habit (from the app)<input type="text" id="habit" placeholder="e.g. running"></label>
+    </div>
+    <p class="muted" id="order-text"></p>
+    <div class="say">Read aloud: “There are no right answers. I didn’t build this to be praised, so honest criticism helps me most. Pick one habit you actually wish you did more. You’ll try two versions of the app, then answer a few questions.”</div>
+  </div>
+
+  <div id="rounds"></div>
+
+  <div class="box" id="final">
+    <h2>4 · Final questions <span class="muted" style="font-size:13px;font-weight:400">(participant fills in)</span></h2>
+    <div id="final-qs"></div>
+    <p class="q">Researcher notes (you)<small>First reactions word for word, confusion, did they scroll or open “You, if you stopped”?</small></p>
+    <textarea id="notes"></textarea>
+    <p class="err" id="final-err"></p>
+    <button class="btn primary" id="save-final">Save final answers</button>
+  </div>
+
+  <div class="box">
+    <h2>Results so far</h2>
+    <div class="sum" id="sum"></div>
+    <div style="overflow-x:auto"><table class="res" id="res"></table></div>
+    <p style="margin-top:12px"><a class="btn" href="/api/survey.csv">Download CSV</a>
+      <button class="btn" id="next">Next participant →</button></p>
+  </div>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const VERSION_QS = [
+  { k: "motivation", q: "How motivated are you to do this habit tomorrow?", type: "scale", min: 1, max: 7, ends: ["Not at all", "Extremely"] },
+  { k: "predicted_days", q: "If you used this app, how many days next week do you think you'd do the habit?", type: "scale", min: 0, max: 7, ends: ["0 days", "7 days"] },
+  { k: "future_self", q: "How connected do you feel to the person you'll be in 10 years?", type: "scale", min: 1, max: 7, ends: ["A completely different person", "The same person"] },
+  { k: "enjoy", q: "How enjoyable was this?", type: "scale", min: 1, max: 7, ends: ["Not at all", "Very"] },
+  { k: "keep_using", q: "Would you keep using this app for two weeks?", type: "choice", options: ["Yes", "Maybe", "No"] },
+];
+const FINAL_QS = [
+  { k: "preference", q: "Which version would you rather use?", type: "choice", options: ["A · plain streak tracker", "B · future Instagram feed", "No preference"] },
+  { k: "why", q: "Why? (one or two sentences)", type: "text" },
+  { k: "unrealistic_or_uncomfortable", q: "Did anything in version B feel unrealistic, fake, or uncomfortable?", type: "text" },
+  { k: "stopped_timeline_feeling", q: "How did it feel to see “You, if you stopped”?", type: "choice", options: ["Motivating", "Neutral", "Discouraging", "Didn't see it"] },
+  { k: "stopped_timeline_comment", q: "Anything to add about that? (optional)", type: "text", optional: true },
+  { k: "current_habit_app", q: "What habit app, if any, do you use today?", type: "text" },
+  { k: "quote_ok", q: "Can I quote you anonymously in my report?", type: "choice", options: ["Yes", "No"] },
+];
+const NAMES = { A: "Version A · plain streak tracker", B: "Version B · Future Feed" };
+const URLS = { A: "/?mode=plain", B: "/" };
+const answers = { 1: {}, 2: {}, final: {} };
+
+function qHTML(q, group) {
+  const id = `${group}-${q.k}`;
+  if (q.type === "text") return `<p class="q">${q.q}</p><textarea data-g="${group}" data-k="${q.k}" id="${id}"></textarea>`;
+  const opts = q.type === "scale" ? Array.from({ length: q.max - q.min + 1 }, (_, i) => String(q.min + i)) : q.options;
+  return `<p class="q">${q.q}${q.hint ? `<small>${q.hint}</small>` : ""}</p>
+    <div class="scale" data-g="${group}" data-k="${q.k}">${opts.map((o) => `<button type="button">${o}</button>`).join("")}</div>
+    ${q.ends ? `<div class="ends"><span>${q.ends[0]}</span><span>${q.ends[1]}</span></div>` : ""}`;
+}
+
+document.addEventListener("click", (e) => {
+  const b = e.target.closest(".scale button");
+  if (!b) return;
+  const s = b.parentElement;
+  s.querySelectorAll("button").forEach((x) => x.classList.toggle("on", x === b));
+  answers[s.dataset.g][s.dataset.k] = b.textContent;
+});
+
+function order() {
+  const n = parseInt(($("pid").value.match(/\d+/) || ["1"])[0], 10);
+  return n % 2 === 1 ? ["A", "B"] : ["B", "A"];
+}
+
+function renderRounds() {
+  const [first, second] = order();
+  $("order-text").innerHTML = `Order for this person: <b>${first} first, then ${second}</b> (odd IDs do A→B, even IDs do B→A).`;
+  $("rounds").innerHTML = [first, second].map((v, i) => {
+    const pos = i + 1;
+    return `
+    <div class="box" id="round-${pos}">
+      <h2>${pos + 1} · Round ${pos}: ${NAMES[v]}</h2>
+      <p>
+        <button class="btn" data-reset>Reset app</button>
+        <button class="btn primary" style="width:auto" data-open="${v}">Open ${v} in new tab</button>
+      </p>
+      <ol class="steps">
+        <li>They onboard with their own name, a real friend's name, and their habit.</li>
+        <li>They tap <b>I did it</b> (day 1).</li>
+        <li>You: clock icon → <b>Next day</b>. They tap <b>I did it</b>.</li>
+        <li>You: clock icon → <b>Skip 4 days (slump)</b>. Let them react. They tap <b>I did it</b>.</li>
+        <li>Say “Feel free to keep looking around. Tell me when you're done.” and start the timer.</li>
+      </ol>
+      <div class="row2">
+        <span class="timer" id="t-${pos}">0s</span>
+        <button class="btn" data-timer="${pos}">Start timer</button>
+        <label>Explore seconds<input type="number" min="0" id="sec-${pos}"></label>
+      </div>
+      <p class="q">Your observations for this round<small>Word-for-word reactions, confusion, what they tapped</small></p>
+      <textarea data-g="${pos}" data-k="observations"></textarea>
+      <div class="hand">Hand the laptop to the participant for these 5 questions about <b>${NAMES[v]}</b>.</div>
+      ${VERSION_QS.map((q) => qHTML(q, pos)).join("")}
+      <p class="err" id="err-${pos}"></p>
+      <button class="btn primary" data-save="${pos}" data-version="${v}">Save round ${pos}</button><span class="ok" id="ok-${pos}"></span>
+    </div>`;
+  }).join("");
+  bindRounds();
+}
+
+const timers = {};
+function bindRounds() {
+  document.querySelectorAll("[data-reset]").forEach((b) => (b.onclick = async () => {
+    await fetch("/api/demo/reset", { method: "POST" });
+    b.textContent = "Reset ✓";
+  }));
+  document.querySelectorAll("[data-open]").forEach((b) => (b.onclick = () => window.open(URLS[b.dataset.open], "futurefeed-app")));
+  document.querySelectorAll("[data-timer]").forEach((b) => (b.onclick = () => {
+    const pos = b.dataset.timer;
+    if (timers[pos]) {
+      clearInterval(timers[pos].iv);
+      $(`sec-${pos}`).value = Math.round((Date.now() - timers[pos].start) / 1000);
+      timers[pos] = null;
+      b.textContent = "Restart timer";
+    } else {
+      const start = Date.now();
+      timers[pos] = { start, iv: setInterval(() => ($(`t-${pos}`).textContent = Math.round((Date.now() - start) / 1000) + "s"), 250) };
+      b.textContent = "Stop timer";
+    }
+  }));
+  document.querySelectorAll("[data-save]").forEach((b) => (b.onclick = () => saveRound(+b.dataset.save, b.dataset.version)));
+}
+
+function collectText(group) {
+  document.querySelectorAll(`textarea[data-g="${group}"]`).forEach((t) => (answers[group][t.dataset.k] = t.value.trim()));
+}
+
+async function post(body) {
+  const r = await fetch("/api/survey", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  if (!r.ok) throw new Error((await r.json()).detail || "Save failed");
+}
+
+async function saveRound(pos, version) {
+  collectText(pos);
+  const a = answers[pos];
+  const missing = VERSION_QS.filter((q) => !a[q.k]).map((q) => q.k);
+  if (!$("pid").value.trim()) return ($(`err-${pos}`).textContent = "Enter a participant ID at the top.");
+  if (missing.length) return ($(`err-${pos}`).textContent = "Please answer every question above.");
+  a.explore_seconds = $(`sec-${pos}`).value;
+  a.habit = $("habit").value.trim();
+  try {
+    await post({ participant: $("pid").value.trim(), part: "version", version, position: pos, answers: a });
+    $(`err-${pos}`).textContent = "";
+    $(`ok-${pos}`).textContent = "Saved ✓";
+    $(`round-${pos}`).classList.add("done");
+    loadResults();
+  } catch (err) {
+    $(`err-${pos}`).textContent = err.message;
+  }
+}
+
+$("save-final").onclick = async () => {
+  collectText("final");
+  const a = answers.final;
+  const missing = FINAL_QS.filter((q) => !q.optional && !a[q.k]);
+  if (missing.length) return ($("final-err").textContent = "Please answer every question (the comment is optional).");
+  a.notes = $("notes").value.trim();
+  a.preference = /^[AB] ·/.test(a.preference) ? a.preference[0] : "None";
+  try {
+    await post({ participant: $("pid").value.trim(), part: "final", answers: a });
+    $("final-err").textContent = "";
+    $("save-final").textContent = "Saved ✓";
+    $("final").classList.add("done");
+    loadResults();
+  } catch (err) {
+    $("final-err").textContent = err.message;
+  }
+};
+
+const avg = (xs) => (xs.length ? (xs.reduce((s, x) => s + x, 0) / xs.length).toFixed(1) : "–");
+async function loadResults() {
+  const rows = await (await fetch("/api/survey")).json();
+  const pairs = (k) => rows.filter((r) => r[`A_${k}`] && r[`B_${k}`]).map((r) => [+r[`A_${k}`], +r[`B_${k}`]]);
+  const card = (label, k) => {
+    const p = pairs(k);
+    const up = p.filter(([a, b]) => b > a).length;
+    return `<div>${label}<b>A ${avg(p.map((x) => x[0]))} → B ${avg(p.map((x) => x[1]))}</b>${p.length ? `${up}/${p.length} scored B higher` : "no pairs yet"}</div>`;
+  };
+  const pref = rows.filter((r) => r.preference);
+  $("sum").innerHTML = `<div>Participants<b>${rows.length}</b>${pref.length} finished</div>
+    <div>Prefer B<b>${pref.filter((r) => r.preference === "B").length} / ${pref.length}</b>A: ${pref.filter((r) => r.preference === "A").length}</div>` +
+    card("Motivation (1–7)", "motivation") + card("Predicted days (0–7)", "predicted_days") +
+    card("Future-self link (1–7)", "future_self") + card("Enjoyment (1–7)", "enjoy");
+  const cols = ["participant", "order", "habit", "A_motivation", "B_motivation", "A_predicted_days", "B_predicted_days", "A_explore_seconds", "B_explore_seconds", "preference"];
+  $("res").innerHTML = `<tr>${cols.map((c) => `<th>${c.replace(/_/g, " ")}</th>`).join("")}</tr>` +
+    rows.map((r) => `<tr>${cols.map((c) => `<td>${r[c] ?? ""}</td>`).join("")}</tr>`).join("");
+  return rows;
+}
+
+function nextId(rows) {
+  const nums = rows.map((r) => parseInt((r.participant.match(/\d+/) || ["0"])[0], 10));
+  return "P" + ((nums.length ? Math.max(...nums) : 0) + 1);
+}
+
+$("next").onclick = () => location.reload();
+$("pid").oninput = renderRounds;
+$("final-qs").innerHTML = FINAL_QS.map((q) => qHTML(q, "final")).join("");
+loadResults().then((rows) => { $("pid").value = nextId(rows); renderRounds(); });
+</script>
+</body>
+</html>

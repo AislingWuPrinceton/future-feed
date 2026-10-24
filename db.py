@@ -53,6 +53,15 @@ CREATE TABLE IF NOT EXISTS usage (
     output_tokens INTEGER,
     created_at TEXT DEFAULT (datetime('now', 'localtime'))
 );
+CREATE TABLE IF NOT EXISTS survey (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    participant TEXT NOT NULL,
+    part TEXT NOT NULL,
+    version TEXT,
+    position INTEGER,
+    answers TEXT NOT NULL,
+    created_at TEXT DEFAULT (datetime('now', 'localtime'))
+);
 CREATE TABLE IF NOT EXISTS events (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     run_id TEXT,

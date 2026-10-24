@@ -287,6 +287,75 @@ def demo_reset():
     return {"ok": True}
 
 
+# ---------- A/B study: survey answers live in their own table, untouched by demo reset ----------
+
+SURVEY_COLUMNS = ["participant", "date", "order", "habit",
+                  *[f"{v}_{k}" for v in "AB" for k in ("motivation", "predicted_days", "future_self", "enjoy",
+                                                         "keep_using", "explore_seconds", "observations")],
+                  "preference", "why", "unrealistic_or_uncomfortable", "stopped_timeline_feeling",
+                  "stopped_timeline_comment", "current_habit_app", "quote_ok", "followup_did_habit", "notes"]
+
+
+class SurveyIn(BaseModel):
+    participant: str
+    part: str            # "version" or "final"
+    version: str = ""    # "A" or "B" for part == "version"
+    position: int = 0    # 1 = first version tried, 2 = second
+    answers: dict
+
+
+@app.post("/api/survey")
+def save_survey(body: SurveyIn):
+    pid = re.sub(r"[^A-Za-z0-9_-]", "", body.participant)[:12]
+    if not pid or body.part not in ("version", "final") or (body.part == "version" and body.version not in ("A", "B")):
+        raise HTTPException(400, "Missing participant, part, or version.")
+    with db.connect() as c:
+        c.execute("INSERT INTO survey (participant, part, version, position, answers) VALUES (?,?,?,?,?)",
+                  (pid, body.part, body.version, body.position, json.dumps(body.answers, ensure_ascii=False)[:5000]))
+    return {"ok": True}
+
+
+def survey_rows():
+    """One row per participant; later submissions overwrite earlier ones (so a redo just works)."""
+    people = {}
+    with db.connect() as c:
+        for r in c.execute("SELECT * FROM survey ORDER BY id"):
+            p = people.setdefault(r["participant"], {"participant": r["participant"], "date": r["created_at"][:10]})
+            a = json.loads(r["answers"])
+            if r["part"] == "version":
+                if r["position"] == 1:
+                    p["order"] = "AB" if r["version"] == "A" else "BA"
+                for k, v in a.items():
+                    p[k if k in ("habit", "notes") else f"{r['version']}_{k}"] = v
+            else:
+                p.update(a)
+    return [people[k] for k in sorted(people, key=lambda s: (len(s), s))]
+
+
+@app.get("/api/survey")
+def survey_list():
+    return survey_rows()
+
+
+@app.get("/api/survey.csv")
+def survey_csv():
+    import csv
+    import io
+    from fastapi.responses import Response
+    buf = io.StringIO()
+    w = csv.DictWriter(buf, fieldnames=SURVEY_COLUMNS, extrasaction="ignore")
+    w.writeheader()
+    for row in survey_rows():
+        w.writerow(row)
+    return Response(buf.getvalue(), media_type="text/csv",
+                    headers={"Content-Disposition": "attachment; filename=ab-results.csv"})
+
+
+@app.get("/research")
+def research():
+    return FileResponse(os.path.join(ROOT, "static", "research.html"))
+
+
 @app.get("/")
 def index():
     return FileResponse(os.path.join(ROOT, "static", "index.html"))

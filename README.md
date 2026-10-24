@@ -34,6 +34,8 @@ You need Python 3.10 or newer and an internet connection to load the photos.
 - **Fast-forward 2 weeks** checks in on about 85% of days and jumps levels.
 - **Reset everything** starts over.
 
+**Study console:** http://localhost:8000/research walks you through each A/B session, stores survey answers (they survive Reset), and exports `ab-results.csv`.
+
 **A/B test mode:** http://localhost:8000/?mode=plain is the control group. It's an ordinary streak tracker with no feed and no AI. Give testers either version on their own device or a fresh copy, then compare check-in rates and motivation.
 
 ## How it plays
