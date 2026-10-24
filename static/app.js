@@ -1,4 +1,8 @@
+import { renderAll, ico, HABIT_ICON, CHARACTER_ICON } from "./icons.js";
+
 const $ = (id) => document.getElementById(id);
+renderAll();
+const hico = (key, cls = "") => ico(HABIT_ICON(key), cls);
 let S = null;              // latest /api/state
 let timeline = "kept";
 let newestPostId = null;    // to animate a freshly written post
@@ -49,7 +53,7 @@ function pickItem(t, on) {
   return `
     <div class="pick-item ${on ? "on" : ""}" data-key="${t.key}">
       <div class="pick-top">
-        <span class="em">${t.emoji}</span>
+        <span class="em">${hico(t.key)}</span>
         ${custom ? `<input class="cname" maxlength="40" placeholder="Something else: meditate, draw, piano…">` : `<span class="name">${t.label}</span>`}
         <input type="number" class="amt" min="1" max="240" value="${t.default_amount}" aria-label="amount">
         <span class="unit">${t.unit === "dollars" ? "$ / day" : "min / day"}</span>
@@ -154,7 +158,7 @@ $("add-save").onclick = async () => {
 function renderStories() {
   $("stories").innerHTML = S.habits.map((h) => `
     <button class="story" data-scroll="${h.id}">
-      <span class="ring ${h.checked_today ? "done" : ""}"><span>${h.emoji}</span><b class="lv">Lv ${h.level}</b></span>
+      <span class="ring ${h.checked_today ? "done" : ""}"><span>${hico(h.key)}</span><b class="lv">Lv ${h.level}</b></span>
       <span class="slabel">${h.short}</span>
     </button>`).join("") + `
     <button class="story" id="add-story">
@@ -181,10 +185,10 @@ function renderToday() {
     return `
       <div class="task ${h.checked_today ? "done" : ""}" id="task-${h.id}">
         <div class="top">
-          <span style="font-size:26px">${h.emoji}</span>
+          <span class="task-ico">${hico(h.key)}</span>
           <span class="q">${h.checked_today ? "Done for today" : `${h.label}, ${amountText(h)} today?`}
-            <small>🔥 ${h.streak}-day streak · ${h.checkins} check-ins · ${Math.round(h.adherence * 100)}% of days</small></span>
-          <button class="go" data-checkin="${h.id}" ${h.checked_today || busy ? "disabled" : ""}>${h.checked_today ? "✓ Done" : "I did it"}</button>
+            <small>${ico("flame", "inline")} ${h.streak}-day streak · ${h.checkins} check-ins · ${Math.round(h.adherence * 100)}% of days</small></span>
+          <button class="go" data-checkin="${h.id}" ${h.checked_today || busy ? "disabled" : ""}>${h.checked_today ? `${ico("check", "inline")} Done` : "I did it"}</button>
         </div>
         <div class="prog"><i style="width:${pct}%"></i></div>
         <div class="meta"><span>Level ${h.level}</span><span>${next ? `${next - h.checkins} more to Level ${h.level + 1}` : "Max level"}</span></div>
@@ -298,7 +302,7 @@ async function renderFeed() {
   const handle = timeline === "kept" ? prof.handle : prof.handle.replace(".2036", ".someday");
   const pending = S.habits.filter((h) => !h.checked_today);
   const locked = timeline === "kept" && pending.length ? `
-    <article class="locked"><div class="media"><span class="lock">🔒</span>
+    <article class="locked"><div class="media"><span class="lock">${ico("lock")}</span>
       <p>Tomorrow's you is waiting</p><small>Check in on ${pending.map((h) => h.label.toLowerCase()).join(" or ")} to see what happens next.</small>
     </div></article>` : "";
   if (!posts.length) {
@@ -309,7 +313,7 @@ async function renderFeed() {
   }
   $("feed").innerHTML = locked + posts.map((p) => {
     const photo = p.photo
-      ? `<img src="${p.photo.url}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'fallback',textContent:'${emojiFor(p.habit_key)}'}))">`
+      ? `<div class="fallback">${emojiFor(p.habit_key)}</div><img src="${p.photo.url}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">`
       : `<div class="fallback">${emojiFor(p.habit_key)}</div>`;
     const credit = p.photo ? `Photo: <a href="${esc(p.photo.page)}" target="_blank" rel="noopener">${esc(p.photo.title || "untitled")}</a> by ${esc(p.photo.creator)}, ${esc(p.photo.license)}` : "";
     const b = (p.basis || "").replace(/ ?combo:\d+/, "").trim();
@@ -330,7 +334,7 @@ async function renderFeed() {
 }
 
 function emojiFor(key) {
-  return (S.templates.find((t) => t.key === key) || {}).emoji || "✨";
+  return hico(key);
 }
 
 function syncSeg() {
@@ -412,11 +416,11 @@ function avatarHTML(size, opts = {}) {
   const top = [...(S?.habits || [])].sort((a, b) => b.level - a.level)[0];
   const face = av.photo
     ? `<img src="${av.photo}" alt="">`
-    : `<span class="face" style="font-size:${Math.round(size * 0.52)}px">${av.character || (S?.profile?.name || "Y")[0]}</span>`;
+    : `<span class="face">${ico(CHARACTER_ICON[av.character] || "person")}</span>`;
   return `<span class="avx t${t} ${opts.gray ? "gray" : ""}" style="width:${size}px;height:${size}px">
       <span class="avx-in">${face}</span>
-      ${t >= 3 && top && size >= 44 ? `<span class="avx-badge">${top.emoji}</span>` : ""}
-      ${t >= 5 && size >= 44 ? `<span class="avx-crown">👑</span>` : ""}
+      ${t >= 3 && top && size >= 44 ? `<span class="avx-badge">${hico(top.key)}</span>` : ""}
+      ${t >= 5 && size >= 44 ? `<span class="avx-crown">${ico("crown")}</span>` : ""}
     </span>`;
 }
 
@@ -426,8 +430,8 @@ function avatarPicker(el, current = {}) {
   let choice = { ...current };
   const draw = () => {
     el.innerHTML = (S?.avatar_characters || ["🦊", "🐼", "🐱", "🐰", "🐻", "🐨", "🐸", "🦁", "🐧", "🙂"]).map((c) =>
-      `<button type="button" class="avopt ${choice.character === c && !choice.photo ? "on" : ""}" data-c="${c}">${c}</button>`).join("") +
-      `<label class="avopt up ${choice.photo ? "on" : ""}">${choice.photo ? `<img src="${choice.photo}" alt="">` : "📷"}<input type="file" accept="image/*" hidden></label>`;
+      `<button type="button" class="avopt ${choice.character === c && !choice.photo ? "on" : ""}" data-c="${c}">${ico(CHARACTER_ICON[c])}</button>`).join("") +
+      `<label class="avopt up ${choice.photo ? "on" : ""}">${choice.photo ? `<img src="${choice.photo}" alt="">` : ico("camera")}<input type="file" accept="image/*" hidden></label>`;
     el.querySelectorAll("[data-c]").forEach((b) => (b.onclick = () => { choice = { character: b.dataset.c }; draw(); }));
     el.querySelector("input[type=file]").onchange = async (e) => {
       const file = e.target.files[0];
@@ -483,7 +487,7 @@ function renderMe() {
   const best = Math.max(0, ...S.habits.map((h) => h.streak));
   const chapters = S.habits.reduce((n, h) => n + Math.max(0, h.allowed_chapter + 1), 0);
   const stats = `<div class="me-stats"><span><b>${total}</b>check-ins</span><span><b>${best}</b>streak</span><span><b>${chapters}</b>chapters</span></div>`;
-  const play = `<button class="btn play" data-play>▶ Play your next 10 years</button>`;
+  const play = `<button class="btn play" data-play>${ico("play", "inline")} Play your next 10 years</button>`;
   $("me-top").innerHTML = `
     <div class="me-row">
       <button class="me-av" data-avatar title="Change your future self">${avatarHTML(72)}</button>
@@ -497,7 +501,7 @@ function renderMe() {
       ${stats}
       ${play}
       <div class="side-habits">${S.habits.map((h) => `
-        <div class="sh"><span>${h.emoji} ${esc(h.short)}</span><span class="muted">Lv ${h.level}</span></div>
+        <div class="sh"><span>${hico(h.key, "inline")} ${esc(h.short)}</span><span class="muted">Lv ${h.level}</span></div>
         <div class="dots small">${Array.from({ length: 6 }, (_, i) => `<i class="${i <= h.allowed_chapter ? "on" : ""}"></i>`).join("")}</div>
         <p class="sh-next">${h.next_milestone ? "Next: " + esc(h.next_milestone.milestone) : "Top of the ladder"}</p>`).join("")}
       </div>

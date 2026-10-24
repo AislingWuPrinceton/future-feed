@@ -69,6 +69,7 @@ You need Python 3.10 or newer and an internet connection to load the photos.
 - Reading: Brysbaert (2019), an average silent reading speed of 238 words per minute. Books are assumed to be 80,000 words.
 - Saving: future value of daily deposits at an assumed 4% annual return. This is math, not financial advice.
 - Guitar milestones have no authoritative hours source, so they are conservative estimates and labeled that way in the app.
+- Icons: Future Feed's own hand-drawn set (`static/icons.js`), rendered with rough.js (MIT, vendored in `static/vendor/`).
 - Photos: Openverse (https://openverse.org), Creative Commons licensed and credited on every post. Rebuild the library with `python scripts/build_photo_pool.py`.
 
 ## Safety built in

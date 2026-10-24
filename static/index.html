@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Future Feed</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Grand+Hotel&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=Grand+Hotel&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
@@ -30,7 +30,9 @@
       <p class="muted">Pick one small thing to do every day. Each check-in writes the next post on your Instagram ten years from now.</p>
       <form id="onboard-form">
         <label>Your first name<input id="ob-name" required maxlength="30" placeholder="Aisling"></label>
-        <label>Your best friend's name<input id="ob-bestie" maxlength="30" placeholder="Jess"></label>
+        <label>Who do you most want cheering you on?
+          <small class="muted hint">The person you'd most want to see you get there. They'll show up in your future posts.</small>
+          <input id="ob-bestie" maxlength="30" placeholder="Jess, Mom, my partner…"></label>
         <div id="ob-avatar-wrap">
           <p class="label">Pick your future self <small class="muted">(they level up with you)</small></p>
           <div class="avpick" id="ob-avatar"></div>

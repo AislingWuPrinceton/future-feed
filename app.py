@@ -158,13 +158,17 @@ def set_profile(body: ProfileIn):
     name = body.name.strip()[:30]
     if not name:
         raise HTTPException(400, "Tell us your first name.")
-    bestie = body.bestie.strip()[:30] or "Maya"
+    supporter = body.bestie.strip()[:30] or "Maya"
+    family = supporter.lower() in {"mom", "mum", "mother", "mama", "dad", "father", "papa"}
     db.set_setting("profile", {
         "name": name,
         "handle": clean_handle(name, "you") + ".2036",
         "cast": [
-            {"name": bestie, "handle": clean_handle(bestie, "bestie"), "relation": "best friend"},
-            {"name": "Mom", "handle": "mom", "relation": "mom"},
+            # the person the user most wants cheering them on: the main recurring character
+            {"name": supporter, "handle": clean_handle(supporter, "cheerleader"),
+             "relation": "the person they most want cheering them on"},
+            {"name": "Sam", "handle": "sam", "relation": "friend"} if family
+            else {"name": "Mom", "handle": "mom", "relation": "mom"},
         ],
     })
     return {"ok": True}
