@@ -531,14 +531,16 @@ body.study .page { padding-bottom: 120px; }
 .roadwrap.off { display: none; }
 .townwrap .road-legend { margin: 8px 0 10px; }
 
-.town { --px: 0; --py: 0; position: relative; height: 480px; overflow: hidden; isolation: isolate; background: #fbf6ec;
+.town { --px: 0; --py: 0; position: relative; height: 480px; overflow: hidden; isolation: isolate; background: #f6efe2;
   border: 2.5px solid var(--ink); border-radius: var(--wobble-sm); box-shadow: 4px 5px 0 rgba(43, 36, 32, .85); }
 .town-defs { position: absolute; width: 0; height: 0; }
-.grain { position: absolute; inset: 0; z-index: 15; pointer-events: none; opacity: .22; mix-blend-mode: multiply; }
+.grain { position: absolute; inset: 0; z-index: 15; pointer-events: none; opacity: .16; mix-blend-mode: multiply; }
+/* outlines are running stitches in thread */
+.town :where(svg path[fill="none"]) { stroke-dasharray: 3.2 2.4; stroke-linecap: round; }
 .grain svg { display: block; }
 .sky { position: absolute; inset: 0; pointer-events: none; }
 .sky > svg { position: absolute; inset: 0; width: 100%; height: 100%; }
-.sky-wash { fill: #b3d5ec; opacity: .6; transition: fill .8s; }
+.sky-wash { fill: #bcdcee; transition: fill .8s; }
 .sky-wash2 { fill: #ffe3a3; opacity: .5; }
 .town.night { background: #2a3150; }
 .town.night .sky-wash { fill: #1b2347; opacity: .95; }
@@ -574,14 +576,10 @@ body.study .page { padding-bottom: 120px; }
 .town.night .hills { filter: brightness(.45) saturate(.7); }
 
 .street-scroll { position: absolute; inset: 0; overflow-x: auto; overflow-y: hidden; scrollbar-width: thin; }
-.street { position: relative; min-width: 100%; width: max-content; height: 100%; display: flex; align-items: flex-end; gap: 10px; padding: 0 44px 0 26px;
-  background: linear-gradient(180deg, transparent calc(100% - 62px), #efe5d3 calc(100% - 62px), #efe5d3 calc(100% - 46px), #d8cdbb calc(100% - 46px)); }
-.street::before { content: ""; position: absolute; left: 0; right: 0; bottom: 45px; height: 2.5px; background: var(--ink); opacity: .85;
-  -webkit-mask: repeating-linear-gradient(90deg, #000 0 180px, rgba(0, 0, 0, .6) 180px 186px); }
-.street::after { content: ""; position: absolute; left: 0; right: 0; bottom: 20px; height: 2px;
-  background: repeating-linear-gradient(90deg, rgba(43, 36, 32, .55) 0 22px, transparent 22px 44px); }
-.town.night .street { background: linear-gradient(180deg, transparent calc(100% - 62px), #6c6470 calc(100% - 62px), #6c6470 calc(100% - 46px), #4f4a5c calc(100% - 46px)); }
-.town.night .street::after { background: repeating-linear-gradient(90deg, rgba(255, 246, 220, .5) 0 22px, transparent 22px 44px); }
+.street { position: relative; min-width: 100%; width: max-content; height: 100%; display: flex; align-items: flex-end; gap: 10px; padding: 0 44px 0 26px; }
+.ground { position: absolute; left: 0; bottom: 0; pointer-events: none; overflow: visible; }
+.g-walk { fill: #e6dac5; } .g-road { fill: #b9ad9c; } .g-mid { stroke: #f4ecdc; }
+.town.night .g-walk { fill: #6c6470; } .town.night .g-road { fill: #4a4558; } .town.night .g-mid { stroke: #cfc39f; }
 
 .welcome { align-self: flex-end; margin-bottom: 74px; background: var(--card); border: 2.5px solid var(--ink); border-radius: var(--wobble-sm);
   padding: 6px 14px; transform: rotate(-4deg); box-shadow: 3px 3px 0 var(--ink); text-align: center; position: relative; transition: transform .3s cubic-bezier(.3, 1.6, .5, 1); }
@@ -612,7 +610,7 @@ body.study .page { padding-bottom: 120px; }
 .lot:hover .bp, .lot.working .bp { opacity: 1; }
 .lot:hover .win.lit { animation: flicker .6s ease calc(var(--w) * .05s) both; }
 .town.night .win.lit { filter: drop-shadow(0 0 4px #ffc65c) drop-shadow(0 0 10px rgba(255, 190, 80, .7)); }
-.town.night .lot-b .wash > :not(.win) { filter: brightness(.62) saturate(.85); }
+.town.night .lot-b .felt > :not(.win) { filter: brightness(.62) saturate(.85); }
 .town.night .lot-b .ink { opacity: .75; }
 @keyframes flicker { 0% { opacity: .35; } 40% { opacity: 1; } 60% { opacity: .7; } 100% { opacity: 1; } }
 .win.new-lit { animation: newlit 1.2s ease .4s both; }

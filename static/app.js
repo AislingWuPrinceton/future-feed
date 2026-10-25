@@ -859,9 +859,9 @@ const KIND = { guitar: "hall", music: "hall", piano: "hall", dance: "hall", read
   running: "gym", bike: "gym", dumbbell: "gym", wave: "gym", spanish: "cafe", chat: "cafe", pan: "cafe",
   saving: "home", heart: "home", lotus: "garden", sprout: "garden", drop: "garden", moon: "garden", sun: "garden" };
 const KIND_NAME = { hall: "Music hall", library: "Library", gym: "Gym", cafe: "Café", home: "Home", garden: "Greenhouse", studio: "Studio" };
-// The town is drawn like an urban sketch: wobbly ink lines (rough.js) over loose watercolor
-// washes that bleed a little past the lines, on the same paper as the rest of the app.
-const SC = 1.2, X0 = 14, INK = "#2b2420";
+// The town is made of needle felt: every piece of colour is a puffy wool patch (an SVG filter
+// adds fuzzy edges, fibre texture and soft light), and the outlines are running stitches.
+const SC = 1.2, X0 = 14, INK = "#2b2420", THREAD = "#5a4232";
 const seen = JSON.parse(localStorage.getItem("ff-town") || "{}");
 let night = new Date().getHours() < 7 || new Date().getHours() >= 19;
 const STYLE = {
@@ -878,7 +878,7 @@ const WIN_COUNT = { hall: [4, 5], library: [2, 4], cafe: [2, 2], home: [2, 3], g
 // a fresh pen for each building; fixed seeds keep every drawing identical between renders
 function pen(seed) {
   const host = document.createElementNS("http://www.w3.org/2000/svg", "svg"), rc = rough.svg(host);
-  const o = (e = {}) => ({ stroke: INK, strokeWidth: 1.15, roughness: 0.85, bowing: 0.8, seed: ++seed, ...e });
+  const o = (e = {}) => ({ stroke: THREAD, strokeWidth: 1.15, roughness: 0.35, bowing: 0.3, disableMultiStroke: true, seed: ++seed, ...e });
   return {
     rect: (x, y, w, h, e) => rc.rectangle(x, y, w, h, o(e)).outerHTML,
     line: (x1, y1, x2, y2, e) => rc.line(x1, y1, x2, y2, o(e)).outerHTML,
@@ -908,10 +908,10 @@ function buildingSVG(h, idx, built, checkins, fresh, alt) {
     w++;
     return [wash, ink];
   };
-  const floor = (f, wash, ink) => `<g class="floor ${f >= fresh.floors ? "new" : ""}" style="--f:${f}">
-      <g class="wash" filter="url(#wc)" transform="translate(1.6 1.2)">${wash}</g><g class="ink">${ink}</g></g>`;
+  const floor = (f, wall0, wash, ink) => `<g class="floor ${f >= fresh.floors ? "new" : ""}" style="--f:${f}">
+      <g class="felt base" filter="url(#felt)">${wall0}</g><g class="felt" filter="url(#felt)">${wash}</g><g class="ink">${ink}</g></g>`;
 
-  out += `<ellipse cx="${cx + 4}" cy="${base + 2}" rx="${Wd / 2 + 16}" ry="5" fill="#2b2420" opacity=".12" filter="url(#wc)"/>`;
+  out += `<ellipse cx="${cx + 4}" cy="${base + 2}" rx="${Wd / 2 + 16}" ry="5" fill="#2b2420" opacity=".16" filter="url(#soft)"/>`;
   for (let f = 0; f < 6; f++) {
     const FH = 36, top = base - (f + 1) * FH - (f >= built ? 58 : 0);
     if (f >= built) {  // blueprint floors float above the roof
@@ -919,7 +919,7 @@ function buildingSVG(h, idx, built, checkins, fresh, alt) {
         <text x="${cx}" y="${top + FH / 2 + 6}" text-anchor="middle" class="bp-t">floor ${f + 1} · ~${(h.chapter_dates[f] || "").slice(0, 4)}</text></g>`;
       continue;
     }
-    let wash = wr(x0, top, Wd, FH, wall), ink = P.rect(x0, top, Wd, FH);
+    let wall0 = wr(x0, top, Wd, FH, wall), wash = "", ink = P.rect(x0 + 2.5, top + 2.5, Wd - 5, FH - 5, { strokeWidth: 0.9 });
     const add = ([a, b]) => { wash += a; ink += b; };
     const g = f === 0;
     if (kind === "hall") {
@@ -1006,7 +1006,7 @@ function buildingSVG(h, idx, built, checkins, fresh, alt) {
         [0, 1, 2, 3].forEach((i) => add(win(x0 + 8 + i * pw, top + 9, pw, 18)));
       }
     } else if (kind === "garden") {
-      wash = wr(x0, top, Wd, FH, wall, `opacity=".75"`);
+      wall0 = wr(x0, top, Wd, FH, wall);
       ink += [1, 2, 3, 4, 5, 6].map((i) => `<line x1="${x0 + i * 20}" y1="${top}" x2="${x0 + i * 20}" y2="${top + FH}" stroke="${INK}" stroke-width=".6" opacity=".35"/>`).join("");
       if (g) {
         [x0 + 6, x0 + 36, x0 + 106].forEach((x) => add(win(x, top + 6, 26, 26)));
@@ -1022,7 +1022,7 @@ function buildingSVG(h, idx, built, checkins, fresh, alt) {
       wash += [0, 1, 2, 3, 4, 5, 6].map((i) => `<circle cx="${x0 + 6 + i * 21}" cy="${top + FH - 3 - (i % 2) * 3}" r="${4 + (i % 3)}" fill="#7fae70"/>`).join("");
       ink += P.path(`M${x0} ${top + 2}` + [1, 2, 3, 4, 5, 6, 7].map((i) => `Q${x0 + i * 20 - 10} ${top + 9} ${x0 + i * 20} ${top + 2}`).join(""), { stroke: "#4f7d47", strokeWidth: 1 });
     } else {  // studio: brick loft with big factory windows
-      wash += wr(x0, top, Wd, FH, "url(#brick)");
+      wall0 = wr(x0, top, Wd, FH, "url(#brick)");
       const fw = (x, y, ww, hh, n) => {
         for (let i = 0; i < n; i++) add(win(x + (i * ww) / n, y, ww / n, hh));
         ink += P.path(`M${x - 2} ${y - 1}Q${x + ww / 2} ${y - 7} ${x + ww + 2} ${y - 1}`, { strokeWidth: 1 });
@@ -1035,7 +1035,7 @@ function buildingSVG(h, idx, built, checkins, fresh, alt) {
         fw(x0 + 10, top + 9, 60, 23, 2); fw(x0 + 80, top + 9, 58, 23, 1);
       }
     }
-    out += floor(f, wash, ink);
+    out += floor(f, wall0, wash, ink);
   }
 
   // roof on the highest built floor
@@ -1080,7 +1080,7 @@ function buildingSVG(h, idx, built, checkins, fresh, alt) {
     roofTop = T - 46;
   } else if (kind === "garden") {
     const d = `M${x0} ${T}A${Wd / 2} 34 0 0 1 ${x0 + Wd} ${T}Z`;
-    wash += wp(d, st.roof, `opacity=".7"`);
+    wash += wp(d, st.roof);
     ink += P.path(d) + [-2, -1, 0, 1, 2].map((i) => {
       const x = cx + i * 24, y = T - 34 * Math.sqrt(1 - ((x - cx) / (Wd / 2)) ** 2);
       return `<line x1="${x}" y1="${T}" x2="${x}" y2="${y}" stroke="${INK}" stroke-width=".7" opacity=".6"/>`;
@@ -1099,7 +1099,7 @@ function buildingSVG(h, idx, built, checkins, fresh, alt) {
       + P.line(x0 + Wd - 43, T - 30, x0 + Wd - 19, T - 30, { strokeWidth: 0.7 });
     roofTop = T - 68;
   }
-  out += `<g class="roof ${built > fresh.floors ? "new" : ""}" style="--f:${built - 1}"><g class="wash" filter="url(#wc)" transform="translate(1.6 1.2)">${wash}</g><g class="ink">${ink}</g></g>`;
+  out += `<g class="roof ${built > fresh.floors ? "new" : ""}" style="--f:${built - 1}"><g class="felt" filter="url(#felt)">${wash}</g><g class="ink">${ink}</g></g>`;
   return { svg: `<svg viewBox="0 0 ${SVGW} ${SVGH}" width="${SVGW * SC}" height="${SVGH * SC}">${out}</svg>`, total, lit, width: SVGW * SC, signAt: (SVGH - roofTop) * SC };
 }
 
@@ -1107,43 +1107,61 @@ function buildingSVG(h, idx, built, checkins, fresh, alt) {
 let SUN = [], SKY = "", CLOUD = "", HILLS = "", TREE = [], LAMP = "", MAILBOX = { up: "", down: "" }, DEFS = "";
 function townArt() {
   if (CLOUD) return;
+  // felt: fuzzy fibre edges, a puffy bevel lit from the top left, fibre speckle, and a soft shadow underneath
+  const felt = (id, fuzz, puff, lift) => `<filter id="${id}" x="-12%" y="-12%" width="124%" height="130%" color-interpolation-filters="sRGB">
+      <feTurbulence type="fractalNoise" baseFrequency=".85" numOctaves="2" seed="3" result="n"/>
+      <feDisplacementMap in="SourceGraphic" in2="n" scale="${fuzz}" xChannelSelector="R" yChannelSelector="G" result="fz"/>
+      <feTurbulence type="turbulence" baseFrequency="1.8" numOctaves="1" seed="5" result="n2"/>
+      <feDisplacementMap in="SourceGraphic" in2="n2" scale="${fuzz * 2.6}" xChannelSelector="R" yChannelSelector="B" result="hair0"/>
+      <feColorMatrix in="hair0" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 .45 0" result="hair"/>
+      <feGaussianBlur in="fz" stdDeviation="${puff}" result="bl"/>
+      <feDiffuseLighting in="bl" surfaceScale="${puff * 2.2}" diffuseConstant="1" lighting-color="#fff" result="lt"><feDistantLight azimuth="235" elevation="52"/></feDiffuseLighting>
+      <feComposite in="fz" in2="lt" operator="arithmetic" k1=".8" k2=".42" result="sh"/>
+      <feTurbulence type="fractalNoise" baseFrequency="1.3" numOctaves="3" seed="11" result="t"/>
+      <feTurbulence type="fractalNoise" baseFrequency=".06" numOctaves="2" seed="21" result="m"/>
+      <feComposite in="t" in2="m" operator="arithmetic" k2=".6" k3=".4" result="tm"/>
+      <feColorMatrix in="tm" values=".32 0 0 0 .8  .32 0 0 0 .8  .32 0 0 0 .8  0 0 0 0 1" result="tex"/>
+      <feComposite in="sh" in2="tex" operator="arithmetic" k1="1.04" result="tx"/>
+      <feComposite in="tx" in2="fz" operator="in" result="wool"/>
+      <feGaussianBlur in="fz" stdDeviation="${lift}" result="sb"/><feOffset in="sb" dx="${lift * .6}" dy="${lift}" result="so"/>
+      <feFlood flood-color="#3b2a1e" flood-opacity=".3"/><feComposite in2="so" operator="in" result="shadow"/>
+      <feMerge><feMergeNode in="shadow"/><feMergeNode in="hair"/><feMergeNode in="wool"/></feMerge></filter>`;
   DEFS = `<svg class="town-defs" width="0" height="0" aria-hidden="true"><defs>
-    <filter id="wc" x="-8%" y="-8%" width="116%" height="116%"><feTurbulence type="fractalNoise" baseFrequency=".04" numOctaves="3" seed="4" result="n"/>
-      <feDisplacementMap in="SourceGraphic" in2="n" scale="5" xChannelSelector="R" yChannelSelector="G" result="d"/><feGaussianBlur in="d" stdDeviation=".45"/></filter>
-    <filter id="wcsoft" x="-20%" y="-20%" width="140%" height="140%"><feTurbulence type="fractalNoise" baseFrequency=".012" numOctaves="3" seed="9" result="n"/>
-      <feDisplacementMap in="SourceGraphic" in2="n" scale="40" xChannelSelector="R" yChannelSelector="G" result="d"/><feGaussianBlur in="d" stdDeviation="3"/></filter>
+    ${felt("felt", 1.8, 2, 1.6)}${felt("feltbig", 3, 5, 3)}
+    <filter id="soft" x="-20%" y="-50%" width="140%" height="200%"><feGaussianBlur stdDeviation="3"/></filter>
     <pattern id="brick" width="16" height="8" patternUnits="userSpaceOnUse"><rect width="16" height="8" fill="#d39478"/>
-      <path d="M0 .5h16M0 4.5h16M4 .5v4M12 4.5v4" stroke="#9c5a40" stroke-width=".6" opacity=".55"/></pattern>
-    <filter id="grain"><feTurbulence type="fractalNoise" baseFrequency=".9" numOctaves="2" seed="2"/><feColorMatrix values="0 0 0 0 .17 0 0 0 0 .14 0 0 0 0 .12 0 0 0 .55 0"/></filter>
+      <path d="M0 .5h16M0 4.5h16M4 .5v4M12 4.5v4" stroke="#9c5a40" stroke-width=".9" stroke-dasharray="1.6 1.2" opacity=".6"/></pattern>
+    <filter id="grain"><feTurbulence type="fractalNoise" baseFrequency="1.1" numOctaves="3" seed="2"/><feColorMatrix values="0 0 0 0 .3 0 0 0 0 .24 0 0 0 0 .2 0 0 0 .5 0"/></filter>
   </defs></svg>`;
-  const P = pen(7);
-  CLOUD = `<svg viewBox="0 0 140 54"><path filter="url(#wc)" d="M18 46c-12 0-14-14-2-16 0-12 16-16 24-8 4-12 24-14 30-2 10-6 26 0 24 12 14 0 16 14 4 14z" fill="#fff"/>
-    ${P.path("M18 46c-12 0-14-14-2-16 0-12 16-16 24-8 4-12 24-14 30-2 10-6 26 0 24 12 14 0 16 14 4 14z", { strokeWidth: 1, roughness: 1.1 })}</svg>`;
+  const P = pen(7), F = (id, inner, extra = "") => `<g filter="url(#${id})" ${extra}>${inner}</g>`;
+  const cloud = "M18 46c-12 0-14-14-2-16 0-12 16-16 24-8 4-12 24-14 30-2 10-6 26 0 24 12 14 0 16 14 4 14z";
+  CLOUD = `<svg viewBox="0 0 140 54">${F("feltbig", wp(cloud, "#fffdf8"))}
+    ${P.path("M24 42c-8 0-9-9 0-11 0-9 12-12 18-5 3-9 19-10 23-1 8-4 19 0 18 9 10 0 11 8 3 8z", { strokeWidth: 1, stroke: "#c9bfb2" })}</svg>`;
   const towers = [[60, 70], [95, 112], [128, 58], [180, 92], [216, 132], [252, 76], [900, 84], [936, 126], [968, 66], [1010, 104], [1050, 72], [1180, 96], [1216, 60]];
   HILLS = `<svg viewBox="0 0 1400 260" preserveAspectRatio="xMidYMax slice">
-    <g class="far">${towers.map(([x, hh]) => wr(x, 200 - hh, 30, hh, "#c9d7e6", `filter="url(#wc)" opacity=".7"`)
-      + P.rect(x, 200 - hh, 30, hh, { stroke: "#7f95ad", strokeWidth: 0.8, roughness: 1 })
-      + [...Array(Math.floor(hh / 16))].map((_, i) => `<line x1="${x + 6}" x2="${x + 24}" y1="${208 - hh + i * 16}" y2="${208 - hh + i * 16}" stroke="#7f95ad" stroke-width=".6" opacity=".6"/>`).join("")).join("")}</g>
-    <g class="mid">${wp("M0 190C180 136 300 168 430 158S700 112 860 150 1150 136 1400 158V260H0z", "#cfe0c3", `filter="url(#wc)"`)}</g>
-    <g class="near">${wp("M0 218C220 182 380 214 560 200S900 176 1080 204 1300 192 1400 200V260H0z", "#b2d3a2", `filter="url(#wc)"`)}
-      ${P.path("M0 218C220 182 380 214 560 200S900 176 1080 204 1300 192 1400 200", { strokeWidth: 1, roughness: 1.2, stroke: "#5f7f55" })}</g></svg>`;
-  SKY = `<svg viewBox="0 0 1400 470" preserveAspectRatio="xMidYMin slice"><g filter="url(#wcsoft)">
+    <g class="far">${F("felt", towers.map(([x, hh], i) => wr(x, 200 - hh, 30, hh, i % 2 ? "#c7d6e6" : "#d6dfe9")).join(""))}
+      ${towers.map(([x, hh]) => [...Array(Math.floor(hh / 16))].map((_, i) => `<path d="M${x + 7} ${208 - hh + i * 16}h16" stroke="#8ea3ba" stroke-width="1.2" fill="none"/>`).join("")).join("")}</g>
+    <g class="mid">${F("feltbig", wp("M0 190C180 136 300 168 430 158S700 112 860 150 1150 136 1400 158V260H0z", "#c9deb8"))}
+      ${P.path("M0 198C180 144 300 176 430 166S700 120 860 158 1150 144 1400 166", { strokeWidth: 1.1, stroke: "#8fae7e" })}</g>
+    <g class="near">${F("feltbig", wp("M0 218C220 182 380 214 560 200S900 176 1080 204 1300 192 1400 200V260H0z", "#a9cf96"))}
+      ${P.path("M0 226C220 190 380 222 560 208S900 184 1080 212 1300 200 1400 208", { strokeWidth: 1.2, stroke: "#6f9a5f" })}</g></svg>`;
+  SKY = `<svg viewBox="0 0 1400 470" preserveAspectRatio="xMidYMin slice"><g filter="url(#feltbig)">
     <path class="sky-wash" d="M-60 -60H1460V230C1300 300 1160 220 980 270S640 230 460 290 120 240 -60 300Z"/></g></svg>`;
-  SUN = [`<svg viewBox="-40 -40 80 80"><circle r="20" fill="#ffd36b" filter="url(#wc)"/>${P.circle(0, 0, 40, { strokeWidth: 1.3 })}
-      <g class="rays">${[...Array(10)].map((_, i) => { const a = (i * Math.PI) / 5; return P.line(Math.cos(a) * 26, Math.sin(a) * 26, Math.cos(a) * 34, Math.sin(a) * 34, { strokeWidth: 1.3 }); }).join("")}</g></svg>`,
+  SUN = [`<svg viewBox="-40 -40 80 80"><g class="rays">${F("felt", [...Array(10)].map((_, i) => `<path d="M-3.5 -24L0 -36L3.5 -24Z" fill="#f6b84b" transform="rotate(${i * 36})"/>`).join(""))}</g>
+      ${F("feltbig", `<circle r="21" fill="#ffd36b"/>`)}${P.circle(0, 0, 30, { strokeWidth: 1.2, stroke: "#c98a2a" })}</svg>`,
     `<svg viewBox="-40 -40 80 80"><mask id="moonm"><rect x="-40" y="-40" width="80" height="80" fill="#fff"/><circle cx="11" cy="-7" r="17" fill="#000"/></mask>
-      <circle r="20" fill="#fff4cf" mask="url(#moonm)"/><circle r="20" fill="none" stroke="#f4ecd2" stroke-width="1" stroke-dasharray="3 4" opacity=".4"/></svg>`];
-  for (const [a, b] of [["#8fbe7d", "#79a86a"], ["#a3c98a", "#86b070"]]) {
-    TREE.push(`<svg viewBox="0 0 46 76"><g class="wash" filter="url(#wc)"><circle cx="23" cy="30" r="17" fill="${a}"/><circle cx="16" cy="24" r="10" fill="${b}"/></g>
-      ${P.line(23, 74, 23, 40, { strokeWidth: 2 })}${P.line(23, 52, 30, 44, { strokeWidth: 1 })}
-      <g class="crown">${P.circle(23, 30, 34, { fill: b, fillStyle: "hachure", hachureGap: 5, fillWeight: 0.6, hachureAngle: -50, strokeWidth: 1 })}</g></svg>`);
+      ${F("feltbig", `<circle r="20" fill="#fff4cf" mask="url(#moonm)"/>`)}</svg>`];
+  for (const [a, b, c] of [["#8fbe7d", "#79a86a", "#a6cf92"], ["#a3c98a", "#86b070", "#bcdba3"]]) {
+    TREE.push(`<svg viewBox="0 0 46 76">${F("felt", wr(20, 40, 6, 34, "#9a6b4b"))}
+      <g class="crown">${F("felt", `<circle cx="23" cy="32" r="16" fill="${b}"/><circle cx="14" cy="24" r="10" fill="${a}"/><circle cx="30" cy="20" r="10" fill="${c}"/>`)}
+      ${P.path("M14 30q4 -6 9 -2M26 36q5 -4 8 1M24 18q4 -3 8 0", { strokeWidth: 1, stroke: "#4f7d47" })}</g></svg>`);
   }
-  LAMP = `<svg viewBox="0 0 30 92"><circle class="halo" cx="15" cy="14" r="14" fill="#ffd27a"/>${P.line(15, 90, 15, 20, { strokeWidth: 1.6 })}
-    ${P.path("M8 19h14l-3 -9h-8z", { fill: "#fff2c4", fillStyle: "solid" })}${P.line(10, 90, 20, 90)}</svg>`;
+  LAMP = `<svg viewBox="0 0 30 92"><circle class="halo" cx="15" cy="14" r="14" fill="#ffd27a"/>
+    ${F("felt", wr(13, 18, 4, 72, "#5f6f7d") + wp("M7 19h16l-3 -10h-10z", "#fff2c4") + wr(8, 88, 14, 4, "#5f6f7d"))}</svg>`;
   for (const up of [true, false]) {
-    MAILBOX[up ? "up" : "down"] = `<svg viewBox="0 -12 46 64"><g filter="url(#wc)">${wp("M4 16a10 10 0 0 1 20 0v12H4z", "#7aa0c4")}${wr(14, 6, 18, 22, "#7aa0c4")}</g>
-      ${P.line(14, 28, 14, 52, { strokeWidth: 1.8 })}${P.path("M4 28V16a10 10 0 0 1 10 -10h18v22z")}${P.line(14, 6, 14, 6)}
-      <g class="mb-flag">${up ? P.path("M32 12V-8h10v7h-8", { fill: "#d9655b", fillStyle: "solid" }) : P.path("M32 20h12v6H32", { fill: "#d9655b", fillStyle: "solid" })}</g></svg>`;
+    MAILBOX[up ? "up" : "down"] = `<svg viewBox="0 -12 46 64">${F("felt", wr(12, 28, 4, 24, "#8a6a52") + wp("M4 16a10 10 0 0 1 10 -10h18v22H4z", "#7aa0c4"))}
+      ${P.path("M8 24V16a7 7 0 0 1 7 -7h14v15z", { strokeWidth: 0.9, stroke: "#4c6f92" })}
+      <g class="mb-flag">${F("felt", up ? wp("M32 12V-8h10v7h-8v1z", "#d9655b") : wp("M32 20h12v6H32z", "#d9655b"))}</g></svg>`;
   }
 }
 
@@ -1200,6 +1218,9 @@ function renderTown(opts = {}) {
     </div>
     <div class="hills">${HILLS}</div>
     <div class="street-scroll"><div class="street">
+      <svg class="ground" width="100%" height="64" aria-hidden="true"><g filter="url(#feltbig)"><rect class="g-walk" x="-20" y="2" width="120%" height="18"/><rect class="g-road" x="-20" y="18" width="120%" height="60"/></g>
+        <line x1="0" x2="100%" y1="13" y2="13" stroke="#8d7b66" stroke-width="1.2" stroke-dasharray="3.2 2.4" stroke-linecap="round"/>
+        <line class="g-mid" x1="0" x2="100%" y1="44" y2="44" stroke-width="3" stroke-dasharray="18 22" stroke-linecap="round"/></svg>
       <div class="welcome"><b>${esc(name)}ville</b><small>est. ${S.today.slice(0, 4)} · pop. ${pop}</small></div>
       ${lots}
       <div class="lot empty" id="lot-add"><div class="lot-plot"><span>${ico("sprout")}</span><b>Empty lot</b><small>Add a daily thing<br>and build here</small></div></div>
