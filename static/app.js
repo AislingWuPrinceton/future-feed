@@ -310,7 +310,7 @@ function renderToday() {
             <span class="hr-ico">${hIcon(h)}</span>
             <div class="hr-mid">
               <b>${esc(h.label)} · ${amountText(h)}</b>
-              <small>${ico("flame", "inline")} ${h.streak}-day streak${PLAIN ? "" : ` · stop ${Math.max(0, h.allowed_chapter + 1)} of 6`}</small>
+              <small>${ico("flame", "inline")} ${h.streak}-day streak${PLAIN ? "" : ` · floor ${Math.min(MAXF, h.level)} of 6`}</small>
               ${PLAIN ? "" : `<div class="prog"><i style="width:${pct}%"></i></div>`}
               ${quest}
             </div>
@@ -676,6 +676,7 @@ const KIND_NAME = { hall: "Music hall", library: "Library", gym: "Gym", cafe: "C
 // adds fuzzy edges, fibre texture and soft light), and the outlines are running stitches.
 const SC = 1.35, X0 = 14, INK = "#2b2420", THREAD = "#5a4232";
 const seen = JSON.parse(localStorage.getItem("ff-town") || "{}");
+let hadTown = Object.keys(seen).length > 0;  // a building not seen before (and not on the very first visit) rises up
 let night = new Date().getHours() < 7 || new Date().getHours() >= 19;
 const STYLE = {
   hall: { W: 160, wall: "#f7efe4", alt: "#f6ead2", trim: "#fffaf0", roof: "#d9603a" },
@@ -929,18 +930,31 @@ const artUrl = (n) => `/static/art/${n}`;
 async function loadArt() {
   ART = await fetch("/static/art/manifest.json").then((r) => (r.ok ? r.json() : {})).catch(() => ({}));
 }
-function feltBuilding(kind, built, fresh) {
+// Every finished floor is a whole felt storey; the floor being built sits on top as a pale outline
+// whose wool fills in from the bottom, one room (check-in) at a time, so the town shows daily progress.
+function feltBuilding(h, kind, fresh) {
   const piece = (role) => ART[`${kind}_${role}.webp`];
   if (!piece("roof") || !piece("floor") || !piece("ground")) return null;
   const W = Math.round(STYLE[kind].W * 1.45), hOf = (role) => Math.round((piece(role)[1] * W) / piece(role)[0]);
-  const img = (role, cls, f) => `<img class="i-${role} ${cls}" style="--f:${f}" src="${artUrl(`${kind}_${role}.webp`)}" width="${W}" height="${hOf(role)}" alt="" draggable="false">`;
-  const uppers = Array.from({ length: built - 1 }, (_, i) => img("floor", `floor ${i + 1 >= fresh.floors ? "new" : ""}`, i + 1)).reverse().join("");
-  const ghost = built < MAXF ? `<span class="i-ghost" style="height:${hOf("floor")}px"></span>` : "";
-  const height = hOf("roof") + (built - 1) * hOf("floor") + hOf("ground");
-  return {
-    svg: `<span class="ibld" style="width:${W}px">${ghost}${img("roof", `roof ${built > fresh.floors ? "new" : ""}`, built - 1)}${uppers}${img("ground", "floor", 0)}</span>`,
-    width: W + 24, signAt: height + 4,
+  const prog = floorProgress(h), full = Math.min(MAXF, h.level), count = Math.max(1, full + (prog ? 1 : 0));
+  const img = (role, cls) => `<img class="i-${role} ${cls}" src="${artUrl(`${kind}_${role}.webp`)}" width="${W}" height="${hOf(role)}" alt="" draggable="false">`;
+  const storey = (i) => {
+    const role = i ? "floor" : "ground";
+    if (prog && i === full) return `<span class="i-part floor" style="--pct:${(prog.done / prog.n).toFixed(3)}">${img(role, "ghost")}${img(role, "fill")}</span>`;
+    return img(role, `floor ${i >= fresh.floors ? "new" : ""}`);
   };
+  const height = hOf("roof") + (count - 1) * hOf("floor") + hOf("ground");
+  return {
+    svg: `<span class="ibld" style="width:${W}px">${img("roof", `roof ${count > fresh.floors ? "new" : ""}`)}${Array.from({ length: count }, (_, i) => storey(i)).reverse().join("")}</span>`,
+    width: W + 24, signAt: height + 4, count,
+  };
+}
+// the floor now being built: rooms done of rooms needed (null once all six floors stand)
+function floorProgress(h) {
+  const L = S.level_checkins;
+  if (h.level >= L.length) return null;
+  const from = L[h.level - 1] || 0;
+  return { done: Math.max(0, h.checkins - from), n: L[h.level] - from };
 }
 // "2 of 4 rooms on floor 3": the check-ins still needed for the next floor, as rooms
 function roomsText(h) {
@@ -1064,9 +1078,6 @@ function townBackdrop() {
   return name && { name, p: PATH_Y[name] || .79, native: name === want && night };
 }
 
-const SUPPORT = ["Go {n}! I can hear you from here.", "Floor {f}! I'm so proud of you.", "Save me a seat at the top, {n}.",
-  "Look at this place. You built that.", "See you tomorrow, same time?"];
-
 function renderTown(opts = {}) {
   const wrap = $("townwrap");
   const show = !PLAIN && S.habits.length;
@@ -1076,32 +1087,35 @@ function renderTown(opts = {}) {
   wrap.hidden = VIEW !== "town";
   if (VIEW !== "town") return;
   townArt();
-  const name = S.profile.name, friend = S.profile.cast?.[0]?.name || "Mom";
+  const name = S.profile.name;
   const sounds = [], usedKinds = new Set();
   const lots = S.habits.map((h, idx) => {
     const built = Math.min(MAXF, Math.max(1, h.level));  // one floor per full floor of rooms (check-ins)
     const kind = KIND[h.icon] || "studio";
-    const was = seen[h.id] || { floors: built, lit: 999 };
-    const fresh = opts.noAnim ? { floors: built, lit: 999 } : was;
+    const was = seen[h.id] || { floors: 99, lit: 999 };
+    const fresh = opts.noAnim ? { floors: 99, lit: 999 } : was;
     const art = buildingSVG(h, idx, built, h.checkins, fresh, usedKinds.has(kind));
-    Object.assign(art, feltBuilding(kind, built, fresh) || {});
+    Object.assign(art, feltBuilding(h, kind, fresh) || {});
+    const back = idx % 2 === 1, rise = !opts.noAnim && hadTown && !seen[h.id];  // back row: a little further up the meadow
     usedKinds.add(kind);
     const { total, lit } = art;
-    if (built > fresh.floors) sounds.push("stamp"); else if (lit > fresh.lit) sounds.push("pop");
-    seen[h.id] = { floors: built, lit };
+    if ((art.count || built) > fresh.floors) sounds.push("stamp"); else if (lit > fresh.lit) sounds.push("pop");
+    seen[h.id] = { floors: art.count || built, lit };
     const mine = POSTS.kept.filter((p) => p.habit_id === h.id);
-    const nc = h.start_level + built;
-    const next = built < MAXF && h.chapters[nc] ? `<i>Next floor (~${year(h.chapter_dates[nc])}): ${esc(lower(h.chapters[nc]))}</i>` : `<i>Finished. This one is ten years tall.</i>`;
-    const toNext = h.next_level_at ? `${h.next_level_at - h.checkins} check-in${h.next_level_at - h.checkins === 1 ? "" : "s"} to the next floor` : "";
+    const prog = floorProgress(h), left = prog ? prog.n - prog.done : 0, s = left === 1 ? "" : "s";
+    const days = h.checked_today ? left : left - 1;  // one check-in a day; today's still counts if not done yet
+    const tip = prog
+      ? `<span class="tip-bar"><i style="width:${(prog.done / prog.n) * 100}%"></i></span><small>Floor ${Math.min(MAXF, h.level) + 1}: ${prog.done} of ${prog.n} rooms</small>
+         <em>${left} more check-in${s} · ${days === 0 ? "could finish today" : days === 1 ? "could finish tomorrow" : `about ${days} days`}</em>`
+      : `<em>All six floors are built.</em>`;
+    const signAt = back ? 46 + art.signAt * .76 : art.signAt;
     return `
-      <div class="lot ${opts.working === h.id ? "working" : ""} ${h.checked_today ? "done-today" : ""}" data-h="${h.id}" style="--b:${idx}; width:${art.width}px">
-        <div class="lot-tip"><b>${KIND_NAME[kind]} · floor ${built} of 6</b>${esc(h.allowed_milestone ? `Future you ${lower(h.allowed_milestone.milestone)}.` : "")}${next}<small>${roomsText(h)}${toNext ? ` · ${toNext}` : ""}</small>
-          <span class="tip-acts"><button data-in="${h.id}">${ico("flag", "inline")} Go inside</button>${mine.length ? `<button data-mail="${h.id}">Postcards (${mine.length})</button>` : ""}</span></div>
+      <div class="lot ${back ? "back" : ""} ${rise ? "rise" : ""} ${opts.working === h.id ? "working" : ""} ${h.checked_today ? "done-today" : ""}" data-h="${h.id}" style="--b:${idx}; width:${art.width}px; --lw:${art.width}px">
+        <div class="lot-tip"><b>${KIND_NAME[kind]} · ${Math.min(MAXF, h.level)} of 6 floors</b>${tip}</div>
         ${h.quest ? `<div class="lot-storm">${ico("storm")}<span class="rain"></span><b>Comeback quest ${h.quest.progress}/3</b></div>` : ""}
-        <div class="lot-sign" style="bottom:${art.signAt + 4}px">${hIcon(h, "inline")} ${esc(h.short)}</div>
+        <div class="lot-sign" style="bottom:${signAt + 4}px">${hIcon(h, "inline")} ${esc(h.short)}</div>
         <div class="lot-work">Building floor ${built + 1}…<br><small>your postcard is on its way</small></div>
         <button class="lot-b" aria-label="${esc(h.short)}: go inside">${art.svg}</button>
-        <span class="lot-say">${esc(friend)}: “${esc(SUPPORT[(h.checkins + idx) % SUPPORT.length].replace("{n}", name).replace("{f}", built))}”</span>
         <button class="mailbox ${mine.length ? "has" : ""}" data-mail="${h.id}" aria-label="Postcards">${mine.length ? MAILBOX.up : MAILBOX.down}${mine.length ? `<b>${mine.length}</b>` : ""}</button>
         <p class="lot-name">${KIND_NAME[kind]}<small>${esc(h.short)} · ${h.checked_today ? "done today ✓" : "not yet today"}</small></p>
         ${h.checked_today ? "" : `<button class="lot-hold" data-hold="${h.id}" ${busy ? "disabled" : ""}><i></i><span>Hold to build</span></button>`}
@@ -1111,6 +1125,7 @@ function renderTown(opts = {}) {
       <span class="prop ${idx % 2 ? "lamp" : "tree"}" style="--d:${idx}">${idx % 2 ? LAMP : TREE[(idx / 2) % 3]}</span>`;
   }).join("");
   localStorage.setItem("ff-town", JSON.stringify(seen));
+  hadTown = true;
 
   const pop = 1 + (S.profile.cast?.length || 0), bg = townBackdrop(), BGP = !!bg;
   $("town").className = `town ${night ? "night" : ""} ${BGP ? `photo ${bg.name.replace("_", "-")}` : ""} ${bg?.native ? "native" : ""}`;
@@ -1130,7 +1145,7 @@ function renderTown(opts = {}) {
         <line x1="0" x2="100%" y1="9" y2="9" stroke="#c9bba0" stroke-width="1.2" stroke-dasharray="4 5"/><line x1="0" x2="100%" y1="16" y2="16" stroke="#c9bba0" stroke-width="1.2" stroke-dasharray="4 5"/></svg>
       <div class="welcome"><b>${esc(name)}ville</b><small>est. ${S.today.slice(0, 4)} · pop. ${pop}</small></div>
       ${lots}
-      <div class="lot empty" id="lot-add"><div class="lot-plot"><span>${ico("sprout")}</span><b>Empty lot</b><small>Add a daily thing<br>and build here</small></div></div>
+      <div class="lot empty ${pic("fence") ? "fenced" : ""} ${S.habits.length % 2 ? "back" : ""}" id="lot-add"><div class="lot-plot">${pic("fence")}<span class="plot-sign"><span>${ico("sprout")}</span><b>Empty lot</b><small>Tap to start a new<br>daily thing here</small></span></div></div>
       <span class="walker" id="walker">${avatarHTML(S.profile.avatar?.photo ? 38 : 36, { tier: 0 })}<span class="say">Day ${S.day_offset + 1} in ${esc(name)}ville.</span></span>
     </div></div>
     <div class="grain"><svg width="100%" height="100%"><rect width="100%" height="100%" filter="url(#grain)"/></svg></div>`;
@@ -1188,6 +1203,8 @@ function renderTown(opts = {}) {
       town.style.setProperty("--py", ((e.clientY - r.top) / r.height - 0.5).toFixed(3));
     });
   }
+  const risen = town.querySelector(".lot.rise");
+  if (risen) { setTimeout(() => { risen.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" }); sfx.stamp(); buzz(30); }, 300); }
   if (wantIntro) revealTown();
   else if (sounds.length) setTimeout(() => { sfx[sounds.includes("stamp") ? "stamp" : "pop"](); buzz(30); }, sounds.includes("stamp") ? 700 : 300);
 }
@@ -1239,22 +1256,41 @@ function renderInside(opts = {}) {
       }
       return `<div class="room empty ${state === "plan" ? "" : roomPic(EMPTY_ROOMS[k % EMPTY_ROOMS.length])}"><small>${k + 1}</small></div>`;
     }).join("");
-    const status = state === "built" ? "built ✓" : state === "building" ? `${done} of ${n} rooms · ${n - done} more to build it` : `${n} room${n > 1 ? "s" : ""} · starts after check-in ${from}`;
-    return `<section class="fl ${state}" style="--f:${f}">
-      <header><b>Floor ${f + 1}</b><span>${status}</span><i>${h.chapters[ch] ? `~${year(h.chapter_dates[ch])}: future you ${esc(lower(h.chapters[ch]))}` : "A bonus floor: you're already past the last chapter."}</i></header>
-      <div class="rooms ${pics ? "pics" : ""}">${rooms}</div></section>`;
-  }).reverse().join("");
+    const story = h.chapters[ch] ? `~${year(h.chapter_dates[ch])}: future you ${esc(lower(h.chapters[ch]))}` : "A bonus floor: you're already past the last chapter.";
+    if (state === "plan") {  // floors still to come: a quiet row with a peek at their empty rooms
+      const peek = Array.from({ length: Math.min(n, 5) }, (_, r) => ART[`${EMPTY_ROOMS[(from + r) % EMPTY_ROOMS.length]}.jpg`]
+        ? `<img src="${artUrl(`${EMPTY_ROOMS[(from + r) % EMPTY_ROOMS.length]}.jpg`)}" alt="" loading="lazy">` : `<i></i>`).join("");
+      return { state, html: `<section class="fl plan"><div class="plan-peek">${peek}${n > 5 ? `<span>+${n - 5}</span>` : ""}</div>
+        <div class="plan-text"><b>Floor ${f + 1}</b><small>${n} room${n > 1 ? "s" : ""} · opens after check-in ${from}</small><i>${story}</i></div></section>` };
+    }
+    const status = state === "built" ? "Built ✓" : `Building now · ${done} of ${n} rooms`;
+    return { state, html: `<section class="fl ${state}" style="--f:${f}">
+      <header><b>Floor ${f + 1}</b><span class="pill">${status}</span><i>${story}</i></header>
+      <div class="rooms ${pics ? "pics" : ""}">${rooms}</div></section>` };
+  }).reverse();
 
-  $("inside").innerHTML = `<div class="house ${opts.enter ? "enter" : ""}" style="--wall:${st.wall}; --roof:${st.roof}">
-      <div class="roofcap"><span>${KIND_NAME[kind]} · ${esc(h.short)}</span></div>
-      ${floors}
-      <div class="foundation">${days.length} check-in${days.length === 1 ? "" : "s"} · ${Math.min(MAXF, h.level)} of ${MAXF} floors built</div></div>`;
+  const full = Math.min(MAXF, h.level), prog = floorProgress(h), bg = townBackdrop(), mini = feltBuilding(h, kind, { floors: 99 });
+  const plan = floors.filter((x) => x.state === "plan").map((x) => x.html).join(""), lived = floors.filter((x) => x.state !== "plan").map((x) => x.html).join("");
+  $("inside").style.setProperty("--inbg", bg ? `url(${artUrl(`${bg.name}.jpg`)})` : "none");
+  $("inside").innerHTML = `
+    <div class="in-hero ${opts.enter ? "enter" : ""}" style="--roof:${st.roof}">
+      ${mini ? `<div class="in-mini">${mini.svg}</div>` : ""}
+      <div class="in-hero-text">
+        <p class="kicker">Inside your ${KIND_NAME[kind].toLowerCase()}</p>
+        <h2>${hIcon(h, "inline")} ${esc(h.short)}</h2>
+        <p class="muted">${days.length} room${days.length === 1 ? "" : "s"} lived in · ${full} of ${MAXF} floors built</p>
+        ${prog ? `<span class="tip-bar"><i style="width:${(prog.done / prog.n) * 100}%"></i></span><small>Floor ${full + 1}: ${prog.done} of ${prog.n} rooms · ${prog.n - prog.done} more check-in${prog.n - prog.done === 1 ? "" : "s"} to finish it</small>` : `<small>Every floor is built. Ten years tall.</small>`}
+      </div>
+    </div>
+    ${plan ? `<div class="in-future"><h3>Still to build</h3>${plan}</div>` : ""}
+    <div class="in-stack ${opts.enter ? "enter" : ""}">${lived}</div>
+    <div class="in-ground"></div>`;
 
   $("in-tabs").querySelectorAll("[data-in]").forEach((b) => (b.onclick = () => { inHabit = +b.dataset.in; sfx.tick(); renderInside({ enter: true }); }));
   $("inside").querySelectorAll("[data-post]").forEach((b) => (b.onclick = () => openPostcard(mine.find((p) => p.id === +b.dataset.post))));
   $("inside").querySelectorAll(".lot-hold").forEach(bindHold);
   $("in-back").onclick = () => setView("town");
-  if (opts.enter) requestAnimationFrame(() => $("inside").querySelector(".fl.building, .fl.built")?.scrollIntoView({ behavior: "smooth", block: "center" }));
+  if (opts.enter) requestAnimationFrame(() => $("inside").querySelector(".fl.building, .fl.built")?.scrollIntoView({ behavior: "smooth", block: "start" }));
 }
 
 function replay(el, cls) { el.classList.remove(cls); void el.offsetWidth; el.classList.add(cls); }

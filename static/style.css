@@ -827,8 +827,6 @@ body.study .page { padding-bottom: 120px; }
 .ibld { display: flex; flex-direction: column; align-items: center; filter: drop-shadow(8px 6px 6px rgba(60, 40, 20, .28)); }
 .ibld img { display: block; width: 100%; height: auto; margin-top: -3%; user-select: none; }
 .ibld img:first-of-type { margin-top: 0; }
-.ibld .i-ghost { width: 92%; margin-bottom: 6px; border: 2px dashed rgba(91, 143, 209, .7); border-radius: 8px; background: rgba(91, 143, 209, .08); opacity: 0; transition: opacity .3s; }
-.lot:hover .ibld .i-ghost { opacity: 1; }
 .town.night .ibld img { filter: brightness(.55) saturate(.85); }
 /* the landscape photo is sized so its cream path (at --p of its height) runs under the buildings, 50px up */
 .town.photo { container-type: inline-size; background: #b9cfd9; }
@@ -856,7 +854,6 @@ body.study .page { padding-bottom: 120px; }
 .town.night .prop .pic, .town.night .mailbox .pic { filter: brightness(.55) saturate(.8); }
 .town.night .prop.lamp .pic { filter: brightness(.9); }
 .town.night .cloud .pic { opacity: .7; }
-.lot.working .ibld .i-ghost { opacity: 1; animation: blueprint 1s ease-in-out infinite alternate; }
 
 /* felt-photo rooms: the room picture fills the tile, the postcard hangs in its picture frame */
 .room .tag { display: flex; flex-direction: column; align-items: center; line-height: 1.15; }
@@ -918,3 +915,98 @@ body.study .page { padding-bottom: 120px; }
 .town.night.photo .lot-b::before { content: ""; position: absolute; z-index: 1; left: 20%; right: 20%; bottom: -10px; height: 30px; pointer-events: none;
   background: radial-gradient(closest-side, rgba(255, 196, 102, .55), transparent); mix-blend-mode: screen; }
 .town.night.photo .ibld img { filter: brightness(.6) saturate(.8) sepia(.12); }
+
+/* the floor being built: a pale outline that fills with wool from the bottom, room by room */
+.ibld .i-part { position: relative; display: block; width: 100%; margin-top: -3%; }
+.ibld .i-part img { margin: 0; }
+.ibld .i-part .ghost { opacity: .78; filter: grayscale(1) brightness(1.45) contrast(.55) blur(.4px); }
+.ibld .i-part .fill { position: absolute; inset: 0; clip-path: inset(calc((1 - var(--pct)) * 100%) 0 0 0); transition: clip-path 1.2s cubic-bezier(.3, 1.2, .5, 1); }
+.ibld .i-part::after { content: ""; position: absolute; left: 4%; right: 4%; bottom: calc(var(--pct) * 100%); height: 0; border-top: 2px dashed rgba(255, 250, 240, .9); }
+.lot.celebrate .i-part .fill { animation: fillup 1.2s ease-out .3s both; }
+@keyframes fillup { from { clip-path: inset(100% 0 0 0); } }
+
+/* hover card: just how tall it is and how long until the next floor */
+.lot-tip .tip-bar { display: block; height: 8px; margin: 7px 0 2px; border-radius: 4px; background: var(--paper-2); border: 1.5px solid var(--ink); overflow: hidden; }
+.lot-tip .tip-bar i { display: block; height: 100%; background: var(--yellow); }
+.lot-tip em { display: block; margin-top: 4px; font-style: normal; font-weight: 800; color: #3f6fae; }
+
+/* a village, not a row: every other building stands further back on the meadow, smaller and tucked in */
+.town.photo .lot.back { margin: 0 calc(var(--lw) * -.2); }
+.town.photo .lot.back .lot-b { scale: .76; margin-bottom: 96px; z-index: 0; }
+.town.photo .lot.back .mailbox { bottom: 96px; scale: .8; }
+.town.photo .lot.back .lot-name { display: none; }
+.town.photo .lot.back .lot-hold { bottom: 62px; }
+.town.photo .lot.back .lot-tip { top: 140px; }
+/* a new building rises out of the ground in a puff of wool */
+.lot.rise .lot-b { animation: lotrise 1.5s cubic-bezier(.2, 1.1, .4, 1) .4s both; }
+@keyframes lotrise { 0% { clip-path: inset(100% -20% 0 -20%); translate: 0 30px; } 70% { translate: 0 -6px; } 100% { clip-path: inset(-20% -20% -20% -20%); translate: 0 0; } }
+.lot.rise::after { content: ""; position: absolute; left: -10%; right: -10%; bottom: 30px; height: 70px; z-index: 3; pointer-events: none; border-radius: 50%;
+  background: radial-gradient(closest-side, rgba(255, 250, 240, .95), rgba(255, 250, 240, 0)); animation: puff 1.6s ease-out .3s both; }
+@keyframes puff { 0% { opacity: 0; transform: scale(.4); } 30% { opacity: 1; } 100% { opacity: 0; transform: scale(1.5) translateY(-20px); } }
+/* the empty lot: a little felt fence and a sign */
+.town.photo .lot.empty.fenced { width: 130px; }
+.lot.empty.fenced .lot-plot { height: auto; border: 0; background: none; margin-bottom: 48px; position: relative; display: block; }
+.town.photo .lot.empty.fenced.back .lot-plot { margin-bottom: 90px; scale: .85; transform-origin: 50% 100%; }
+.lot.empty.fenced .lot-plot > .pic { width: 120px; filter: var(--grade) drop-shadow(var(--shx, 6px) 4px 4px rgba(50, 40, 20, .35)); }
+.lot.empty.fenced .plot-sign { position: absolute; left: 50%; bottom: 72%; translate: -50% 0; rotate: -3deg; width: 128px; padding: 5px 6px 6px; text-align: center;
+  background: var(--card); border: 2px solid var(--ink); border-radius: var(--wobble-sm); box-shadow: 2px 3px 0 rgba(43, 36, 32, .5); transition: rotate .3s, translate .3s; }
+.lot.empty.fenced .plot-sign .ico { width: 26px; height: 26px; }
+.lot.empty.fenced:hover .lot-plot { transform: none; background: none; }
+.lot.empty.fenced:hover .plot-sign { rotate: 3deg; translate: -50% -6px; }
+.town.night .ibld .i-part .ghost { filter: grayscale(1) brightness(.85) contrast(.6); opacity: .6; }
+
+/* ---------- inside a building: cosy rooms over a soft, blurred view of the town's landscape ---------- */
+.inside { position: relative; isolation: isolate; overflow: hidden; margin-top: 12px; padding: 22px clamp(12px, 3vw, 30px) 0;
+  background: #efe6d6; border: 2.5px solid var(--ink); border-radius: var(--wobble-sm); box-shadow: 4px 5px 0 rgba(43, 36, 32, .85); }
+.inside::before { content: ""; position: absolute; inset: -40px; z-index: -1; background: var(--inbg) center 70% / cover; filter: blur(16px) saturate(1.1) brightness(1.06); opacity: .8; }
+.in-hero { display: flex; align-items: flex-end; gap: 26px; padding: 18px 26px 18px 18px; border-radius: 26px;
+  background: rgba(255, 250, 240, .9); box-shadow: 0 10px 28px rgba(60, 40, 20, .16); }
+.in-mini { flex: none; line-height: 0; }
+.in-mini .ibld { zoom: .62; filter: drop-shadow(6px 6px 6px rgba(60, 40, 20, .3)); }
+.in-hero-text { flex: 1; min-width: 0; padding-bottom: 4px; }
+.in-hero-text .kicker { font-size: 22px; }
+.in-hero-text h2 { font-family: var(--hand); font-size: 44px; line-height: 1; margin: 2px 0 6px; display: flex; align-items: center; gap: 8px; }
+.in-hero-text h2 .ico { width: 34px; height: 34px; }
+.in-hero-text .muted { margin: 0 0 8px; font-weight: 700; }
+.in-hero-text .tip-bar { display: block; max-width: 380px; height: 10px; border-radius: 5px; background: var(--paper-2); border: 1.5px solid var(--ink); overflow: hidden; }
+.in-hero-text .tip-bar i { display: block; height: 100%; background: var(--yellow); }
+.in-hero-text small { display: block; margin-top: 6px; font-weight: 800; color: #3f6fae; }
+.in-hero.enter, .in-stack.enter { animation: walkin .55s cubic-bezier(.2, 1.2, .4, 1) both; }
+.in-stack.enter { animation-delay: .12s; }
+
+.in-future { margin-top: 18px; padding: 12px 18px 6px; border-radius: 22px; background: rgba(255, 250, 240, .84); border: 2px dashed rgba(90, 66, 50, .3); }
+.in-future h3 { margin: 0 0 4px; font-family: var(--hand); font-size: 26px; color: #6d5a43; }
+.inside .fl.plan { display: flex; align-items: center; gap: 18px; padding: 10px 0; margin: 0; opacity: 1; background: none; border: 0; border-top: 1.5px dashed rgba(90, 66, 50, .16); }
+.inside .fl.plan:first-of-type { border-top: 0; }
+.plan-peek { flex: none; display: flex; align-items: center; width: 232px; }
+.plan-peek img, .plan-peek i { width: 50px; height: 50px; border-radius: 10px; object-fit: cover; margin-left: -16px; border: 2.5px solid #fffaf0;
+  box-shadow: 0 2px 5px rgba(60, 40, 20, .2); filter: saturate(.45) brightness(1.06); opacity: .8; background: #efe3cc; }
+.plan-peek :first-child { margin-left: 0; }
+.plan-peek span { margin-left: 10px; white-space: nowrap; font-weight: 800; font-size: 13px; color: var(--muted); }
+.plan-text { min-width: 0; }
+.plan-text b { font-family: var(--hand); font-size: 24px; line-height: 1; margin-right: 8px; color: #5b8fd1; }
+.plan-text small { font-weight: 800; font-size: 12px; color: var(--muted); }
+.plan-text i { display: block; font-size: 13px; color: var(--muted); }
+
+.in-stack { display: flex; flex-direction: column; gap: 18px; margin-top: 18px; }
+.inside .fl.built, .inside .fl.building { padding: 16px 18px 20px; border: 0; border-radius: 26px; background: rgba(255, 250, 240, .9);
+  box-shadow: 0 10px 28px rgba(60, 40, 20, .14); scroll-margin-top: 90px; }
+.inside .fl.building { box-shadow: 0 0 0 3px var(--yellow), 0 10px 28px rgba(60, 40, 20, .14); }
+.inside .fl header { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; margin-bottom: 12px; }
+.inside .fl header b { font-family: var(--hand); font-size: 32px; line-height: 1; }
+.inside .fl header .pill { padding: 3px 11px; border-radius: 99px; font-size: 12px; font-weight: 800; color: #3f6a3f; background: #dfeccd; }
+.inside .fl.building header .pill { color: #7a5410; background: #fbe7b0; }
+.inside .fl header i { flex-basis: 100%; font-size: 14px; color: var(--muted); }
+.inside .rooms.pics { grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 16px; }
+.inside .room.rpic { border-radius: 18px; box-shadow: 0 6px 14px rgba(60, 40, 20, .22); }
+.inside .room.rpic.empty { opacity: .55; filter: saturate(.55) brightness(1.05); }
+.inside .room.rpic.next { outline-offset: 4px; }
+.in-ground { height: 26px; margin: 22px calc(-1 * clamp(12px, 3vw, 30px)) 0; background: linear-gradient(#a9b866, #8e9f58); box-shadow: inset 0 4px 6px rgba(60, 70, 20, .25); }
+@media (max-width: 760px) {
+  .in-hero { flex-direction: column; align-items: center; text-align: center; padding: 16px; gap: 10px; }
+  .in-hero-text h2 { justify-content: center; font-size: 34px; }
+  .in-hero-text .tip-bar { margin: 0 auto; }
+  .in-mini .ibld { zoom: .5; }
+  .inside .fl.plan { flex-direction: column; align-items: flex-start; gap: 6px; }
+  .inside .rooms.pics { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; }
+}
