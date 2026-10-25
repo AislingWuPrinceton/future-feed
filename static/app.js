@@ -854,132 +854,296 @@ document.querySelectorAll(".overlay").forEach((o) => o.addEventListener("click",
 // stop on that habit's road adds a floor. Unbuilt floors are a blueprint you see on hover.
 
 let VIEW = localStorage.getItem("ff-view") || "town";
-const FH = 36, BW = 150, ROOF = 64, MAXF = 6, SVGW = BW + 20, SVGH = MAXF * FH + ROOF, LIFT = 56;
-const KIND = { guitar: "hall", music: "hall", piano: "hall", dance: "hall", reading: "library", pencil: "library",
+const MAXF = 6;
+const KIND = { guitar: "hall", music: "hall", piano: "hall", dance: "hall", reading: "library", pencil: "studio", palette: "studio", camera: "studio", laptop: "studio",
   running: "gym", bike: "gym", dumbbell: "gym", wave: "gym", spanish: "cafe", chat: "cafe", pan: "cafe",
   saving: "home", heart: "home", lotus: "garden", sprout: "garden", drop: "garden", moon: "garden", sun: "garden" };
 const KIND_NAME = { hall: "Music hall", library: "Library", gym: "Gym", cafe: "Café", home: "Home", garden: "Greenhouse", studio: "Studio" };
-// Muted architectural palette: facade, side (in shade), roof, roof in shade, trim.
-const PAL = [
-  { wall: "#e7b5a1", side: "#c48b77", roof: "#a4524a", roofS: "#7f3c37", trim: "#fbf0e8" },
-  { wall: "#efd29d", side: "#c9a96f", roof: "#bf7d3c", roofS: "#955e2a", trim: "#fff7e6" },
-  { wall: "#b3caa5", side: "#8aa47f", roof: "#587a56", roofS: "#435f43", trim: "#f3f7ee" },
-  { wall: "#a9bfd5", side: "#8199b4", roof: "#4b6a8d", roofS: "#385270", trim: "#eff4f9" },
-  { wall: "#cbbbdb", side: "#a594ba", roof: "#766396", roofS: "#5a4b77", trim: "#f6f1fb" },
-  { wall: "#ecae8b", side: "#c78764", roof: "#a35b39", roofS: "#7f4428", trim: "#fdf1e8" },
-];
-const SC = 1.25, INKC = "#3b312b", D = 20, DY = 9, X0 = 12, W = 128;
+// The town is drawn like an urban sketch: wobbly ink lines (rough.js) over loose watercolor
+// washes that bleed a little past the lines, on the same paper as the rest of the app.
+const SC = 1.2, X0 = 14, INK = "#2b2420";
 const seen = JSON.parse(localStorage.getItem("ff-town") || "{}");
 let night = new Date().getHours() < 7 || new Date().getHours() >= 19;
-const ln = `stroke="${INKC}" stroke-width="1.2" stroke-linejoin="round"`;
+const STYLE = {
+  hall: { W: 160, wall: "#efc3b3", alt: "#f1d0a6", trim: "#fbe9df", roof: "#b9675a" },
+  library: { W: 150, wall: "#eadfc4", alt: "#dfe3ec", trim: "#faf3e3", roof: "#8fb8a8" },
+  cafe: { W: 116, wall: "#f3d197", alt: "#f2c1c6", trim: "#fcecd1", roof: "#7d8ca8" },
+  home: { W: 134, wall: "#d5e5c5", alt: "#cfe0ee", trim: "#f5f9ef", roof: "#bd6a4c" },
+  gym: { W: 152, wall: "#d7dde3", alt: "#e4dccd", trim: "#f2f4f6", roof: "#e27d6b" },
+  garden: { W: 140, wall: "#d2ece0", alt: "#e2efd0", trim: "#eef8f3", roof: "#8fc4ab" },
+  studio: { W: 148, wall: "#d39478", alt: "#c9a58c", trim: "#f3dccd", roof: "#77685f" },
+};
+const WIN_COUNT = { hall: [4, 5], library: [2, 4], cafe: [2, 2], home: [2, 3], gym: [4, 4], garden: [3, 4], studio: [3, 3] };
 
-// a box face pair: front rectangle plus the shaded side face going back to the right
-const box = (x, y, w, h, front, side) =>
-  `<path d="M${x + w} ${y} l${D} ${-DY} v${h} l${-D} ${DY} z" fill="${side}" ${ln}/><rect x="${x}" y="${y}" width="${w}" height="${h}" fill="${front}" ${ln}/>`;
-
-function windowSVG(x, y, on, isNew, w, p) {
-  return `<g class="win ${on ? "lit" : ""} ${isNew ? "new-lit" : ""}" style="--w:${w}">
-    <rect x="${x}" y="${y}" width="22" height="20" rx="2" fill="url(#${on ? "glow" : night ? "glassN" : "glass"})" ${ln}/>
-    <path d="M${x + 11} ${y + 1}v18M${x + 1} ${y + 9}h20" stroke="${p.trim}" stroke-width="1.6"/>
-    ${on ? "" : `<path d="M${x + 4} ${y + 16}l6-11M${x + 9} ${y + 17}l4-7" stroke="#fff" stroke-width="1.4" opacity=".55"/>`}
-    <rect x="${x - 2}" y="${y + 20}" width="26" height="3" rx="1" fill="${p.trim}" ${ln} stroke-width=".9"/></g>`;
+// a fresh pen for each building; fixed seeds keep every drawing identical between renders
+function pen(seed) {
+  const host = document.createElementNS("http://www.w3.org/2000/svg", "svg"), rc = rough.svg(host);
+  const o = (e = {}) => ({ stroke: INK, strokeWidth: 1.15, roughness: 0.85, bowing: 0.8, seed: ++seed, ...e });
+  return {
+    rect: (x, y, w, h, e) => rc.rectangle(x, y, w, h, o(e)).outerHTML,
+    line: (x1, y1, x2, y2, e) => rc.line(x1, y1, x2, y2, o(e)).outerHTML,
+    path: (d, e) => rc.path(d, o(e)).outerHTML,
+    circle: (x, y, d, e) => rc.circle(x, y, d, o(e)).outerHTML,
+    ellipse: (x, y, w, h, e) => rc.ellipse(x, y, w, h, o(e)).outerHTML,
+  };
 }
+const wr = (x, y, w, h, c, extra = "") => `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="${c}" ${extra}/>`;
+const wp = (d, c, extra = "") => `<path d="${d}" fill="${c}" ${extra}/>`;
+const arch = (x, y, w, h) => `M${x} ${y + h}V${y + w / 2}A${w / 2} ${w / 2} 0 0 1 ${x + w} ${y + w / 2}V${y + h}Z`;
 
-function buildingSVG(h, idx, built, lit, fresh) {
-  const p = PAL[idx % 6], kind = KIND[h.icon] || "studio", base = SVGH - 8;
-  let out = `<ellipse cx="${X0 + W / 2 + 8}" cy="${base + 1}" rx="${W / 2 + 22}" ry="6" fill="#2b2420" opacity=".14"/>`;
-  let w = 0;
-  for (let f = 0; f < MAXF; f++) {
-    const top = base - (f + 1) * FH - (f >= built ? LIFT : 0);  // blueprint floors float above the roof
-    if (f >= built) {
-      const yr = (h.chapter_dates[f] || "").slice(0, 4);
-      out += `<g class="bp"><path d="M${X0} ${top}h${W}v${FH}h${-W}zM${X0 + W} ${top}l${D} ${-DY}v${FH}l${-D} ${DY}" fill="rgba(91,143,209,.07)" stroke="#5b8fd1" stroke-width="1.1" stroke-dasharray="4 4"/>
-        <text x="${X0 + W / 2}" y="${top + FH / 2 + 5}" text-anchor="middle" class="bp-t">floor ${f + 1} · ~${yr}</text></g>`;
+function buildingSVG(h, idx, built, checkins, fresh, alt) {
+  const kind = KIND[h.icon] || "studio", st = STYLE[kind], Wd = st.W, wall = alt ? st.alt : st.wall;
+  const x0 = kind === "cafe" ? 34 : X0, cx = x0 + Wd / 2, SVGW = Wd + x0 + X0 + 6, SVGH = 304, base = SVGH - 10;
+  const P = pen(h.id * 131 + idx);
+  const total = WIN_COUNT[kind][0] + (built - 1) * WIN_COUNT[kind][1], lit = Math.min(total, checkins);
+  let w = 0, out = "";
+  const glass = () => (night ? "#55628a" : "#bcd4e4");
+  // a window: wash (lit or glass) + ink outline + glazing bars
+  const win = (x, y, ww, hh, shape = "rect") => {
+    const on = w < lit, isNew = on && w >= fresh.lit, d = shape === "arch" ? arch(x, y, ww, hh) : null;
+    const fill = on ? "#ffd36b" : glass();
+    const wash = `<g class="win ${on ? "lit" : ""} ${isNew ? "new-lit" : ""}" style="--w:${w}">${d ? wp(d, fill) : wr(x, y, ww, hh, fill)}</g>`;
+    const ink = (d ? P.path(d) : P.rect(x, y, ww, hh)) + P.line(x + ww / 2, y + (d ? ww / 2 - 4 : 1), x + ww / 2, y + hh - 1, { strokeWidth: 0.8 })
+      + (shape === "rect" ? P.line(x + 1, y + hh * 0.45, x + ww - 1, y + hh * 0.45, { strokeWidth: 0.8 }) : "");
+    w++;
+    return [wash, ink];
+  };
+  const floor = (f, wash, ink) => `<g class="floor ${f >= fresh.floors ? "new" : ""}" style="--f:${f}">
+      <g class="wash" filter="url(#wc)" transform="translate(1.6 1.2)">${wash}</g><g class="ink">${ink}</g></g>`;
+
+  out += `<ellipse cx="${cx + 4}" cy="${base + 2}" rx="${Wd / 2 + 16}" ry="5" fill="#2b2420" opacity=".12" filter="url(#wc)"/>`;
+  for (let f = 0; f < 6; f++) {
+    const FH = 36, top = base - (f + 1) * FH - (f >= built ? 58 : 0);
+    if (f >= built) {  // blueprint floors float above the roof
+      out += `<g class="bp"><rect x="${x0}" y="${top}" width="${Wd}" height="${FH}" fill="rgba(91,143,209,.06)" stroke="#5b8fd1" stroke-width="1.1" stroke-dasharray="5 4"/>
+        <text x="${cx}" y="${top + FH / 2 + 6}" text-anchor="middle" class="bp-t">floor ${f + 1} · ~${(h.chapter_dates[f] || "").slice(0, 4)}</text></g>`;
       continue;
     }
-    let g = box(X0, top, W, FH, p.wall, p.side);
-    g += `<rect x="${X0}" y="${top + FH - 5}" width="${W}" height="5" fill="${p.side}" opacity=".35"/>`;  // soft shade under the cornice
-    const slots = f === 0 ? [X0 + 12, X0 + 94] : [X0 + 14, X0 + 53, X0 + 92];
-    for (const sx of slots) { g += windowSVG(sx, top + 7, w < lit, w < lit && w >= fresh.lit, w, p); w++; }
-    if (f === 0) {
-      const dx = X0 + 50;
-      g += `<path d="M${dx} ${top + FH}v-19a14 14 0 0 1 28 0v19z" fill="#5d4232" ${ln}/>
-        <path d="M${dx + 14} ${top + FH - 32}v32" stroke="#4a3427" stroke-width="1"/>
-        <circle cx="${dx + 19}" cy="${top + FH - 12}" r="1.6" fill="#f2c55c"/>
-        <rect x="${dx - 3}" y="${top + FH - 2}" width="34" height="3" fill="${p.trim}" ${ln} stroke-width=".9"/>`;
-      if (kind === "cafe") {  // striped awning over the shop windows
-        g += `<path d="M${X0 + 4} ${top + 4}h${W - 8}l-4 9h${-(W - 16)}z" fill="url(#stripe${idx % 6})" ${ln}/>`;
-      } else {  // window boxes with a little green
-        for (const sx of slots) g += `<rect x="${sx - 1}" y="${top + 30}" width="24" height="4" fill="#8a6a4f"/>
-          <circle cx="${sx + 5}" cy="${top + 29}" r="3.2" fill="#6f9a62"/><circle cx="${sx + 12}" cy="${top + 28.5}" r="3.6" fill="#7fae70"/><circle cx="${sx + 18}" cy="${top + 29}" r="3" fill="#6f9a62"/>`;
+    let wash = wr(x0, top, Wd, FH, wall), ink = P.rect(x0, top, Wd, FH);
+    const add = ([a, b]) => { wash += a; ink += b; };
+    const g = f === 0;
+    if (kind === "hall") {
+      if (g) {
+        [x0 + 12, x0 + 38, x0 + 104, x0 + 130].forEach((x) => add(win(x, top + 9, 18, 25, "arch")));
+        wash += wp(arch(cx - 15, top + 6, 30, 30), "#8a5a44");
+        ink += P.path(arch(cx - 15, top + 6, 30, 30)) + P.line(cx, top + 21, cx, base);
+        wash += wr(cx - 30, top - 4, 60, 10, "#f6d36d");  // marquee with bulbs
+        ink += P.rect(cx - 30, top - 4, 60, 10) + `<text x="${cx}" y="${top + 4}" text-anchor="middle" class="sk-t">TONIGHT</text>`
+          + [0, 1, 2, 3, 4, 5, 6].map((i) => `<circle cx="${cx - 27 + i * 9}" cy="${top + 8}" r="1.3" fill="#e2a23a"/>`).join("");
+      } else {
+        [x0 + 12, x0 + 40, x0 + 71, x0 + 102, x0 + 130].forEach((x) => add(win(x, top + 7, 18, 24, "arch")));
+        ink += P.line(x0, top + 33, x0 + Wd, top + 33, { strokeWidth: 0.7 });
+      }
+    } else if (kind === "library") {
+      if (g) {
+        wash += wr(x0 - 8, base - 6, Wd + 16, 6, "#e3d8c2");
+        ink += P.line(x0 - 8, base - 6, x0 + Wd + 8, base - 6) + P.line(x0 - 4, base - 3, x0 + Wd + 4, base - 3);
+        [x0 + 16, x0 + 50, x0 + 90, x0 + 124].forEach((x) => {
+          wash += wr(x, top + 8, 10, FH - 14, "#f7f0e0");
+          ink += P.rect(x, top + 8, 10, FH - 14) + P.rect(x - 2, top + 6, 14, 3, { strokeWidth: 0.9 });
+        });
+        add(win(x0 + 31, top + 12, 14, 16)); add(win(x0 + 105, top + 12, 14, 16));
+        wash += wr(cx - 9, top + 12, 18, FH - 18, "#6e5a4a");
+        ink += P.rect(cx - 9, top + 12, 18, FH - 18) + `<text x="${cx}" y="${top + 5}" text-anchor="middle" class="sk-t">LIBRARY</text>`;
+      } else {
+        [x0 + 20, x0 + 54, x0 + 82, x0 + 116].forEach((x) => {
+          add(win(x, top + 8, 14, 24));
+          wash += wp(`M${x - 2} ${top + 8}h18l-3 -4h-12z`, st.trim);
+          ink += P.path(`M${x - 2} ${top + 8}h18l-3 -4h-12z`, { strokeWidth: 0.8 });
+        });
+      }
+    } else if (kind === "cafe") {
+      if (g) {
+        add(win(x0 + 8, top + 13, 26, 21)); add(win(x0 + 34, top + 13, 26, 21));
+        wash += wr(x0 + 74, top + 8, 20, FH - 8, "#5f8a8b");
+        ink += P.rect(x0 + 74, top + 8, 20, FH - 8) + `<circle cx="${x0 + 90}" cy="${top + 22}" r="1.4" fill="${INK}"/>`;
+        const aw = `M${x0 + 2} ${top + 2}h${Wd - 4}v8` + Array.from({ length: 9 }, (_, i) => `a${(Wd - 4) / 18} 3 0 0 1 ${-(Wd - 4) / 9} 0`).join("") + "z";
+        wash += Array.from({ length: 9 }, (_, i) => wr(x0 + 2 + i * (Wd - 4) / 9, top + 2, (Wd - 4) / 9, 10, i % 2 ? "#fdf4e6" : "#d9655b")).join("");
+        ink += P.path(aw);
+        wash += `<circle cx="${x0 + Wd + 13}" cy="${top - 8}" r="8" fill="#fdf4e6"/>`;  // hanging cup sign
+        ink += P.line(x0 + Wd, top - 18, x0 + Wd + 16, top - 18) + P.circle(x0 + Wd + 13, top - 8, 16)
+          + P.path(`M${x0 + Wd + 9} ${top - 11}h8v5a4 4 0 0 1 -8 0zM${x0 + Wd + 17} ${top - 9}a2 2 0 0 1 0 4`, { strokeWidth: 0.9 });
+        // a little table outside
+        wash += `<ellipse cx="${x0 - 16}" cy="${base - 14}" rx="10" ry="2.5" fill="#fdf4e6"/>`;
+        ink += P.ellipse(x0 - 16, base - 14, 20, 5) + P.line(x0 - 16, base - 13, x0 - 16, base) + P.line(x0 - 22, base, x0 - 10, base)
+          + P.path(`M${x0 - 30} ${base}v-12h5M${x0 - 30} ${base - 6}h6v6`, { strokeWidth: 0.9 });
+      } else {
+        [x0 + 16, x0 + Wd - 38].forEach((x) => {
+          add(win(x, top + 4, 22, 24, "arch"));
+          ink += P.rect(x - 5, top + 24, 32, 9, { strokeWidth: 0.9 })
+            + [0, 1, 2, 3, 4, 5].map((i) => P.line(x - 1 + i * 5, top + 24, x - 1 + i * 5, top + 33, { strokeWidth: 0.6 })).join("");
+          wash += [0, 1, 2].map((i) => `<circle cx="${x + 2 + i * 9}" cy="${top + 23}" r="3" fill="${["#ef7f97", "#f6a15b", "#ef7f97"][i]}"/>`).join("");
+        });
+      }
+    } else if (kind === "home") {
+      ink += [1, 2, 3, 4, 5].map((i) => `<line x1="${x0 + 2}" y1="${top + i * 6}" x2="${x0 + Wd - 2}" y2="${top + i * 6}" stroke="${INK}" stroke-width=".5" opacity=".18"/>`).join("");
+      const shut = (x, y, ww, hh) => {
+        add(win(x, y, ww, hh));
+        wash += wr(x - 6, y, 5, hh, st.roof) + wr(x + ww + 1, y, 5, hh, st.roof);
+        ink += P.rect(x - 6, y, 5, hh, { strokeWidth: 0.8 }) + P.rect(x + ww + 1, y, 5, hh, { strokeWidth: 0.8 });
+      };
+      if (g) {
+        shut(x0 + 14, top + 10, 20, 18); shut(x0 + Wd - 34, top + 10, 20, 18);
+        wash += wr(cx - 11, top + 8, 22, FH - 8, "#7c9a8e") + wp(`M${cx - 20} ${top + 9}L${cx} ${top - 4}L${cx + 20} ${top + 9}Z`, st.roof);
+        ink += P.rect(cx - 11, top + 8, 22, FH - 8) + P.circle(cx, top + 16, 7) + P.path(`M${cx - 20} ${top + 9}L${cx} ${top - 4}L${cx + 20} ${top + 9}Z`)
+          + P.line(cx - 17, top + 9, cx - 17, base) + P.line(cx + 17, top + 9, cx + 17, base);
+        for (const [a, b] of [[x0 - 8, x0 + 40], [x0 + Wd - 40, x0 + Wd + 8]]) {  // picket fence
+          ink += P.line(a, base - 6, b, base - 6, { strokeWidth: 0.8 });
+          for (let x = a; x <= b; x += 6) { wash += wp(`M${x} ${base}v-10l2 -3l2 3v10z`, "#fffaf0"); ink += P.path(`M${x} ${base}v-10l2 -3l2 3v10`, { strokeWidth: 0.7 }); }
+        }
+      } else {
+        shut(x0 + 16, top + 8, 20, 20); add(win(cx - 7, top + 9, 14, 16)); shut(x0 + Wd - 36, top + 8, 20, 20);
+      }
+    } else if (kind === "gym") {
+      wash += wr(x0 - 3, top - 1, Wd + 6, 4, "#aab3bd");
+      ink += P.rect(x0 - 3, top - 1, Wd + 6, 4, { strokeWidth: 0.9 });
+      if (g) {
+        [x0 + 8, x0 + 36, x0 + 94, x0 + 122].forEach((x) => add(win(x, top + 8, 24, 26)));
+        wash += wr(cx - 14, top + 8, 28, FH - 8, "#cfe3ee") + wr(x0, top + 3, Wd, 4, st.roof);
+        ink += P.rect(cx - 14, top + 8, 28, FH - 8) + P.line(cx, top + 8, cx, base) + `<text x="${cx}" y="${top + 7}" text-anchor="middle" class="sk-t">FIT · CLUB</text>`;
+      } else {
+        const pw = (Wd - 16) / 4;
+        [0, 1, 2, 3].forEach((i) => add(win(x0 + 8 + i * pw, top + 9, pw, 18)));
+      }
+    } else if (kind === "garden") {
+      wash = wr(x0, top, Wd, FH, wall, `opacity=".75"`);
+      ink += [1, 2, 3, 4, 5, 6].map((i) => `<line x1="${x0 + i * 20}" y1="${top}" x2="${x0 + i * 20}" y2="${top + FH}" stroke="${INK}" stroke-width=".6" opacity=".35"/>`).join("");
+      if (g) {
+        [x0 + 6, x0 + 36, x0 + 106].forEach((x) => add(win(x, top + 6, 26, 26)));
+        wash += wp(arch(cx - 12, top + 6, 24, 30), "#b8dccb");
+        ink += P.path(arch(cx - 12, top + 6, 24, 30)) + P.line(cx, top + 18, cx, base);
+        for (const x of [x0 - 6, x0 + Wd - 2]) {  // potted plants
+          wash += wp(`M${x} ${base - 9}h10l-2 9h-6z`, "#c9805a") + `<circle cx="${x + 5}" cy="${base - 14}" r="6" fill="#7fae70"/>`;
+          ink += P.path(`M${x} ${base - 9}h10l-2 9h-6z`, { strokeWidth: 0.9 }) + P.path(`M${x + 5} ${base - 9}c-6 -4 -4 -10 0 -12c4 2 6 8 0 12`, { strokeWidth: 0.8 });
+        }
+      } else {
+        [0, 1, 2, 3].forEach((i) => add(win(x0 + 6 + i * 33, top + 5, 28, 26)));
+      }
+      wash += [0, 1, 2, 3, 4, 5, 6].map((i) => `<circle cx="${x0 + 6 + i * 21}" cy="${top + FH - 3 - (i % 2) * 3}" r="${4 + (i % 3)}" fill="#7fae70"/>`).join("");
+      ink += P.path(`M${x0} ${top + 2}` + [1, 2, 3, 4, 5, 6, 7].map((i) => `Q${x0 + i * 20 - 10} ${top + 9} ${x0 + i * 20} ${top + 2}`).join(""), { stroke: "#4f7d47", strokeWidth: 1 });
+    } else {  // studio: brick loft with big factory windows
+      wash += wr(x0, top, Wd, FH, "url(#brick)");
+      const fw = (x, y, ww, hh, n) => {
+        for (let i = 0; i < n; i++) add(win(x + (i * ww) / n, y, ww / n, hh));
+        ink += P.path(`M${x - 2} ${y - 1}Q${x + ww / 2} ${y - 7} ${x + ww + 2} ${y - 1}`, { strokeWidth: 1 });
+      };
+      if (g) {
+        fw(x0 + 10, top + 10, 72, 24, 3);
+        wash += wr(x0 + 100, top + 8, 26, FH - 8, "#6c7f92");
+        ink += P.rect(x0 + 100, top + 8, 26, FH - 8) + [1, 2, 3].map((i) => P.line(x0 + 100, top + 8 + i * 7, x0 + 126, top + 8 + i * 7, { strokeWidth: 0.6 })).join("");
+      } else {
+        fw(x0 + 10, top + 9, 60, 23, 2); fw(x0 + 80, top + 9, 58, 23, 1);
       }
     }
-    out += `<g class="floor ${f >= fresh.floors ? "new" : ""}" style="--f:${f}">${g}</g>`;
+    out += floor(f, wash, ink);
   }
+
   // roof on the highest built floor
-  const T = base - built * FH, cx = X0 + W / 2;
-  let r = "";
-  const parapet = `<path d="M${X0 + W + 3} ${T - 6}l${D} ${-DY}v6l${-D} ${DY}z" fill="${p.side}" ${ln}/><rect x="${X0 - 3}" y="${T - 6}" width="${W + 6}" height="6" fill="${p.trim}" ${ln}/>`;
-  if (kind === "hall" || kind === "home" || kind === "cafe") {
-    const peak = T - 40;
-    r += `<path d="M${cx} ${peak}l${D} ${-DY}L${X0 + W + 4 + D} ${T - DY}L${X0 + W + 4} ${T}z" fill="${p.roofS}" ${ln}/>
-      <path d="M${X0 - 4} ${T}L${cx} ${peak}L${X0 + W + 4} ${T}z" fill="${p.roof}" ${ln}/>
-      <path d="M${X0 + 8} ${T - 3}L${cx} ${peak + 8}L${X0 + W - 8} ${T - 3}" fill="none" stroke="${p.trim}" stroke-width="1.4" opacity=".6"/>`;
-    r += kind === "home"
-      ? `<path d="M${X0 + W - 10} ${T - 34}v-16h12v26" fill="#9a6b4f" ${ln}/><rect x="${X0 + W - 12}" y="${T - 54}" width="16" height="5" fill="#7c5440" ${ln}/>
-         <rect x="${cx - 9}" y="${T - 24}" width="18" height="14" rx="1" fill="url(#${night ? "glow" : "glass"})" ${ln}/>`
-      : `<circle cx="${cx}" cy="${T - 16}" r="8" fill="url(#${night ? "glow" : "glass"})" ${ln}/><path d="M${cx - 8} ${T - 16}h16M${cx} ${T - 24}v16" stroke="${p.trim}" stroke-width="1.3"/>`;
+  const T = base - built * 36;
+  let wash = "", ink = "", roofTop = T - 40;
+  if (kind === "hall") {
+    const d = `M${x0 - 6} ${T}L${cx} ${T - 32}L${x0 + Wd + 6} ${T}Z`;
+    wash += wr(x0 - 6, T - 5, Wd + 12, 5, st.trim) + wp(d, st.roof);
+    ink += P.rect(x0 - 6, T - 5, Wd + 12, 5) + P.path(d) + P.circle(cx, T - 13, 16) + P.ellipse(cx - 2, T - 9, 6, 4.5)
+      + P.path(`M${cx + 1} ${T - 9}V${T - 20}l5 2`, { strokeWidth: 1 });
+    wash += `<circle cx="${cx}" cy="${T - 13}" r="8" fill="${st.trim}"/>`;
+    roofTop = T - 36;
   } else if (kind === "library") {
-    r += parapet + `<path d="M${X0 + 22} ${T - 6}a42 34 0 0 1 84 0z" fill="${p.roof}" ${ln}/>
-      <path d="M${X0 + 36} ${T - 14}a28 22 0 0 1 30 -16" fill="none" stroke="#fff" stroke-width="2.4" opacity=".35" stroke-linecap="round"/>
-      <rect x="${cx - 4}" y="${T - 48}" width="8" height="9" fill="${p.trim}" ${ln}/><path d="M${cx} ${T - 48}v-14" stroke="${INKC}" stroke-width="1.2"/>
-      <path class="flag" d="M${cx} ${T - 62}l14 4l-14 4z" fill="#e8b04a" ${ln}/>`;
-  } else if (kind === "garden") {
-    r += `<path d="M${cx} ${T - 34}l${D} ${-DY}L${X0 + W + D} ${T - DY}L${X0 + W} ${T}z" fill="#bcd9d2" ${ln}/>
-      <path d="M${X0} ${T}L${cx} ${T - 34}L${X0 + W} ${T}z" fill="#d7ece6" ${ln}/>
-      <path d="M${cx} ${T - 34}V${T}M${cx - 32} ${T - 17}V${T}M${cx + 32} ${T - 17}V${T}M${X0 + 16} ${T - 8}H${X0 + W - 16}" stroke="${INKC}" stroke-width=".8" opacity=".6"/>
-      <path d="M${X0 + 22} ${T - 6}L${cx - 10} ${T - 26}" stroke="#fff" stroke-width="2" opacity=".7"/>`;
+    const dome = `M${cx - 40} ${T - 8}A40 32 0 0 1 ${cx + 40} ${T - 8}Z`;
+    wash += wr(x0 - 4, T - 8, Wd + 8, 8, st.trim) + wp(dome, st.roof) + wr(cx - 6, T - 50, 12, 10, st.trim);
+    ink += P.rect(x0 - 4, T - 8, Wd + 8, 8) + [...Array(18)].map((_, i) => `<line x1="${x0 + 2 + i * 8.4}" y1="${T - 7}" x2="${x0 + 2 + i * 8.4}" y2="${T - 1}" stroke="${INK}" stroke-width=".7"/>`).join("")
+      + P.path(dome) + P.path(`M${cx - 20} ${T - 8}Q${cx - 18} ${T - 34} ${cx} ${T - 40}M${cx + 20} ${T - 8}Q${cx + 18} ${T - 34} ${cx} ${T - 40}`, { strokeWidth: 0.8 })
+      + P.rect(cx - 6, T - 50, 12, 10) + P.line(cx, T - 50, cx, T - 64) + `<path class="flag" d="M${cx} ${T - 64}l12 3l-12 3z" fill="#e8b04a" stroke="${INK}" stroke-width="1"/>`;
+    roofTop = T - 64;
+  } else if (kind === "cafe") {
+    const m = `M${x0 - 4} ${T}L${x0 + 10} ${T - 30}H${x0 + Wd - 10}L${x0 + Wd + 4} ${T}Z`;
+    wash += wp(m, st.roof) + wr(cx - 11, T - 26, 22, 18, st.trim) + wp(`M${cx - 14} ${T - 26}L${cx} ${T - 38}L${cx + 14} ${T - 26}Z`, st.roof)
+      + wr(x0 + Wd - 30, T - 44, 7, 16, "#c98d5e") + wr(x0 + Wd - 21, T - 42, 7, 14, "#c98d5e");
+    ink += P.path(m) + [1, 2, 3].map((i) => P.line(x0 + 6 - i, T - 8 * i, x0 + Wd - 6 + i, T - 8 * i, { strokeWidth: 0.6 })).join("")
+      + P.rect(x0 + Wd - 30, T - 44, 7, 16) + P.rect(x0 + Wd - 21, T - 42, 7, 14)
+      + P.rect(cx - 11, T - 26, 22, 18) + P.path(`M${cx - 14} ${T - 26}L${cx} ${T - 38}L${cx + 14} ${T - 26}Z`);
+    const [a, b] = win(cx - 6, T - 23, 12, 13); wash += a; ink += b; w--;  // dormer (not counted)
+    roofTop = T - 44;
+  } else if (kind === "home") {
+    const d = `M${x0 - 8} ${T}L${cx} ${T - 48}L${x0 + Wd + 8} ${T}Z`;
+    wash += wr(x0 + Wd - 40, T - 46, 12, 26, "#b07c5e") + wp(d, st.roof);
+    ink += P.rect(x0 + Wd - 40, T - 46, 12, 26) + P.path(d) + P.circle(cx, T - 18, 14)
+      + [1, 2, 3].map((i) => P.line(cx - i * 13, T - 48 + i * 12, cx + i * 13, T - 48 + i * 12, { strokeWidth: 0.6 })).join("")
+      + `<path class="smoke" d="M${x0 + Wd - 34} ${T - 50}c-6 -6 6 -10 0 -16s6 -10 0 -16" fill="none" stroke="#8b7f76" stroke-width="1.6" stroke-linecap="round"/>`;
+    wash += `<circle cx="${cx}" cy="${T - 18}" r="7" fill="${checkins > 0 && night ? "#ffd36b" : glass()}"/>`;
+    roofTop = T - 48;
   } else if (kind === "gym") {
-    r += parapet + `<path d="M${X0 + 20} ${T - 6}v-42" stroke="${INKC}" stroke-width="1.4"/><path class="flag" d="M${X0 + 20} ${T - 48}l24 6l-24 6z" fill="#d9655b" ${ln}/>
-      <rect x="${X0 + 74}" y="${T - 18}" width="34" height="12" rx="2" fill="${p.trim}" ${ln}/><path d="M${X0 + 78} ${T - 12}h26" stroke="${INKC}" stroke-width="1"/>`;
-  } else {  // studio: water tower on the roof
-    r += parapet + `<path d="M${X0 + 84} ${T - 6}l4-14M${X0 + 108} ${T - 6}l-4-14" stroke="${INKC}" stroke-width="1.2"/>
-      <path d="M${X0 + 82} ${T - 20}v-18a14 5 0 0 1 28 0v18a14 5 0 0 1 -28 0z" fill="#b98a62" ${ln}/><path d="M${X0 + 82} ${T - 38}l14-10l14 10" fill="#8f6748" ${ln}/>
-      <path d="M${X0 + 24} ${T - 6}v-22" stroke="${INKC}" stroke-width="1.2"/><circle cx="${X0 + 24}" cy="${T - 30}" r="3.5" fill="#e8b04a" ${ln}/>`;
+    wash += wr(x0 - 3, T - 6, Wd + 6, 6, "#aab3bd") + `<ellipse cx="${cx}" cy="${T - 16}" rx="60" ry="9" fill="${st.roof}"/><ellipse cx="${cx}" cy="${T - 16}" rx="44" ry="5" fill="#9ed39b"/>`;
+    ink += P.rect(x0 - 3, T - 6, Wd + 6, 6) + P.ellipse(cx, T - 16, 120, 18) + P.ellipse(cx, T - 16, 88, 10)
+      + P.line(cx - 60, T - 16, cx - 60, T - 6, { strokeWidth: 0.8 }) + P.line(cx + 60, T - 16, cx + 60, T - 6, { strokeWidth: 0.8 })
+      + P.line(x0 + Wd - 8, T - 6, x0 + Wd - 8, T - 46) + `<path class="flag" d="M${x0 + Wd - 8} ${T - 46}l-18 5l18 5z" fill="#ef7f97" stroke="${INK}" stroke-width="1"/>`;
+    roofTop = T - 46;
+  } else if (kind === "garden") {
+    const d = `M${x0} ${T}A${Wd / 2} 34 0 0 1 ${x0 + Wd} ${T}Z`;
+    wash += wp(d, st.roof, `opacity=".7"`);
+    ink += P.path(d) + [-2, -1, 0, 1, 2].map((i) => {
+      const x = cx + i * 24, y = T - 34 * Math.sqrt(1 - ((x - cx) / (Wd / 2)) ** 2);
+      return `<line x1="${x}" y1="${T}" x2="${x}" y2="${y}" stroke="${INK}" stroke-width=".7" opacity=".6"/>`;
+    }).join("") + P.line(cx, T - 34, cx, T - 50) + P.path(`M${cx - 8} ${T - 46}h16l-4 -3m4 3l-4 3`, { strokeWidth: 0.9 });
+    roofTop = T - 50;
+  } else {  // studio: sawtooth roof with skylights and a water tower
+    const tw = Wd / 3;
+    for (let i = 0; i < 3; i++) {
+      const x = x0 + i * tw, d = `M${x} ${T}L${x + tw} ${T - 20}V${T}Z`;
+      wash += wp(d, st.roof) + wr(x + tw - 4, T - 18, 4, 18, "#bcd4e4");
+      ink += P.path(d);
+    }
+    wash += wr(x0 + Wd - 44, T - 58, 26, 18, "#b98a62") + wp(`M${x0 + Wd - 46} ${T - 58}L${x0 + Wd - 31} ${T - 68}L${x0 + Wd - 16} ${T - 58}Z`, "#8f6748");
+    ink += P.rect(x0 + Wd - 44, T - 58, 26, 18) + P.path(`M${x0 + Wd - 46} ${T - 58}L${x0 + Wd - 31} ${T - 68}L${x0 + Wd - 16} ${T - 58}Z`)
+      + P.line(x0 + Wd - 42, T - 40, x0 + Wd - 44, T - 20) + P.line(x0 + Wd - 20, T - 40, x0 + Wd - 18, T - 20)
+      + P.line(x0 + Wd - 43, T - 30, x0 + Wd - 19, T - 30, { strokeWidth: 0.7 });
+    roofTop = T - 68;
   }
-  out += `<g class="roof ${built > fresh.floors ? "new" : ""}" style="--f:${built - 1}">${r}</g>`;
-  const defs = `<defs>
-    <linearGradient id="glass" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f3f8fb"/><stop offset="1" stop-color="#a9bccb"/></linearGradient>
-    <linearGradient id="glassN" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#4a5a7c"/><stop offset="1" stop-color="#2c3757"/></linearGradient>
-    <linearGradient id="glow" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffeab0"/><stop offset="1" stop-color="#ffb34a"/></linearGradient>
-    <pattern id="stripe${idx % 6}" width="12" height="10" patternUnits="userSpaceOnUse"><rect width="6" height="10" fill="${p.roof}"/><rect x="6" width="6" height="10" fill="${p.trim}"/></pattern></defs>`;
-  return `<svg viewBox="0 0 ${SVGW} ${SVGH}" width="${SVGW * SC}" height="${SVGH * SC}">${defs}${out}</svg>`;
+  out += `<g class="roof ${built > fresh.floors ? "new" : ""}" style="--f:${built - 1}"><g class="wash" filter="url(#wc)" transform="translate(1.6 1.2)">${wash}</g><g class="ink">${ink}</g></g>`;
+  return { svg: `<svg viewBox="0 0 ${SVGW} ${SVGH}" width="${SVGW * SC}" height="${SVGH * SC}">${out}</svg>`, total, lit, width: SVGW * SC, signAt: (SVGH - roofTop) * SC };
 }
 
-// scenery: soft clouds, a far 2036 skyline, layered hills; trees and lamps between buildings
-let CLOUD = "", HILLS = "", TREE = [], LAMP = "", MAILBOX = { up: "", down: "" };
+// scenery in the same pen and washes
+let SUN = [], SKY = "", CLOUD = "", HILLS = "", TREE = [], LAMP = "", MAILBOX = { up: "", down: "" }, DEFS = "";
 function townArt() {
   if (CLOUD) return;
-  CLOUD = `<svg viewBox="0 0 140 50"><path d="M18 44c-12 0-14-14-2-16 0-12 16-16 24-8 4-12 24-14 30-2 10-6 26 0 24 12 14 0 16 14 4 14z" fill="#fff" opacity=".92"/>
-    <path d="M20 44h96" stroke="#d9e6ef" stroke-width="3" stroke-linecap="round"/></svg>`;
-  const towers = [[60, 70], [95, 110], [120, 58], [180, 92], [215, 130], [250, 76], [900, 84], [935, 126], [965, 66], [1010, 104], [1050, 72], [1180, 96], [1215, 60]]
-    .map(([x, hh]) => `<rect x="${x}" y="${190 - hh}" width="30" height="${hh}" rx="2"/>`).join("");
-  HILLS = `<svg viewBox="0 0 1400 240" preserveAspectRatio="xMidYMax slice">
-    <g class="far" fill="#b9cddc" opacity=".75">${towers}<path d="M1230 190v-170l6-8 6 8v170z"/></g>
-    <path class="mid" d="M0 172C180 120 300 150 430 140S700 96 860 132 1150 120 1400 140V240H0z" fill="#bcd3b4"/>
-    <path class="near" d="M0 200C220 166 380 196 560 182S900 160 1080 186 1300 176 1400 182V240H0z" fill="#9fc195"/></svg>`;
-  for (const [a, b] of [["#7fae70", "#6a9a5d"], ["#8fbb7a", "#739f63"]]) {
-    TREE.push(`<svg viewBox="0 0 40 70"><ellipse cx="20" cy="67" rx="14" ry="3" fill="#2b2420" opacity=".14"/>
-      <path d="M19 66V40h2v26z" fill="#7a5a43"/>
-      <g class="crown"><circle cx="20" cy="28" r="15" fill="${b}"/><circle cx="15" cy="24" r="11" fill="${a}"/><circle cx="24" cy="20" r="8" fill="${a}"/>
-      <circle cx="13" cy="20" r="3" fill="#fff" opacity=".18"/></g></svg>`);
+  DEFS = `<svg class="town-defs" width="0" height="0" aria-hidden="true"><defs>
+    <filter id="wc" x="-8%" y="-8%" width="116%" height="116%"><feTurbulence type="fractalNoise" baseFrequency=".04" numOctaves="3" seed="4" result="n"/>
+      <feDisplacementMap in="SourceGraphic" in2="n" scale="5" xChannelSelector="R" yChannelSelector="G" result="d"/><feGaussianBlur in="d" stdDeviation=".45"/></filter>
+    <filter id="wcsoft" x="-20%" y="-20%" width="140%" height="140%"><feTurbulence type="fractalNoise" baseFrequency=".012" numOctaves="3" seed="9" result="n"/>
+      <feDisplacementMap in="SourceGraphic" in2="n" scale="40" xChannelSelector="R" yChannelSelector="G" result="d"/><feGaussianBlur in="d" stdDeviation="3"/></filter>
+    <pattern id="brick" width="16" height="8" patternUnits="userSpaceOnUse"><rect width="16" height="8" fill="#d39478"/>
+      <path d="M0 .5h16M0 4.5h16M4 .5v4M12 4.5v4" stroke="#9c5a40" stroke-width=".6" opacity=".55"/></pattern>
+    <filter id="grain"><feTurbulence type="fractalNoise" baseFrequency=".9" numOctaves="2" seed="2"/><feColorMatrix values="0 0 0 0 .17 0 0 0 0 .14 0 0 0 0 .12 0 0 0 .55 0"/></filter>
+  </defs></svg>`;
+  const P = pen(7);
+  CLOUD = `<svg viewBox="0 0 140 54"><path filter="url(#wc)" d="M18 46c-12 0-14-14-2-16 0-12 16-16 24-8 4-12 24-14 30-2 10-6 26 0 24 12 14 0 16 14 4 14z" fill="#fff"/>
+    ${P.path("M18 46c-12 0-14-14-2-16 0-12 16-16 24-8 4-12 24-14 30-2 10-6 26 0 24 12 14 0 16 14 4 14z", { strokeWidth: 1, roughness: 1.1 })}</svg>`;
+  const towers = [[60, 70], [95, 112], [128, 58], [180, 92], [216, 132], [252, 76], [900, 84], [936, 126], [968, 66], [1010, 104], [1050, 72], [1180, 96], [1216, 60]];
+  HILLS = `<svg viewBox="0 0 1400 260" preserveAspectRatio="xMidYMax slice">
+    <g class="far">${towers.map(([x, hh]) => wr(x, 200 - hh, 30, hh, "#c9d7e6", `filter="url(#wc)" opacity=".7"`)
+      + P.rect(x, 200 - hh, 30, hh, { stroke: "#7f95ad", strokeWidth: 0.8, roughness: 1 })
+      + [...Array(Math.floor(hh / 16))].map((_, i) => `<line x1="${x + 6}" x2="${x + 24}" y1="${208 - hh + i * 16}" y2="${208 - hh + i * 16}" stroke="#7f95ad" stroke-width=".6" opacity=".6"/>`).join("")).join("")}</g>
+    <g class="mid">${wp("M0 190C180 136 300 168 430 158S700 112 860 150 1150 136 1400 158V260H0z", "#cfe0c3", `filter="url(#wc)"`)}</g>
+    <g class="near">${wp("M0 218C220 182 380 214 560 200S900 176 1080 204 1300 192 1400 200V260H0z", "#b2d3a2", `filter="url(#wc)"`)}
+      ${P.path("M0 218C220 182 380 214 560 200S900 176 1080 204 1300 192 1400 200", { strokeWidth: 1, roughness: 1.2, stroke: "#5f7f55" })}</g></svg>`;
+  SKY = `<svg viewBox="0 0 1400 470" preserveAspectRatio="xMidYMin slice"><g filter="url(#wcsoft)">
+    <path class="sky-wash" d="M-60 -60H1460V230C1300 300 1160 220 980 270S640 230 460 290 120 240 -60 300Z"/></g></svg>`;
+  SUN = [`<svg viewBox="-40 -40 80 80"><circle r="20" fill="#ffd36b" filter="url(#wc)"/>${P.circle(0, 0, 40, { strokeWidth: 1.3 })}
+      <g class="rays">${[...Array(10)].map((_, i) => { const a = (i * Math.PI) / 5; return P.line(Math.cos(a) * 26, Math.sin(a) * 26, Math.cos(a) * 34, Math.sin(a) * 34, { strokeWidth: 1.3 }); }).join("")}</g></svg>`,
+    `<svg viewBox="-40 -40 80 80"><mask id="moonm"><rect x="-40" y="-40" width="80" height="80" fill="#fff"/><circle cx="11" cy="-7" r="17" fill="#000"/></mask>
+      <circle r="20" fill="#fff4cf" mask="url(#moonm)"/><circle r="20" fill="none" stroke="#f4ecd2" stroke-width="1" stroke-dasharray="3 4" opacity=".4"/></svg>`];
+  for (const [a, b] of [["#8fbe7d", "#79a86a"], ["#a3c98a", "#86b070"]]) {
+    TREE.push(`<svg viewBox="0 0 46 76"><g class="wash" filter="url(#wc)"><circle cx="23" cy="30" r="17" fill="${a}"/><circle cx="16" cy="24" r="10" fill="${b}"/></g>
+      ${P.line(23, 74, 23, 40, { strokeWidth: 2 })}${P.line(23, 52, 30, 44, { strokeWidth: 1 })}
+      <g class="crown">${P.circle(23, 30, 34, { fill: b, fillStyle: "hachure", hachureGap: 5, fillWeight: 0.6, hachureAngle: -50, strokeWidth: 1 })}</g></svg>`);
   }
-  LAMP = `<svg viewBox="0 0 30 90"><circle class="halo" cx="15" cy="14" r="14" fill="#ffd27a"/><path d="M14 88V20h2v68z" fill="#3b312b"/>
-    <path d="M9 18h12l-2-9h-8z" fill="#3b312b"/><rect x="11" y="10" width="8" height="8" fill="#ffe6a3"/><rect x="10" y="86" width="10" height="3" fill="#3b312b"/></svg>`;
+  LAMP = `<svg viewBox="0 0 30 92"><circle class="halo" cx="15" cy="14" r="14" fill="#ffd27a"/>${P.line(15, 90, 15, 20, { strokeWidth: 1.6 })}
+    ${P.path("M8 19h14l-3 -9h-8z", { fill: "#fff2c4", fillStyle: "solid" })}${P.line(10, 90, 20, 90)}</svg>`;
   for (const up of [true, false]) {
-    MAILBOX[up ? "up" : "down"] = `<svg viewBox="0 -10 46 62"><path d="M15 28v24" stroke="${INKC}" stroke-width="2.4"/>
-      <path d="M4 16a10 10 0 0 1 10-10h18v22H4z" fill="#5f86ad" ${ln}/><path d="M32 6a8 8 0 0 1 8 8v14h-8z" fill="#4a6d91" ${ln}/>
-      <g class="mb-flag">${up ? `<path d="M34 12V-6h9v7h-7" fill="#d9655b" ${ln}/>` : `<path d="M34 20h12v6H34" fill="#d9655b" ${ln}/>`}</g></svg>`;
+    MAILBOX[up ? "up" : "down"] = `<svg viewBox="0 -12 46 64"><g filter="url(#wc)">${wp("M4 16a10 10 0 0 1 20 0v12H4z", "#7aa0c4")}${wr(14, 6, 18, 22, "#7aa0c4")}</g>
+      ${P.line(14, 28, 14, 52, { strokeWidth: 1.8 })}${P.path("M4 28V16a10 10 0 0 1 10 -10h18v22z")}${P.line(14, 6, 14, 6)}
+      <g class="mb-flag">${up ? P.path("M32 12V-8h10v7h-8", { fill: "#d9655b", fillStyle: "solid" }) : P.path("M32 20h12v6H32", { fill: "#d9655b", fillStyle: "solid" })}</g></svg>`;
   }
 }
 
@@ -997,25 +1161,27 @@ function renderTown(opts = {}) {
   if (VIEW !== "town") return;
   townArt();
   const name = S.profile.name, friend = S.profile.cast?.[0]?.name || "Mom";
-  const sounds = [];
+  const sounds = [], usedKinds = new Set();
   const lots = S.habits.map((h, idx) => {
     const built = Math.min(MAXF, Math.max(1, h.allowed_chapter + 1));
-    const total = built * 3 - 1, lit = Math.min(total, h.checkins);
-    const was = seen[h.id] || { floors: built, lit };
-    const fresh = opts.noAnim ? { floors: built, lit } : was;
+    const kind = KIND[h.icon] || "studio";
+    const was = seen[h.id] || { floors: built, lit: 999 };
+    const fresh = opts.noAnim ? { floors: built, lit: 999 } : was;
+    const art = buildingSVG(h, idx, built, h.checkins, fresh, usedKinds.has(kind));
+    usedKinds.add(kind);
+    const { total, lit } = art;
     if (built > fresh.floors) sounds.push("stamp"); else if (lit > fresh.lit) sounds.push("pop");
     seen[h.id] = { floors: built, lit };
-    const kind = KIND[h.icon] || "studio";
     const mine = POSTS.kept.filter((p) => p.habit_id === h.id);
     const next = h.chapters[built] ? `<i>Next floor (~${year(h.chapter_dates[built])}): ${esc(lower(h.chapters[built]))}</i>` : `<i>Finished. This one is ten years tall.</i>`;
     const toNext = h.next_level_at ? `${h.next_level_at - h.checkins} check-in${h.next_level_at - h.checkins === 1 ? "" : "s"} to the next floor` : "";
     return `
-      <div class="lot ${opts.working === h.id ? "working" : ""} ${h.checked_today ? "done-today" : ""}" data-h="${h.id}" style="--b:${idx}">
+      <div class="lot ${opts.working === h.id ? "working" : ""} ${h.checked_today ? "done-today" : ""}" data-h="${h.id}" style="--b:${idx}; width:${art.width}px">
         <div class="lot-tip"><b>${KIND_NAME[kind]} · floor ${built} of 6</b>${esc(h.allowed_milestone ? `Future you ${lower(h.allowed_milestone.milestone)}.` : "")}${next}<small>${toNext}${toNext ? " · " : ""}${lit} of ${total} windows lit</small></div>
         ${h.quest ? `<div class="lot-storm">${ico("storm")}<span class="rain"></span><b>Comeback quest ${h.quest.progress}/3</b></div>` : ""}
-        <div class="lot-sign" style="bottom:${(built * FH + ROOF - 2) * SC}px">${hIcon(h, "inline")} ${esc(h.short)}</div>
+        <div class="lot-sign" style="bottom:${art.signAt + 4}px">${hIcon(h, "inline")} ${esc(h.short)}</div>
         <div class="lot-work">Building floor ${built + 1}…<br><small>your postcard is on its way</small></div>
-        <button class="lot-b" aria-label="${esc(h.short)}: see its postcard road">${buildingSVG(h, idx, built, lit, fresh)}</button>
+        <button class="lot-b" aria-label="${esc(h.short)}: see its postcard road">${art.svg}</button>
         <span class="lot-say">${esc(friend)}: “${esc(SUPPORT[(h.checkins + idx) % SUPPORT.length].replace("{n}", name).replace("{f}", built))}”</span>
         <button class="mailbox ${mine.length ? "has" : ""}" data-mail="${h.id}" aria-label="Postcards">${mine.length ? MAILBOX.up : MAILBOX.down}${mine.length ? `<b>${mine.length}</b>` : ""}</button>
         <p class="lot-name">${KIND_NAME[kind]}<small>${esc(h.short)} · ${h.checked_today ? "done today ✓" : "not yet today"}</small></p>
@@ -1027,7 +1193,8 @@ function renderTown(opts = {}) {
   const pop = 1 + (S.profile.cast?.length || 0);
   $("town").className = `town ${night ? "night" : ""}`;
   $("town").innerHTML = `
-    <div class="sky">
+    ${DEFS}
+    <div class="sky">${SKY}
       <span class="cloud c1">${CLOUD}</span><span class="cloud c2">${CLOUD}</span><span class="cloud c3">${CLOUD}</span>
       ${night ? `<span class="stars"></span>` : ""}
     </div>
@@ -1038,7 +1205,8 @@ function renderTown(opts = {}) {
       <div class="lot empty" id="lot-add"><div class="lot-plot"><span>${ico("sprout")}</span><b>Empty lot</b><small>Add a daily thing<br>and build here</small></div></div>
       <span class="walker" id="walker">${avatarHTML(S.profile.avatar?.photo ? 38 : 36, { tier: 0 })}<span class="say">Day ${S.day_offset + 1} in ${esc(name)}ville.</span></span>
     </div></div>
-    <button class="sun" id="sun" aria-label="Day or night" title="${night ? "Back to day" : "See your town at night"}">${night ? "" : "<i></i>"}</button>`;
+    <button class="sun" id="sun" aria-label="Day or night" title="${night ? "Back to day" : "See your town at night"}">${SUN[night ? 1 : 0]}</button>
+    <div class="grain"><svg width="100%" height="100%"><rect width="100%" height="100%" filter="url(#grain)"/></svg></div>`;
 
   const town = $("town");
   town.querySelectorAll(".lot[data-h] .lot-b").forEach((b) => (b.onclick = () => {
@@ -1205,6 +1373,6 @@ if (PLAIN) {  // control group: a neutral habit tracker, nothing about the futur
   document.title = "Streaks";
 }
 // ?dev exposes a couple of functions for testing animations without spending a check-in
-if (new URLSearchParams(location.search).has("dev")) window.ff = { openPostcard, posts: () => POSTS };
+if (new URLSearchParams(location.search).has("dev")) window.ff = { openPostcard, posts: () => POSTS, state: () => S, renderTown };
 studyBar();
 refresh();
