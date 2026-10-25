@@ -859,108 +859,127 @@ const KIND = { guitar: "hall", music: "hall", piano: "hall", dance: "hall", read
   running: "gym", bike: "gym", dumbbell: "gym", wave: "gym", spanish: "cafe", chat: "cafe", pan: "cafe",
   saving: "home", heart: "home", lotus: "garden", sprout: "garden", drop: "garden", moon: "garden", sun: "garden" };
 const KIND_NAME = { hall: "Music hall", library: "Library", gym: "Gym", cafe: "Café", home: "Home", garden: "Greenhouse", studio: "Studio" };
-const WALLS = ["#f7b6c2", "#ffd86b", "#9ed39b", "#9cc6f0", "#c9b5f0", "#f6a15b"];
-const ROOFS = ["#ef7f97", "#f6a15b", "#5fae7a", "#5b8fd1", "#9a7fd6", "#c98d5e"];
+// Muted architectural palette: facade, side (in shade), roof, roof in shade, trim.
+const PAL = [
+  { wall: "#e7b5a1", side: "#c48b77", roof: "#a4524a", roofS: "#7f3c37", trim: "#fbf0e8" },
+  { wall: "#efd29d", side: "#c9a96f", roof: "#bf7d3c", roofS: "#955e2a", trim: "#fff7e6" },
+  { wall: "#b3caa5", side: "#8aa47f", roof: "#587a56", roofS: "#435f43", trim: "#f3f7ee" },
+  { wall: "#a9bfd5", side: "#8199b4", roof: "#4b6a8d", roofS: "#385270", trim: "#eff4f9" },
+  { wall: "#cbbbdb", side: "#a594ba", roof: "#766396", roofS: "#5a4b77", trim: "#f6f1fb" },
+  { wall: "#ecae8b", side: "#c78764", roof: "#a35b39", roofS: "#7f4428", trim: "#fdf1e8" },
+];
+const SC = 1.25, INKC = "#3b312b", D = 20, DY = 9, X0 = 12, W = 128;
 const seen = JSON.parse(localStorage.getItem("ff-town") || "{}");
 let night = new Date().getHours() < 7 || new Date().getHours() >= 19;
-const svgEl = (w, h) => {
-  const s = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-  s.setAttribute("viewBox", `0 0 ${w} ${h}`);
-  s.setAttribute("width", w); s.setAttribute("height", h);
-  return s;
-};
-const R = { stroke: "#2b2420", strokeWidth: 2, roughness: 1.2, bowing: 1, fillStyle: "solid" };
-const group = (cls, parts, style = "") => {
-  const g = document.createElementNS("http://www.w3.org/2000/svg", "g");
-  g.setAttribute("class", cls);
-  if (style) g.setAttribute("style", style);
-  parts.forEach((p) => g.appendChild(p));
-  return g;
-};
+const ln = `stroke="${INKC}" stroke-width="1.2" stroke-linejoin="round"`;
 
-// one building as an SVG string; floors and windows carry classes so CSS can animate them
-function buildingSVG(h, idx, built, lit, fresh) {
-  const svg = svgEl(SVGW, SVGH), rc = rough.svg(svg);
-  const kind = KIND[h.icon] || "studio", wall = WALLS[idx % 6], roofC = ROOFS[idx % 6];
-  const x0 = 10, base = SVGH - 2, s = h.id * 97;
-  let w = 0;  // window counter, bottom-left to top-right
-  for (let f = 0; f < MAXF; f++) {
-    const top = base - (f + 1) * FH - (f >= built ? LIFT : 0);  // blueprint floors float above the roof
-    if (f >= built) {  // blueprint
-      const yr = (h.chapter_dates[f] || "").slice(0, 4);
-      const g = group("bp", [rc.rectangle(x0 + 4, top + 2, BW - 8, FH - 2, { stroke: "#5b8fd1", strokeWidth: 1.3, roughness: 0.8, strokeLineDash: [5, 5], seed: s + f })]);
-      const t = document.createElementNS("http://www.w3.org/2000/svg", "text");
-      Object.entries({ x: x0 + BW / 2, y: top + FH / 2 + 6, "text-anchor": "middle", class: "bp-t" }).forEach(([k, v]) => t.setAttribute(k, v));
-      t.textContent = `floor ${f + 1} · ~${yr}`;
-      g.appendChild(t);
-      svg.appendChild(g);
-      continue;
-    }
-    const parts = [rc.rectangle(x0, top, BW, FH, { ...R, fill: wall, seed: s + f })];
-    const slots = f === 0 ? [12, 112] : [12, 62, 112];
-    for (const sx of slots) {
-      const on = w < lit, isNew = on && w >= fresh.lit;
-      const win = rc.rectangle(x0 + sx, top + 9, 26, 19, { ...R, strokeWidth: 1.6, fill: on ? "#ffd86b" : night ? "#56658a" : "#e6f2fd", seed: s + 40 + w });
-      win.setAttribute("class", `win ${on ? "lit" : ""} ${isNew ? "new-lit" : ""}`);
-      win.setAttribute("style", `--w:${w}`);
-      parts.push(win);
-      w++;
-    }
-    if (f === 0) {
-      parts.push(rc.rectangle(x0 + 61, top + 6, 28, FH - 6, { ...R, fill: "#8a5a3c", seed: s + 30 }));
-      parts.push(rc.circle(x0 + 84, top + 22, 3, { ...R, fill: "#ffd86b", strokeWidth: 1, seed: s + 31 }));
-      if (kind === "cafe") parts.push(rc.path(`M${x0 + 4} ${top + 2} L${x0 + BW - 4} ${top + 2} L${x0 + BW - 10} ${top - 8} L${x0 + 10} ${top - 8} Z`,
-        { ...R, fill: "#ef7f97", fillStyle: "hachure", hachureGap: 6, seed: s + 32 }));
-    }
-    svg.appendChild(group(`floor ${f >= fresh.floors ? "new" : ""}`, parts, `--f:${f}`));
-  }
-  // roof sits on the highest built floor
-  const T = base - built * FH, cx = x0 + BW / 2, roof = [];
-  if (kind === "hall" || kind === "home" || kind === "cafe") {
-    roof.push(rc.path(`M${x0 - 6} ${T} L${cx} ${T - 46} L${x0 + BW + 6} ${T} Z`, { ...R, fill: roofC, seed: s + 50 }));
-    if (kind === "home") roof.push(rc.rectangle(x0 + BW - 40, T - 44, 14, 26, { ...R, fill: "#c98d5e", seed: s + 51 }));
-    else roof.push(rc.circle(cx, T - 18, 16, { ...R, fill: "#fffaf0", seed: s + 52 }));
-  } else if (kind === "library") {
-    roof.push(rc.path(`M${x0 + 8} ${T} Q${cx} ${T - 72} ${x0 + BW - 8} ${T} Z`, { ...R, fill: roofC, seed: s + 53 }));
-    roof.push(rc.line(cx, T - 36, cx, T - 58, { ...R, seed: s + 54 }));
-    roof.push(rc.path(`M${cx} ${T - 58} L${cx + 16} ${T - 53} L${cx} ${T - 48} Z`, { ...R, fill: "#ffd86b", seed: s + 55 }));
-  } else if (kind === "garden") {
-    roof.push(rc.path(`M${x0 - 4} ${T} L${cx} ${T - 40} L${x0 + BW + 4} ${T} Z`, { ...R, fill: "#cfe7fb", fillStyle: "cross-hatch", hachureGap: 7, seed: s + 56 }));
-    roof.push(rc.circle(cx, T - 50, 14, { ...R, fill: "#9ed39b", seed: s + 57 }));
-  } else {  // gym, studio: flat roof with a flag or an antenna
-    roof.push(rc.rectangle(x0 - 5, T - 9, BW + 10, 9, { ...R, fill: roofC, seed: s + 58 }));
-    roof.push(rc.line(x0 + 24, T - 9, x0 + 24, T - 50, { ...R, seed: s + 59 }));
-    roof.push(kind === "gym"
-      ? rc.path(`M${x0 + 24} ${T - 50} L${x0 + 50} ${T - 43} L${x0 + 24} ${T - 36} Z`, { ...R, fill: "#ef7f97", seed: s + 60 })
-      : rc.circle(x0 + 24, T - 52, 9, { ...R, fill: "#ffd86b", seed: s + 61 }));
-  }
-  svg.appendChild(group(`roof ${built > fresh.floors ? "new" : ""}`, roof, `--f:${built - 1}`));
-  return svg.outerHTML;
+// a box face pair: front rectangle plus the shaded side face going back to the right
+const box = (x, y, w, h, front, side) =>
+  `<path d="M${x + w} ${y} l${D} ${-DY} v${h} l${-D} ${DY} z" fill="${side}" ${ln}/><rect x="${x}" y="${y}" width="${w}" height="${h}" fill="${front}" ${ln}/>`;
+
+function windowSVG(x, y, on, isNew, w, p) {
+  return `<g class="win ${on ? "lit" : ""} ${isNew ? "new-lit" : ""}" style="--w:${w}">
+    <rect x="${x}" y="${y}" width="22" height="20" rx="2" fill="url(#${on ? "glow" : night ? "glassN" : "glass"})" ${ln}/>
+    <path d="M${x + 11} ${y + 1}v18M${x + 1} ${y + 9}h20" stroke="${p.trim}" stroke-width="1.6"/>
+    ${on ? "" : `<path d="M${x + 4} ${y + 16}l6-11M${x + 9} ${y + 17}l4-7" stroke="#fff" stroke-width="1.4" opacity=".55"/>`}
+    <rect x="${x - 2}" y="${y + 20}" width="26" height="3" rx="1" fill="${p.trim}" ${ln} stroke-width=".9"/></g>`;
 }
 
-let CLOUD = "", HILLS = "", MAILBOX = { up: "", down: "" };
+function buildingSVG(h, idx, built, lit, fresh) {
+  const p = PAL[idx % 6], kind = KIND[h.icon] || "studio", base = SVGH - 8;
+  let out = `<ellipse cx="${X0 + W / 2 + 8}" cy="${base + 1}" rx="${W / 2 + 22}" ry="6" fill="#2b2420" opacity=".14"/>`;
+  let w = 0;
+  for (let f = 0; f < MAXF; f++) {
+    const top = base - (f + 1) * FH - (f >= built ? LIFT : 0);  // blueprint floors float above the roof
+    if (f >= built) {
+      const yr = (h.chapter_dates[f] || "").slice(0, 4);
+      out += `<g class="bp"><path d="M${X0} ${top}h${W}v${FH}h${-W}zM${X0 + W} ${top}l${D} ${-DY}v${FH}l${-D} ${DY}" fill="rgba(91,143,209,.07)" stroke="#5b8fd1" stroke-width="1.1" stroke-dasharray="4 4"/>
+        <text x="${X0 + W / 2}" y="${top + FH / 2 + 5}" text-anchor="middle" class="bp-t">floor ${f + 1} · ~${yr}</text></g>`;
+      continue;
+    }
+    let g = box(X0, top, W, FH, p.wall, p.side);
+    g += `<rect x="${X0}" y="${top + FH - 5}" width="${W}" height="5" fill="${p.side}" opacity=".35"/>`;  // soft shade under the cornice
+    const slots = f === 0 ? [X0 + 12, X0 + 94] : [X0 + 14, X0 + 53, X0 + 92];
+    for (const sx of slots) { g += windowSVG(sx, top + 7, w < lit, w < lit && w >= fresh.lit, w, p); w++; }
+    if (f === 0) {
+      const dx = X0 + 50;
+      g += `<path d="M${dx} ${top + FH}v-19a14 14 0 0 1 28 0v19z" fill="#5d4232" ${ln}/>
+        <path d="M${dx + 14} ${top + FH - 32}v32" stroke="#4a3427" stroke-width="1"/>
+        <circle cx="${dx + 19}" cy="${top + FH - 12}" r="1.6" fill="#f2c55c"/>
+        <rect x="${dx - 3}" y="${top + FH - 2}" width="34" height="3" fill="${p.trim}" ${ln} stroke-width=".9"/>`;
+      if (kind === "cafe") {  // striped awning over the shop windows
+        g += `<path d="M${X0 + 4} ${top + 4}h${W - 8}l-4 9h${-(W - 16)}z" fill="url(#stripe${idx % 6})" ${ln}/>`;
+      } else {  // window boxes with a little green
+        for (const sx of slots) g += `<rect x="${sx - 1}" y="${top + 30}" width="24" height="4" fill="#8a6a4f"/>
+          <circle cx="${sx + 5}" cy="${top + 29}" r="3.2" fill="#6f9a62"/><circle cx="${sx + 12}" cy="${top + 28.5}" r="3.6" fill="#7fae70"/><circle cx="${sx + 18}" cy="${top + 29}" r="3" fill="#6f9a62"/>`;
+      }
+    }
+    out += `<g class="floor ${f >= fresh.floors ? "new" : ""}" style="--f:${f}">${g}</g>`;
+  }
+  // roof on the highest built floor
+  const T = base - built * FH, cx = X0 + W / 2;
+  let r = "";
+  const parapet = `<path d="M${X0 + W + 3} ${T - 6}l${D} ${-DY}v6l${-D} ${DY}z" fill="${p.side}" ${ln}/><rect x="${X0 - 3}" y="${T - 6}" width="${W + 6}" height="6" fill="${p.trim}" ${ln}/>`;
+  if (kind === "hall" || kind === "home" || kind === "cafe") {
+    const peak = T - 40;
+    r += `<path d="M${cx} ${peak}l${D} ${-DY}L${X0 + W + 4 + D} ${T - DY}L${X0 + W + 4} ${T}z" fill="${p.roofS}" ${ln}/>
+      <path d="M${X0 - 4} ${T}L${cx} ${peak}L${X0 + W + 4} ${T}z" fill="${p.roof}" ${ln}/>
+      <path d="M${X0 + 8} ${T - 3}L${cx} ${peak + 8}L${X0 + W - 8} ${T - 3}" fill="none" stroke="${p.trim}" stroke-width="1.4" opacity=".6"/>`;
+    r += kind === "home"
+      ? `<path d="M${X0 + W - 10} ${T - 34}v-16h12v26" fill="#9a6b4f" ${ln}/><rect x="${X0 + W - 12}" y="${T - 54}" width="16" height="5" fill="#7c5440" ${ln}/>
+         <rect x="${cx - 9}" y="${T - 24}" width="18" height="14" rx="1" fill="url(#${night ? "glow" : "glass"})" ${ln}/>`
+      : `<circle cx="${cx}" cy="${T - 16}" r="8" fill="url(#${night ? "glow" : "glass"})" ${ln}/><path d="M${cx - 8} ${T - 16}h16M${cx} ${T - 24}v16" stroke="${p.trim}" stroke-width="1.3"/>`;
+  } else if (kind === "library") {
+    r += parapet + `<path d="M${X0 + 22} ${T - 6}a42 34 0 0 1 84 0z" fill="${p.roof}" ${ln}/>
+      <path d="M${X0 + 36} ${T - 14}a28 22 0 0 1 30 -16" fill="none" stroke="#fff" stroke-width="2.4" opacity=".35" stroke-linecap="round"/>
+      <rect x="${cx - 4}" y="${T - 48}" width="8" height="9" fill="${p.trim}" ${ln}/><path d="M${cx} ${T - 48}v-14" stroke="${INKC}" stroke-width="1.2"/>
+      <path class="flag" d="M${cx} ${T - 62}l14 4l-14 4z" fill="#e8b04a" ${ln}/>`;
+  } else if (kind === "garden") {
+    r += `<path d="M${cx} ${T - 34}l${D} ${-DY}L${X0 + W + D} ${T - DY}L${X0 + W} ${T}z" fill="#bcd9d2" ${ln}/>
+      <path d="M${X0} ${T}L${cx} ${T - 34}L${X0 + W} ${T}z" fill="#d7ece6" ${ln}/>
+      <path d="M${cx} ${T - 34}V${T}M${cx - 32} ${T - 17}V${T}M${cx + 32} ${T - 17}V${T}M${X0 + 16} ${T - 8}H${X0 + W - 16}" stroke="${INKC}" stroke-width=".8" opacity=".6"/>
+      <path d="M${X0 + 22} ${T - 6}L${cx - 10} ${T - 26}" stroke="#fff" stroke-width="2" opacity=".7"/>`;
+  } else if (kind === "gym") {
+    r += parapet + `<path d="M${X0 + 20} ${T - 6}v-42" stroke="${INKC}" stroke-width="1.4"/><path class="flag" d="M${X0 + 20} ${T - 48}l24 6l-24 6z" fill="#d9655b" ${ln}/>
+      <rect x="${X0 + 74}" y="${T - 18}" width="34" height="12" rx="2" fill="${p.trim}" ${ln}/><path d="M${X0 + 78} ${T - 12}h26" stroke="${INKC}" stroke-width="1"/>`;
+  } else {  // studio: water tower on the roof
+    r += parapet + `<path d="M${X0 + 84} ${T - 6}l4-14M${X0 + 108} ${T - 6}l-4-14" stroke="${INKC}" stroke-width="1.2"/>
+      <path d="M${X0 + 82} ${T - 20}v-18a14 5 0 0 1 28 0v18a14 5 0 0 1 -28 0z" fill="#b98a62" ${ln}/><path d="M${X0 + 82} ${T - 38}l14-10l14 10" fill="#8f6748" ${ln}/>
+      <path d="M${X0 + 24} ${T - 6}v-22" stroke="${INKC}" stroke-width="1.2"/><circle cx="${X0 + 24}" cy="${T - 30}" r="3.5" fill="#e8b04a" ${ln}/>`;
+  }
+  out += `<g class="roof ${built > fresh.floors ? "new" : ""}" style="--f:${built - 1}">${r}</g>`;
+  const defs = `<defs>
+    <linearGradient id="glass" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f3f8fb"/><stop offset="1" stop-color="#a9bccb"/></linearGradient>
+    <linearGradient id="glassN" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#4a5a7c"/><stop offset="1" stop-color="#2c3757"/></linearGradient>
+    <linearGradient id="glow" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffeab0"/><stop offset="1" stop-color="#ffb34a"/></linearGradient>
+    <pattern id="stripe${idx % 6}" width="12" height="10" patternUnits="userSpaceOnUse"><rect width="6" height="10" fill="${p.roof}"/><rect x="6" width="6" height="10" fill="${p.trim}"/></pattern></defs>`;
+  return `<svg viewBox="0 0 ${SVGW} ${SVGH}" width="${SVGW * SC}" height="${SVGH * SC}">${defs}${out}</svg>`;
+}
+
+// scenery: soft clouds, a far 2036 skyline, layered hills; trees and lamps between buildings
+let CLOUD = "", HILLS = "", TREE = [], LAMP = "", MAILBOX = { up: "", down: "" };
 function townArt() {
   if (CLOUD) return;
-  let svg = svgEl(120, 50), rc = rough.svg(svg);
-  svg.appendChild(rc.path("M14 40 Q4 40 6 31 Q8 22 20 24 Q24 10 40 13 Q50 2 66 10 Q82 4 88 18 Q104 16 106 28 Q112 40 98 40 Z",
-    { ...R, strokeWidth: 1.6, fill: "#ffffff", seed: 7 }));
-  CLOUD = svg.outerHTML;
-  svg = svgEl(1400, 240); rc = rough.svg(svg);
-  svg.setAttribute("preserveAspectRatio", "xMidYMax slice");
-  const far = group("far", [rc.path("M0 150 Q160 70 330 130 Q520 40 720 120 Q900 60 1080 125 Q1250 80 1400 120 L1400 240 L0 240 Z",
-    { ...R, strokeWidth: 1.5, fill: "#cfe8c4", seed: 11 })]);
-  const near = group("near", [rc.path("M0 190 Q220 130 430 180 Q640 120 860 185 Q1080 140 1400 175 L1400 240 L0 240 Z",
-    { ...R, strokeWidth: 1.5, fill: "#a9d89a", seed: 12 })]);
-  svg.append(far, near);
-  HILLS = svg.outerHTML;
+  CLOUD = `<svg viewBox="0 0 140 50"><path d="M18 44c-12 0-14-14-2-16 0-12 16-16 24-8 4-12 24-14 30-2 10-6 26 0 24 12 14 0 16 14 4 14z" fill="#fff" opacity=".92"/>
+    <path d="M20 44h96" stroke="#d9e6ef" stroke-width="3" stroke-linecap="round"/></svg>`;
+  const towers = [[60, 70], [95, 110], [120, 58], [180, 92], [215, 130], [250, 76], [900, 84], [935, 126], [965, 66], [1010, 104], [1050, 72], [1180, 96], [1215, 60]]
+    .map(([x, hh]) => `<rect x="${x}" y="${190 - hh}" width="30" height="${hh}" rx="2"/>`).join("");
+  HILLS = `<svg viewBox="0 0 1400 240" preserveAspectRatio="xMidYMax slice">
+    <g class="far" fill="#b9cddc" opacity=".75">${towers}<path d="M1230 190v-170l6-8 6 8v170z"/></g>
+    <path class="mid" d="M0 172C180 120 300 150 430 140S700 96 860 132 1150 120 1400 140V240H0z" fill="#bcd3b4"/>
+    <path class="near" d="M0 200C220 166 380 196 560 182S900 160 1080 186 1300 176 1400 182V240H0z" fill="#9fc195"/></svg>`;
+  for (const [a, b] of [["#7fae70", "#6a9a5d"], ["#8fbb7a", "#739f63"]]) {
+    TREE.push(`<svg viewBox="0 0 40 70"><ellipse cx="20" cy="67" rx="14" ry="3" fill="#2b2420" opacity=".14"/>
+      <path d="M19 66V40h2v26z" fill="#7a5a43"/>
+      <g class="crown"><circle cx="20" cy="28" r="15" fill="${b}"/><circle cx="15" cy="24" r="11" fill="${a}"/><circle cx="24" cy="20" r="8" fill="${a}"/>
+      <circle cx="13" cy="20" r="3" fill="#fff" opacity=".18"/></g></svg>`);
+  }
+  LAMP = `<svg viewBox="0 0 30 90"><circle class="halo" cx="15" cy="14" r="14" fill="#ffd27a"/><path d="M14 88V20h2v68z" fill="#3b312b"/>
+    <path d="M9 18h12l-2-9h-8z" fill="#3b312b"/><rect x="11" y="10" width="8" height="8" fill="#ffe6a3"/><rect x="10" y="86" width="10" height="3" fill="#3b312b"/></svg>`;
   for (const up of [true, false]) {
-    svg = svgEl(40, 52); rc = rough.svg(svg);
-    svg.append(rc.line(14, 30, 14, 52, { ...R, seed: 21 }),
-      rc.path("M4 16 Q4 6 14 6 L32 6 L32 30 L4 30 Z", { ...R, fill: "#9cc6f0", seed: 22 }),
-      group("mb-flag", [up ? rc.path("M32 10 L32 -4 L40 -4 L40 3 L34 3", { ...R, fill: "#ef7f97", seed: 23 })
-        : rc.path("M32 18 L44 18 L44 24 L32 24", { ...R, fill: "#ef7f97", seed: 24 })]));
-    svg.setAttribute("viewBox", "0 -8 46 60");
-    MAILBOX[up ? "up" : "down"] = svg.outerHTML;
+    MAILBOX[up ? "up" : "down"] = `<svg viewBox="0 -10 46 62"><path d="M15 28v24" stroke="${INKC}" stroke-width="2.4"/>
+      <path d="M4 16a10 10 0 0 1 10-10h18v22H4z" fill="#5f86ad" ${ln}/><path d="M32 6a8 8 0 0 1 8 8v14h-8z" fill="#4a6d91" ${ln}/>
+      <g class="mb-flag">${up ? `<path d="M34 12V-6h9v7h-7" fill="#d9655b" ${ln}/>` : `<path d="M34 20h12v6H34" fill="#d9655b" ${ln}/>`}</g></svg>`;
   }
 }
 
@@ -994,13 +1013,14 @@ function renderTown(opts = {}) {
       <div class="lot ${opts.working === h.id ? "working" : ""} ${h.checked_today ? "done-today" : ""}" data-h="${h.id}" style="--b:${idx}">
         <div class="lot-tip"><b>${KIND_NAME[kind]} · floor ${built} of 6</b>${esc(h.allowed_milestone ? `Future you ${lower(h.allowed_milestone.milestone)}.` : "")}${next}<small>${toNext}${toNext ? " · " : ""}${lit} of ${total} windows lit</small></div>
         ${h.quest ? `<div class="lot-storm">${ico("storm")}<span class="rain"></span><b>Comeback quest ${h.quest.progress}/3</b></div>` : ""}
-        <div class="lot-sign" style="bottom:${built * FH + ROOF - 6}px">${hIcon(h, "inline")} ${esc(h.short)}</div>
+        <div class="lot-sign" style="bottom:${(built * FH + ROOF - 2) * SC}px">${hIcon(h, "inline")} ${esc(h.short)}</div>
         <div class="lot-work">Building floor ${built + 1}…<br><small>your postcard is on its way</small></div>
         <button class="lot-b" aria-label="${esc(h.short)}: see its postcard road">${buildingSVG(h, idx, built, lit, fresh)}</button>
         <span class="lot-say">${esc(friend)}: “${esc(SUPPORT[(h.checkins + idx) % SUPPORT.length].replace("{n}", name).replace("{f}", built))}”</span>
         <button class="mailbox ${mine.length ? "has" : ""}" data-mail="${h.id}" aria-label="Postcards">${mine.length ? MAILBOX.up : MAILBOX.down}${mine.length ? `<b>${mine.length}</b>` : ""}</button>
         <p class="lot-name">${KIND_NAME[kind]}<small>${esc(h.short)} · ${h.checked_today ? "done today ✓" : "not yet today"}</small></p>
-      </div>`;
+      </div>
+      <span class="prop ${idx % 2 ? "lamp" : "tree"}" style="--d:${idx}">${idx % 2 ? LAMP : TREE[idx % 4 === 0 ? 0 : 1]}</span>`;
   }).join("");
   localStorage.setItem("ff-town", JSON.stringify(seen));
 
