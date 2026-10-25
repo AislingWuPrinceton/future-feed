@@ -861,7 +861,7 @@ const KIND = { guitar: "hall", music: "hall", piano: "hall", dance: "hall", read
 const KIND_NAME = { hall: "Music hall", library: "Library", gym: "Gym", cafe: "Café", home: "Home", garden: "Greenhouse", studio: "Studio" };
 // The town is made of needle felt: every piece of colour is a puffy wool patch (an SVG filter
 // adds fuzzy edges, fibre texture and soft light), and the outlines are running stitches.
-const SC = 1.2, X0 = 14, INK = "#2b2420", THREAD = "#5a4232";
+const SC = 1.35, X0 = 14, INK = "#2b2420", THREAD = "#5a4232";
 const seen = JSON.parse(localStorage.getItem("ff-town") || "{}");
 let night = new Date().getHours() < 7 || new Date().getHours() >= 19;
 const STYLE = {
@@ -1104,7 +1104,7 @@ function buildingSVG(h, idx, built, checkins, fresh, alt) {
 }
 
 // scenery in the same pen and washes
-let SUN = [], SKY = "", CLOUD = "", HILLS = "", TREE = [], LAMP = "", MAILBOX = { up: "", down: "" }, DEFS = "";
+let SUN = [], SKY = "", CLOUD = "", HILLS = "", TREE = [], LAMP = "", MAILBOX = { up: "", down: "" }, DEFS = "", BALLOON = "", STAR = "", BUSH = [];
 function townArt() {
   if (CLOUD) return;
   // felt: fuzzy fibre edges, a puffy bevel lit from the top left, fibre speckle, and a soft shadow underneath
@@ -1138,15 +1138,29 @@ function townArt() {
   CLOUD = `<svg viewBox="0 0 140 54">${F("feltbig", wp(cloud, "#fffdf8"))}
     ${P.path("M24 42c-8 0-9-9 0-11 0-9 12-12 18-5 3-9 19-10 23-1 8-4 19 0 18 9 10 0 11 8 3 8z", { strokeWidth: 1, stroke: "#c9bfb2" })}</svg>`;
   const towers = [[60, 70], [95, 112], [128, 58], [180, 92], [216, 132], [252, 76], [900, 84], [936, 126], [968, 66], [1010, 104], [1050, 72], [1180, 96], [1216, 60]];
+  const yAt = (d, x) => {
+    const el = document.createElementNS("http://www.w3.org/2000/svg", "path"); el.setAttribute("d", d);
+    let lo = 0, hi = el.getTotalLength();
+    for (let i = 0; i < 24; i++) { const m = (lo + hi) / 2; if (el.getPointAtLength(m).x < x) lo = m; else hi = m; }
+    return el.getPointAtLength(lo).y;
+  };
+  const MID = "M0 190C180 136 300 168 430 158S700 112 860 150 1150 136 1400 158", NEAR = "M0 218C220 182 380 214 560 200S900 176 1080 204 1300 192 1400 200";
+  const hillTree = (x, y, r, c) => wr(x - 1.5, y - 9, 3, 10, "#8a6248") + `<circle cx="${x}" cy="${y - 9 - r * .8}" r="${r}" fill="${c}"/>`;
+  const sheep = (x, y) => `<ellipse cx="${x}" cy="${y - 6}" rx="9" ry="6" fill="#fffdf6"/><circle cx="${x + 9}" cy="${y - 8}" r="3.4" fill="#4a3c34"/>`
+    + wr(x - 5, y - 2, 2, 4, "#4a3c34") + wr(x + 3, y - 2, 2, 4, "#4a3c34");
+  const midTrees = [[300, 7, "#86b471"], [318, 5, "#9cc785"], [560, 8, "#7aa866"], [700, 6, "#93c07b"], [714, 4.5, "#7aa866"], [1110, 7, "#86b471"], [1300, 6, "#9cc785"]]
+    .map(([x, r, c]) => hillTree(x, yAt(MID, x) + 4, r, c)).join("");
+  const nearBits = [[150, 9, "#6f9e5c"], [470, 10, "#79a866"], [486, 7, "#8dbb77"], [1000, 9, "#6f9e5c"], [1240, 11, "#79a866"]]
+    .map(([x, r, c]) => hillTree(x, yAt(NEAR, x) + 5, r, c)).join("") + [[640, 0], [668, 4], [1160, 2]].map(([x, d]) => sheep(x, yAt(NEAR, x) + 8 + d)).join("");
   HILLS = `<svg viewBox="0 0 1400 260" preserveAspectRatio="xMidYMax slice">
     <g class="far">${F("felt", towers.map(([x, hh], i) => wr(x, 200 - hh, 30, hh, i % 2 ? "#c7d6e6" : "#d6dfe9")).join(""))}
       ${towers.map(([x, hh]) => [...Array(Math.floor(hh / 16))].map((_, i) => `<path d="M${x + 7} ${208 - hh + i * 16}h16" stroke="#8ea3ba" stroke-width="1.2" fill="none"/>`).join("")).join("")}</g>
     <g class="mid">${F("feltbig", wp("M0 190C180 136 300 168 430 158S700 112 860 150 1150 136 1400 158V260H0z", "#c9deb8"))}
-      ${P.path("M0 198C180 144 300 176 430 166S700 120 860 158 1150 144 1400 166", { strokeWidth: 1.1, stroke: "#8fae7e" })}</g>
+      ${P.path("M0 198C180 144 300 176 430 166S700 120 860 158 1150 144 1400 166", { strokeWidth: 1.1, stroke: "#8fae7e" })}${F("felt", midTrees)}</g>
     <g class="near">${F("feltbig", wp("M0 218C220 182 380 214 560 200S900 176 1080 204 1300 192 1400 200V260H0z", "#a9cf96"))}
-      ${P.path("M0 226C220 190 380 222 560 208S900 184 1080 212 1300 200 1400 208", { strokeWidth: 1.2, stroke: "#6f9a5f" })}</g></svg>`;
+      ${P.path("M0 226C220 190 380 222 560 208S900 184 1080 212 1300 200 1400 208", { strokeWidth: 1.2, stroke: "#6f9a5f" })}${F("felt", nearBits)}</g></svg>`;
   SKY = `<svg viewBox="0 0 1400 470" preserveAspectRatio="xMidYMin slice"><g filter="url(#feltbig)">
-    <path class="sky-wash" d="M-60 -60H1460V230C1300 300 1160 220 980 270S640 230 460 290 120 240 -60 300Z"/></g></svg>`;
+    <path class="sky-wash" d="M-60 -60H1460V560H-60Z"/></g></svg>`;
   SUN = [`<svg viewBox="-40 -40 80 80"><g class="rays">${F("felt", [...Array(10)].map((_, i) => `<path d="M-3.5 -24L0 -36L3.5 -24Z" fill="#f6b84b" transform="rotate(${i * 36})"/>`).join(""))}</g>
       ${F("feltbig", `<circle r="21" fill="#ffd36b"/>`)}${P.circle(0, 0, 30, { strokeWidth: 1.2, stroke: "#c98a2a" })}</svg>`,
     `<svg viewBox="-40 -40 80 80"><mask id="moonm"><rect x="-40" y="-40" width="80" height="80" fill="#fff"/><circle cx="11" cy="-7" r="17" fill="#000"/></mask>
@@ -1158,6 +1172,14 @@ function townArt() {
   }
   LAMP = `<svg viewBox="0 0 30 92"><circle class="halo" cx="15" cy="14" r="14" fill="#ffd27a"/>
     ${F("felt", wr(13, 18, 4, 72, "#5f6f7d") + wp("M7 19h16l-3 -10h-10z", "#fff2c4") + wr(8, 88, 14, 4, "#5f6f7d"))}</svg>`;
+  BALLOON = `<svg viewBox="0 0 60 92">${F("felt", `<path d="M30 4C12 4 4 18 4 30c0 16 16 26 22 36h8c6-10 22-20 22-36C56 18 48 4 30 4z" fill="#ef8f86"/>
+      <path d="M30 4c-8 0-12 14-12 26 0 16 6 26 8 36h8c2-10 8-20 8-36 0-12-4-26-12-26z" fill="#ffd36b"/><path d="M30 4c-3 0-4 14-4 26 0 16 1 26 2 36h4c1-10 2-20 2-36 0-12-1-26-4-26z" fill="#f6efe2"/>`
+      + wr(22, 76, 16, 12, "#b07c5e"))}${P.path("M26 66L23 76M34 66L37 76", { strokeWidth: 1, stroke: "#6d5444" })}${P.path("M8 30q22 8 44 0", { strokeWidth: 1, stroke: "#b25f55" })}</svg>`;
+  STAR = `<svg viewBox="-20 -20 40 40">${F("felt", `<path d="M0 -16L4.7 -5.5 16 -5 7.4 2.6 9.8 14 0 8 -9.8 14 -7.4 2.6 -16 -5 -4.7 -5.5Z" fill="#ffe08a"/>`)}</svg>`;
+  for (const [g, f] of [["#7fae6c", "#ef8fa6"], ["#8dbb77", "#ffd36b"], ["#79a866", "#f2f0ea"]]) {
+    BUSH.push(`<svg viewBox="0 0 56 34">${F("felt", `<path d="M4 34c-4-10 4-18 12-16 2-10 16-12 20-4 8-4 18 4 16 12 4 2 4 6 2 8z" fill="${g}"/>`
+      + [[14, 20], [26, 13], [38, 18], [46, 26], [21, 27], [33, 26]].map(([x, y]) => `<circle cx="${x}" cy="${y}" r="3.2" fill="${f}"/>`).join(""))}</svg>`);
+  }
   for (const up of [true, false]) {
     MAILBOX[up ? "up" : "down"] = `<svg viewBox="0 -12 46 64">${F("felt", wr(12, 28, 4, 24, "#8a6a52") + wp("M4 16a10 10 0 0 1 10 -10h18v22H4z", "#7aa0c4"))}
       ${P.path("M8 24V16a7 7 0 0 1 7 -7h14v15z", { strokeWidth: 0.9, stroke: "#4c6f92" })}
@@ -1195,7 +1217,8 @@ function renderTown(opts = {}) {
     const toNext = h.next_level_at ? `${h.next_level_at - h.checkins} check-in${h.next_level_at - h.checkins === 1 ? "" : "s"} to the next floor` : "";
     return `
       <div class="lot ${opts.working === h.id ? "working" : ""} ${h.checked_today ? "done-today" : ""}" data-h="${h.id}" style="--b:${idx}; width:${art.width}px">
-        <div class="lot-tip"><b>${KIND_NAME[kind]} · floor ${built} of 6</b>${esc(h.allowed_milestone ? `Future you ${lower(h.allowed_milestone.milestone)}.` : "")}${next}<small>${toNext}${toNext ? " · " : ""}${lit} of ${total} windows lit</small></div>
+        <div class="lot-tip"><b>${KIND_NAME[kind]} · floor ${built} of 6</b>${esc(h.allowed_milestone ? `Future you ${lower(h.allowed_milestone.milestone)}.` : "")}${next}<small>${toNext}${toNext ? " · " : ""}${lit} of ${total} windows lit</small>
+          <span class="tip-acts"><button data-road="${h.id}">${ico("flag", "inline")} Its postcard road</button>${mine.length ? `<button data-mail="${h.id}">Postcards (${mine.length})</button>` : ""}</span></div>
         ${h.quest ? `<div class="lot-storm">${ico("storm")}<span class="rain"></span><b>Comeback quest ${h.quest.progress}/3</b></div>` : ""}
         <div class="lot-sign" style="bottom:${art.signAt + 4}px">${hIcon(h, "inline")} ${esc(h.short)}</div>
         <div class="lot-work">Building floor ${built + 1}…<br><small>your postcard is on its way</small></div>
@@ -1203,7 +1226,9 @@ function renderTown(opts = {}) {
         <span class="lot-say">${esc(friend)}: “${esc(SUPPORT[(h.checkins + idx) % SUPPORT.length].replace("{n}", name).replace("{f}", built))}”</span>
         <button class="mailbox ${mine.length ? "has" : ""}" data-mail="${h.id}" aria-label="Postcards">${mine.length ? MAILBOX.up : MAILBOX.down}${mine.length ? `<b>${mine.length}</b>` : ""}</button>
         <p class="lot-name">${KIND_NAME[kind]}<small>${esc(h.short)} · ${h.checked_today ? "done today ✓" : "not yet today"}</small></p>
+        ${h.checked_today ? "" : `<button class="lot-hold" data-hold="${h.id}" ${busy ? "disabled" : ""}><i></i><span>Hold to build</span></button>`}
       </div>
+      <span class="prop bush" style="--d:${idx}">${BUSH[idx % 3]}</span>
       <span class="prop ${idx % 2 ? "lamp" : "tree"}" style="--d:${idx}">${idx % 2 ? LAMP : TREE[idx % 4 === 0 ? 0 : 1]}</span>`;
   }).join("");
   localStorage.setItem("ff-town", JSON.stringify(seen));
@@ -1212,9 +1237,12 @@ function renderTown(opts = {}) {
   $("town").className = `town ${night ? "night" : ""}`;
   $("town").innerHTML = `
     ${DEFS}
-    <div class="sky">${SKY}
-      <span class="cloud c1">${CLOUD}</span><span class="cloud c2">${CLOUD}</span><span class="cloud c3">${CLOUD}</span>
-      ${night ? `<span class="stars"></span>` : ""}
+    <div class="sky">${SKY}${night ? `<span class="stars"></span>` : ""}</div>
+    <div class="mobile">
+      ${[[6, 34, 120], [27, 84, 92], [52, 18, 150]].map(([x, len, w], i) => `<span class="hang cloud-h" style="--x:${x}%; --len:${len}px; --t:${5 + i * 1.3}s; width:${w}px"><i class="thread"></i><button class="cloud" aria-label="A felt cloud">${CLOUD}<span class="drops"></span></button></span>`).join("")}
+      ${night ? [[18, 40], [40, 22], [66, 54], [93, 30]].map(([x, len], i) => `<span class="hang star-h" style="--x:${x}%; --len:${len}px; --t:${4 + i}s"><i class="thread"></i><button class="star" aria-label="A felt star">${STAR}</button></span>`).join("")
+        : `<span class="hang balloon-h" style="--x:68%; --len:46px; --t:7s"><i class="thread"></i><button class="balloon" aria-label="A felt balloon">${BALLOON}</button></span>`}
+      <span class="hang sun-h" style="--x:84%; --len:26px; --t:6.5s"><i class="thread"></i><button class="sun" id="sun" aria-label="Day or night" title="${night ? "Back to day" : "See your town at night"}">${SUN[night ? 1 : 0]}</button></span>
     </div>
     <div class="hills">${HILLS}</div>
     <div class="street-scroll"><div class="street">
@@ -1226,26 +1254,57 @@ function renderTown(opts = {}) {
       <div class="lot empty" id="lot-add"><div class="lot-plot"><span>${ico("sprout")}</span><b>Empty lot</b><small>Add a daily thing<br>and build here</small></div></div>
       <span class="walker" id="walker">${avatarHTML(S.profile.avatar?.photo ? 38 : 36, { tier: 0 })}<span class="say">Day ${S.day_offset + 1} in ${esc(name)}ville.</span></span>
     </div></div>
-    <button class="sun" id="sun" aria-label="Day or night" title="${night ? "Back to day" : "See your town at night"}">${SUN[night ? 1 : 0]}</button>
     <div class="grain"><svg width="100%" height="100%"><rect width="100%" height="100%" filter="url(#grain)"/></svg></div>`;
 
   const town = $("town");
-  town.querySelectorAll(".lot[data-h] .lot-b").forEach((b) => (b.onclick = () => {
-    roadHabit = +b.closest(".lot").dataset.h; setView("road");
+  // tap a building: it squishes like wool and its card stays open
+  town.querySelectorAll(".lot[data-h] .lot-b").forEach((b) => (b.onclick = (e) => {
+    e.stopPropagation();
+    const lot = b.closest(".lot"), on = !lot.classList.contains("pinned");
+    town.querySelectorAll(".lot.pinned").forEach((l) => l.classList.remove("pinned"));
+    side(lot); lot.classList.toggle("pinned", on);
+    replay(b, "squish"); sfx.pop(); buzz(10);
+  }));
+  town.querySelectorAll("[data-road]").forEach((b) => (b.onclick = (e) => { e.stopPropagation(); roadHabit = +b.dataset.road; setView("road"); }));
+  town.querySelectorAll(".lot-hold").forEach(bindHold);
+  town.querySelectorAll(".hang").forEach((hg) => {
+    hg.onpointerenter = () => replay(hg, "kick");
+  });
+  town.querySelectorAll(".cloud").forEach((c) => (c.onclick = () => {  // a little felt shower
+    c.querySelector(".drops").innerHTML = [...Array(9)].map((_, i) => `<i style="--i:${i}"></i>`).join("");
+    replay(c.closest(".hang"), "kick"); sfx.tick(); setTimeout(() => sfx.tick(), 180);
+  }));
+  town.querySelectorAll(".balloon, .star").forEach((b) => (b.onclick = () => { replay(b, "boing"); sfx.pop(); }));
+  town.querySelectorAll(".prop.tree, .prop.bush").forEach((t) => (t.onclick = () => {  // shake loose a few felt leaves / petals
+    replay(t, "shake"); sfx.paper();
+    const fall = document.createElement("span"); fall.className = "fall";
+    fall.innerHTML = [...Array(5)].map((_, i) => `<i style="--i:${i}; background:${t.classList.contains("bush") ? "#ef8fa6" : ["#8fbe7d", "#e8b04a", "#79a86a"][i % 3]}"></i>`).join("");
+    t.append(fall); setTimeout(() => fall.remove(), 1600);
   }));
   town.querySelectorAll("[data-mail]").forEach((b) => (b.onclick = () => {
     const mine = POSTS.kept.filter((p) => p.habit_id === +b.dataset.mail);
     if (mine.length) { sfx.paper(); openPostcard(mine[0]); } else b.classList.add("nomail");
   }));
-  town.querySelectorAll(".lot[data-h]").forEach((l) => (l.onmouseenter = () => {
-    sfx.tick();
-    const r = l.getBoundingClientRect(), t = town.getBoundingClientRect();  // keep the tip card inside the town
+  const side = (l) => {  // keep the tip card inside the town
+    const r = l.getBoundingClientRect(), t = town.getBoundingClientRect();
     l.classList.toggle("tip-r", r.right + 230 > t.right);
-  }));
+  };
+  town.querySelectorAll(".lot[data-h]").forEach((l) => (l.onmouseenter = () => { sfx.tick(); side(l); }));
   $("lot-add").onclick = openAdd;
   $("sun").onclick = () => { night = !night; sfx.chime(); renderTown({ noAnim: true }); };
   if (!town.dataset.bound) {
     town.dataset.bound = "1";
+    town.addEventListener("click", (e) => {  // tap empty street: unpin cards and walk there
+      if (e.target.closest(".lot, button, .prop")) return;
+      town.querySelectorAll(".lot.pinned").forEach((l) => l.classList.remove("pinned"));
+      const st = town.querySelector(".street"), wk = $("walker"), r = st.getBoundingClientRect();
+      if (e.clientY < r.bottom - 90) return;
+      const from = wk.offsetLeft, to = Math.max(10, e.clientX - r.left - 18);
+      wk.style.transition = "none"; wk.classList.add("parked"); wk.classList.toggle("left", to < from);
+      wk.style.left = `${from}px`; void wk.offsetWidth;
+      wk.style.transition = `left ${Math.min(3, Math.abs(to - from) / 220 + .3)}s ease-in-out`; wk.style.left = `${to}px`;
+      sfx.tick();
+    });
     town.addEventListener("pointermove", (e) => {  // parallax: the hills and clouds drift against the cursor
       const r = town.getBoundingClientRect();
       town.style.setProperty("--px", ((e.clientX - r.left) / r.width - 0.5).toFixed(3));
@@ -1255,6 +1314,8 @@ function renderTown(opts = {}) {
   if (wantIntro) revealTown();
   else if (sounds.length) setTimeout(() => { sfx[sounds.includes("stamp") ? "stamp" : "pop"](); buzz(30); }, sounds.includes("stamp") ? 700 : 300);
 }
+
+function replay(el, cls) { el.classList.remove(cls); void el.offsetWidth; el.classList.add(cls); }
 
 function revealTown() {
   wantIntro = false;
