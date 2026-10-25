@@ -542,10 +542,10 @@ body.study .page { padding-bottom: 120px; }
 .grain svg { display: block; }
 .sky { position: absolute; inset: 0; pointer-events: none; }
 .sky > svg { position: absolute; inset: 0; width: 100%; height: 100%; }
-.sky-wash { fill: #a9cde6; transition: fill .8s; }
+.sky-wash { fill: url(#skyday); }
 .sky-wash2 { fill: #ffe3a3; opacity: .5; }
 .town.night { background: #2a3150; }
-.town.night .sky-wash { fill: #1b2347; opacity: .95; }
+.town.night .sky-wash { fill: url(#skynight); }
 .town.night .sky-wash2 { fill: #3c4a7c; opacity: .6; }
 .sun { position: relative; width: 92px; height: 92px; border: 0; padding: 0; background: none; margin-top: -8px;
   transition: transform .4s cubic-bezier(.3, 1.4, .5, 1); }
@@ -598,8 +598,8 @@ body.study .page { padding-bottom: 120px; }
 .street-scroll { position: absolute; inset: 0; overflow-x: auto; overflow-y: hidden; scrollbar-width: thin; }
 .street { position: relative; min-width: 100%; width: max-content; height: 100%; display: flex; align-items: flex-end; gap: 10px; padding: 0 44px 0 26px; }
 .ground { position: absolute; left: 0; bottom: 0; pointer-events: none; overflow: visible; }
-.g-walk { fill: #e6dac5; } .g-road { fill: #b9ad9c; } .g-mid { stroke: #f4ecdc; }
-.town.night .g-walk { fill: #6c6470; } .town.night .g-road { fill: #4a4558; } .town.night .g-mid { stroke: #cfc39f; }
+.g-walk { fill: #dccaa4; } .g-road { fill: #4f7f32; }
+.town.night .g-walk { fill: #6d6578; } .town.night .g-road { fill: #26402a; }
 
 .welcome { align-self: flex-end; margin-bottom: 74px; background: var(--card); border: 2.5px solid var(--ink); border-radius: var(--wobble-sm);
   padding: 6px 14px; transform: rotate(-4deg); box-shadow: 3px 3px 0 var(--ink); text-align: center; position: relative; transition: transform .3s cubic-bezier(.3, 1.6, .5, 1); }
@@ -615,7 +615,7 @@ body.study .page { padding-bottom: 120px; }
 .fall { position: absolute; inset: 10% 0 auto; pointer-events: none; }
 .fall i { position: absolute; left: calc(15% + var(--i) * 15%); top: 0; width: 7px; height: 5px; border-radius: 60% 0; animation: leaf 1.5s ease-in calc(var(--i) * .08s) both; }
 @keyframes leaf { to { transform: translate(calc((var(--i) - 2) * 9px), 70px) rotate(220deg); opacity: 0; } }
-.prop.tree { width: 54px; margin-bottom: 54px; }
+.prop.tree { width: 92px; margin: 0 -10px 50px; }
 .prop.lamp { width: 24px; margin-bottom: 56px; pointer-events: none; }
 .prop svg { display: block; width: 100%; height: auto; overflow: visible; }
 .prop.tree .crown { transform-box: fill-box; transform-origin: 50% 100%; animation: sway 5s ease-in-out calc(var(--d) * -1.3s) infinite alternate; }
@@ -628,6 +628,8 @@ body.study .page { padding-bottom: 120px; }
 .lot-b { display: block; padding: 0; border: 0; background: none; margin-bottom: 50px; transform-origin: 50% 100%; cursor: pointer;
   transition: transform .4s cubic-bezier(.3, 1.6, .5, 1); }
 .lot-b svg { display: block; overflow: visible; }
+.lot-b .ext { filter: url(#felt) brightness(.62) saturate(1.1); }
+.town.night .lot-b .ext { filter: url(#felt) brightness(.38); }
 .lot:hover .lot-b { transform: translateY(-6px) rotate(-.8deg); }
 .lot-b.squish { animation: squish .55s cubic-bezier(.3, 1.6, .5, 1); }
 @keyframes squish { 25% { transform: scale(1.06, .9); } 55% { transform: scale(.97, 1.05) translateY(-8px); } }
@@ -666,10 +668,10 @@ body.study .page { padding-bottom: 120px; }
   display: flex; align-items: center; gap: 4px; box-shadow: 2px 2px 0 var(--ink); transition: transform .35s cubic-bezier(.3, 1.6, .5, 1), opacity .2s; }
 .lot-sign .ico { width: 22px; height: 22px; }
 .lot:hover .lot-sign { transform: translate(-50%, 8px) rotate(3deg) scale(.9); opacity: 0; }
-.lot-name { position: absolute; bottom: 2px; left: 0; right: 0; margin: 0; text-align: center; font-family: var(--hand); font-size: 22px; font-weight: 700; line-height: .95; color: var(--ink); }
-.lot-name small { display: block; font-family: Nunito, sans-serif; font-size: 10.5px; font-weight: 800; color: #6d5a43; }
+.lot-name { position: absolute; bottom: 2px; left: 0; right: 0; margin: 0; text-align: center; font-family: var(--hand); font-size: 22px; font-weight: 700; line-height: .95; color: #fffaf0; text-shadow: 0 1px 0 #2f4a20, 0 0 6px rgba(30, 50, 20, .6); }
+.lot-name small { display: block; font-family: Nunito, sans-serif; font-size: 10.5px; font-weight: 800; color: #f1e6cf; }
 .town.night .lot-name { color: #fffaf0; } .town.night .lot-name small { color: #e9dcc6; }
-.lot.done-today .lot-name small { color: #3f8a4f; }
+.lot.done-today .lot-name small { color: #d6f5bf; }
 
 .lot-tip { position: absolute; left: calc(100% - 8px); top: 92px; width: 224px; z-index: 8; transform: translate(-8px, 0) rotate(1deg) scale(.95); opacity: 0; pointer-events: none;
   background: var(--card); border: 2px solid var(--ink); border-radius: var(--wobble-sm); padding: 9px 12px; font-size: 13px; line-height: 1.38;
@@ -761,6 +763,7 @@ body.study .page { padding-bottom: 120px; }
 @media (max-width: 760px) {
   .views button { font-size: 21px; padding: 6px 12px 6px 8px; }
   .town { height: 500px; }
+  .cloud-h { zoom: .58; } .balloon-h { zoom: .8; }
   .lot-tip { width: 180px; }
 }
 @media (prefers-reduced-motion: reduce) {
