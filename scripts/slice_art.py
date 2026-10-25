@@ -23,7 +23,7 @@ PROPS = {"scenery": ["tree_yellow", "tree_orange", "tree_green", "cloud_1", "clo
          "scenery2": ["lamp", "bench", "mailbox", "fence", "bike", "tulips", "cat", "sheep", "balloon"]}
 
 
-def cut_out(img, thresh=38):
+def cut_out(img, thresh=38, erode=5):
     """RGBA with the background transparent (a lower thresh keeps white wool, e.g. clouds)."""
     img = img.convert("RGBA")
     a = np.array(img)
@@ -38,7 +38,7 @@ def cut_out(img, thresh=38):
             ImageDraw.floodfill(rgb, s, KEY, thresh=thresh)
     mask = np.all(np.array(rgb) == KEY, axis=-1)
     alpha = Image.fromarray(np.where(mask, 0, 255).astype("uint8"))
-    alpha = alpha.filter(ImageFilter.MinFilter(3)).filter(ImageFilter.GaussianBlur(0.8))  # trim the white halo
+    alpha = alpha.filter(ImageFilter.MinFilter(erode)).filter(ImageFilter.GaussianBlur(0.8))  # trim the white halo
     img.putalpha(alpha)
     return img
 
@@ -128,7 +128,7 @@ def main():
         for p, role in zip((found[i] for i in keep), ("roof", "floor", "ground")):
             save(p, f"{kind}_{role}", 420)
     for f in sorted(RAW.glob("scenery*.png")):  # scenery.png -> scenery_0.., scenery2.png -> scenery2_0..
-        parts = pieces(cut_out(Image.open(f), thresh=14 if f.stem == "scenery" else 38))  # white clouds need the gentle cut
+        parts = pieces(cut_out(Image.open(f), *((14, 3) if f.stem == "scenery" else (38, 5))))  # white clouds need the gentle cut
         names = PROPS.get(f.stem, [])
         print(f"{f.stem}: {len(parts)} pieces" + ("" if len(parts) == len(names) else " (unexpected count: numbered instead of named)"))
         for i, p in enumerate(parts):

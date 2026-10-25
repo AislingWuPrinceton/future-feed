@@ -833,7 +833,7 @@ body.study .page { padding-bottom: 120px; }
 /* the landscape photo is sized so its cream path (at --p of its height) runs under the buildings, 50px up */
 .town.photo { container-type: inline-size; background: #b9cfd9; }
 .bg-photo { --w: max(100cqw + 40px, 980px); position: absolute; left: 50%; width: var(--w); height: auto; max-width: none;
-  bottom: calc(50px - (1 - var(--p)) * var(--w) * .6667); transform: translateX(calc(-50% + var(--px) * -10px)); transition: transform .6s, filter .8s; }
+  bottom: calc(var(--base, 50px) - (1 - var(--p)) * var(--w) * .6667); transform: translateX(calc(-50% + var(--px) * -10px)); transition: transform .6s, filter .8s; }
 .town.night .bg-photo { filter: brightness(.42) saturate(.7) hue-rotate(15deg); }
 .town.night.native .bg-photo { filter: none; }
 .town.photo .sky::after { content: ""; position: absolute; inset: auto 0 0; height: 46%; pointer-events: none;
@@ -884,3 +884,37 @@ body.study .page { padding-bottom: 120px; }
 .lu-scene { display: block; width: calc(100% + 48px); max-width: none; margin: -24px -24px 0; aspect-ratio: 3 / 2; object-fit: cover; border-bottom: 2px solid var(--ink); }
 .lu-scene:not([hidden]) + .lu-emoji { position: relative; margin-top: -58px; }
 .slide.intro h1, .slide.intro p { text-shadow: 0 3px 16px rgba(30, 20, 10, .55); }
+
+/* blending the felt pieces into the landscape photo:
+   1. each scene has its own light: a colour grade (--grade) and shadow side (--shx) for everything standing in it
+   2. a soft contact shadow where each building and prop meets the path
+   3. the bottom strip of the same photo laid back over the building bases, so they stand in the wool, not on top of it
+   4. no strings in the sky, softer clouds */
+.town.photo { --grade: sepia(.1) saturate(1.04); --shx: 9px; --shc: rgba(52, 40, 22, .5); }
+.town.photo.background-autumn { --grade: sepia(.2) saturate(1.12) brightness(.98); }
+.town.photo.background-spring { --grade: sepia(.06) brightness(1.03); --shc: rgba(50, 50, 30, .42); }
+.town.photo.background-winter { --grade: saturate(.82) brightness(1.04) hue-rotate(4deg); --shc: rgba(50, 60, 80, .4); }
+.town.photo.background-sunset { --grade: sepia(.38) saturate(1.3) hue-rotate(-10deg) brightness(.9) contrast(1.04); --shx: -12px; --shc: rgba(70, 30, 20, .55); }
+.town.photo.night { --grade: none; --shc: rgba(10, 14, 30, .6); }
+.town.photo .lot-b, .town.photo .prop { position: relative; z-index: 1; }
+.town.photo .lot-b > *, .town.photo .prop > .pic, .town.photo .mailbox .pic, .town.photo .mobile .pic { filter: var(--grade); }
+.town.photo .ibld { filter: var(--grade) drop-shadow(var(--shx) 5px 7px var(--shc)); }
+.town.night.photo .ibld { filter: drop-shadow(var(--shx) 5px 7px var(--shc)); }
+.town.photo .lot-b::after, .town.photo .prop::after { content: ""; position: absolute; z-index: -1; left: -4%; right: -4%; bottom: -7px; height: 22px; pointer-events: none;
+  transform: translateX(calc(var(--shx) * .8)); background: radial-gradient(closest-side, var(--shc), transparent); }
+.town.photo .prop.lamp::after { left: -60%; right: -60%; height: 10px; bottom: -4px; }
+.fg { position: absolute; inset: 0; z-index: 2; pointer-events: none; overflow: hidden;
+  --m: linear-gradient(to top, #000 0, #000 calc(var(--base, 50px) - 10px), transparent calc(var(--base, 50px) + 8px)); -webkit-mask-image: var(--m); mask-image: var(--m); }
+.town.photo .lot-name, .town.photo .lot-sign, .town.photo .welcome { z-index: 3; }
+.town.photo .welcome { position: relative; }
+.town.photo .hang .thread { opacity: 0; }
+.town.photo .cloud-h { zoom: .78; }
+.town.photo .cloud .pic { filter: var(--grade) blur(.6px) drop-shadow(0 8px 10px rgba(60, 50, 40, .15)); opacity: .94; }
+.town.photo .sun-h { zoom: .72; }
+.town.photo .sun::before { inset: -26px; opacity: .7; }
+@media (max-width: 760px) { .town.photo { --base: 34px; } .town.photo .cloud-h { zoom: .5; } .town.photo .sun-h { zoom: .55; } }
+.town.photo.background-sunset .cloud .pic { filter: var(--grade) sepia(.3) saturate(1.4) blur(.6px); }
+/* at night, warm lamplight pools on the path in front of each door */
+.town.night.photo .lot-b::before { content: ""; position: absolute; z-index: 1; left: 20%; right: 20%; bottom: -10px; height: 30px; pointer-events: none;
+  background: radial-gradient(closest-side, rgba(255, 196, 102, .55), transparent); mix-blend-mode: screen; }
+.town.night.photo .ibld img { filter: brightness(.6) saturate(.8) sepia(.12); }

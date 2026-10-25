@@ -25,19 +25,19 @@
  ],
  "cafe_floor.webp": [
   420,
-  182
+  181
  ],
  "cafe_ground.webp": [
   420,
-  207
+  206
  ],
  "cafe_roof.webp": [
   420,
-  204
+  203
  ],
  "garden_floor.webp": [
   420,
-  186
+  185
  ],
  "garden_ground.webp": [
   420,
@@ -45,7 +45,7 @@
  ],
  "garden_roof.webp": [
   420,
-  173
+  172
  ],
  "gym_floor.webp": [
   420,
@@ -53,19 +53,19 @@
  ],
  "gym_ground.webp": [
   420,
-  149
+  148
  ],
  "gym_roof.webp": [
   420,
-  81
+  80
  ],
  "hall_floor.webp": [
   420,
-  151
+  150
  ],
  "hall_ground.webp": [
   420,
-  164
+  163
  ],
  "hall_roof.webp": [
   420,
@@ -85,7 +85,7 @@
  ],
  "library_floor.webp": [
   420,
-  207
+  206
  ],
  "library_ground.webp": [
   420,
@@ -93,27 +93,27 @@
  ],
  "library_roof.webp": [
   420,
-  280
+  279
  ],
  "prop_balloon.webp": [
-  223,
-  326
+  221,
+  324
  ],
  "prop_bench.webp": [
-  333,
-  230
+  330,
+  228
  ],
  "prop_bike.webp": [
-  332,
-  265
+  329,
+  263
  ],
  "prop_bush.webp": [
   234,
   203
  ],
  "prop_cat.webp": [
-  328,
-  199
+  325,
+  197
  ],
  "prop_cloud_1.webp": [
   301,
@@ -124,24 +124,24 @@
   188
  ],
  "prop_fence.webp": [
-  329,
-  234
+  325,
+  231
  ],
  "prop_lamp.webp": [
-  112,
-  344
+  110,
+  342
  ],
  "prop_mailbox.webp": [
-  148,
-  309
+  145,
+  306
  ],
  "prop_moon.webp": [
   237,
   251
  ],
  "prop_sheep.webp": [
-  271,
-  249
+  267,
+  247
  ],
  "prop_sun.webp": [
   244,
@@ -160,8 +160,8 @@
   339
  ],
  "prop_tulips.webp": [
-  236,
-  294
+  234,
+  292
  ],
  "room.jpg": [
   600,
@@ -273,10 +273,10 @@
  ],
  "studio_ground.webp": [
   420,
-  157
+  156
  ],
  "studio_roof.webp": [
   420,
-  101
+  100
  ]
 }

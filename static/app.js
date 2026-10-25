@@ -1113,7 +1113,7 @@ function renderTown(opts = {}) {
   localStorage.setItem("ff-town", JSON.stringify(seen));
 
   const pop = 1 + (S.profile.cast?.length || 0), bg = townBackdrop(), BGP = !!bg;
-  $("town").className = `town ${night ? "night" : ""} ${BGP ? "photo" : ""} ${bg?.native ? "native" : ""}`;
+  $("town").className = `town ${night ? "night" : ""} ${BGP ? `photo ${bg.name.replace("_", "-")}` : ""} ${bg?.native ? "native" : ""}`;
   $("town").innerHTML = `
     ${DEFS}
     <div class="sky">${BGP ? `<img class="bg-photo" style="--p:${bg.p}" src="${artUrl(`${bg.name}.jpg`)}" alt="">` : SKY}${night && !bg?.native ? `<span class="stars"></span>` : ""}</div>
@@ -1123,7 +1123,7 @@ function renderTown(opts = {}) {
         : `<span class="hang balloon-h" style="--x:76%; --len:46px; --t:7s"><i class="thread"></i><button class="balloon" aria-label="A felt balloon">${BALLOON}</button></span>`}
       <span class="hang sun-h" style="--x:89%; --len:26px; --t:6.5s"><i class="thread"></i><button class="sun" id="sun" aria-label="Day or night" title="${night ? "Back to day" : "See your town at night"}">${SUN[night ? 1 : 0]}</button></span>
     </div>
-    ${BGP ? "" : `<div class="hills">${HILLS}</div>`}
+    ${BGP ? `<div class="fg" aria-hidden="true"><img class="bg-photo" style="--p:${bg.p}" src="${artUrl(`${bg.name}.jpg`)}" alt=""></div>` : `<div class="hills">${HILLS}</div>`}
     <div class="street-scroll"><div class="street">
       <svg class="ground" ${BGP ? "hidden" : ""} width="100%" height="64" aria-hidden="true"><g filter="url(#feltbig)"><rect class="g-road" x="-20" y="0" width="120%" height="80"/>
         <rect class="g-walk" x="-20" y="5" width="120%" height="15" rx="7"/></g>
