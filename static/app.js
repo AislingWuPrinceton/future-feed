@@ -11,7 +11,6 @@ const iconOfPost = (p) => hIcon(S.habits.find((h) => h.id === p.habit_id) || { k
 
 let S = null;            // latest /api/state
 let POSTS = { kept: [], stopped: [] };
-let roadHabit = null;    // which habit's road is shown
 let busy = false;
 // ?mode=plain = control group for the A/B test: an ordinary streak tracker, no road, no AI.
 const PLAIN = new URLSearchParams(location.search).get("mode") === "plain";
@@ -54,7 +53,7 @@ async function refresh() {
   renderToday();
   if (wantIntro) playIntro();
   renderTown();
-  renderRoad();
+  renderInside();
   if (!PLAIN && !refresh.counted) { countUp($("me")); refresh.counted = true; }
   if (STUDY && $("sb-date")) $("sb-date").textContent = `Day ${S.day_offset + 1}`;
 }
@@ -353,7 +352,7 @@ function bindHold(btn) {
 async function checkin(id) {
   if (busy) return;
   busy = true;
-  roadHabit = id;
+  inHabit = id;
   if (PLAIN) {
     await api(`/api/habits/${id}/checkin${Q}`, {}).catch((err) => alert(err.message));
     busy = false;
@@ -361,26 +360,24 @@ async function checkin(id) {
   }
   renderToday();
   renderTown({ working: id, noAnim: true });
-  renderRoad({ transit: true });
-  const stop = animateTransit();
+  renderInside({ working: id });
   try {
     const t0 = performance.now();
     const r = await api(`/api/habits/${id}/checkin`, {});
     // pre-written postcards come back instantly; keep the "in transit" moment for a beat anyway
     await new Promise((ok) => setTimeout(ok, Math.max(0, 1400 - (performance.now() - t0))));
-    stop();
     busy = false;
     await refresh();
     const post = POSTS.kept.find((p) => p.id === r.post_id);
     await townMoment(id, r.kind === "level_up");
     if (r.kind === "level_up") {
       const h = S.habits.find((x) => x.id === id);
-      $("lu-level").textContent = Math.max(1, h.allowed_chapter + 1);
+      $("lu-level").textContent = Math.min(MAXF, h.level);
       $("lu-emoji").innerHTML = avatarHTML(104);
       $("lu-title").textContent = h.allowed_milestone ? `Future you ${lower(h.allowed_milestone.milestone)}.` : "A new chapter begins.";
-      $("lu-sub").textContent = h.next_milestone ? `Next stop: ${lower(h.next_milestone.milestone)}.` : "You've reached the end of this road.";
+      $("lu-sub").textContent = h.next_milestone ? `Next floor: ${lower(h.next_milestone.milestone)}.` : "This building is ten years tall.";
       $("lu-dots").innerHTML = Array.from({ length: 6 }, (_, i) =>
-        `<i class="${i <= h.allowed_chapter ? "on" : ""} ${i === h.allowed_chapter ? "now" : ""}"></i>`).join("");
+        `<i class="${i < h.level ? "on" : ""} ${i === h.level - 1 ? "now" : ""}"></i>`).join("");
       confetti();
       sfx.chime();
       buzz([20, 60, 20, 60, 40]);
@@ -390,28 +387,10 @@ async function checkin(id) {
       openPostcard(post, true);
     }
   } catch (err) {
-    stop();
     busy = false;
     alert(err.message);
     refresh();
   }
-}
-
-// While the agents work (~5-10 s) the frontier postcard says what's happening, following the real pipeline.
-function animateTransit() {
-  const steps = ["Counting your check-ins and pace", "Story agent is writing your next chapter",
-    "Reality check: does this fit your real pace?", "Finding a photo for the moment", "Stamping the postcard"];
-  let y = +S.today.slice(0, 4), i = 0;
-  const yr = setInterval(() => {
-    y = y >= 2036 ? +S.today.slice(0, 4) : y + 1;
-    if ($("tr-year")) $("tr-year").textContent = y;
-  }, 240);
-  const st = setInterval(() => {
-    i = Math.min(i + 1, steps.length - 1);
-    const el = $("tr-step");
-    if (el) { el.classList.remove("in"); void el.offsetWidth; el.textContent = steps[i]; el.classList.add("in"); }
-  }, 1800);
-  return () => { clearInterval(yr); clearInterval(st); };
 }
 
 function confetti() {
@@ -422,163 +401,10 @@ function confetti() {
   }).join("");
 }
 
-// ---------- the road to 2036 ----------
-// Home → six stops (one per chapter) → 2036. Each stop shows the year you'd reach it at your
-// real pace; kept postcards are pinned above their stop, the road not taken runs below.
-
-const STOP_COLORS = ["#f7b6c2", "#ffd86b", "#9ed39b", "#9cc6f0", "#c9b5f0", "#f6a15b"];
-const KIND_LABEL = { level_up: "new stop!", life_event: "plot twist", boss: "slump", comeback: "comeback", combo: "combo" };
-const prevYears = JSON.parse(localStorage.getItem("ff-stop-years") || "{}");
-const lastPos = JSON.parse(localStorage.getItem("ff-piece") || "{}");
-
-function renderRoad(opts = {}) {
-  const wrap = $("roadwrap");
-  if (PLAIN || !S.habits.length) { wrap.hidden = true; return; }
-  if (VIEW !== "road") { wrap.hidden = false; return; }  // laid out when its tab opens
-  wrap.hidden = false;
-  if (!S.habits.some((h) => h.id === roadHabit)) roadHabit = S.habits[0].id;
-  const h = S.habits.find((x) => x.id === roadHabit);
-
-  $("road-tabs").innerHTML = S.habits.length > 1 ? S.habits.map((x) =>
-    `<button class="${x.id === h.id ? "on" : ""}" data-road="${x.id}">${hIcon(x, "inline")} ${esc(x.short)}</button>`).join("") : "";
-  $("road-tabs").querySelectorAll("[data-road]").forEach((b) => (b.onclick = () => { roadHabit = +b.dataset.road; renderRoad(); }));
-
-  const kept = POSTS.kept.filter((p) => p.habit_id === h.id);
-  const stopped = POSTS.stopped.filter((p) => p.habit_id === h.id);
-  const frontier = Math.max(0, h.allowed_chapter + (h.next_level_at === h.checkins + 1 ? 1 : 0));
-  const was = prevYears[h.id] || [];
-
-  const cols = h.chapters.map((milestone, i) => {
-    const mine = kept.filter((p) => (p.chapter ?? 0) === i);
-    const ghost = stopped.filter((p) => (p.chapter ?? 0) === i);
-    const reached = i <= h.allowed_chapter;
-    const y = year(h.chapter_dates[i]);
-    const moved = was[i] && was[i] !== y ? (+y < +was[i] ? `<span class="moved up">↑ sooner</span>` : `<span class="moved down">↓ later</span>`) : "";
-    let pending = "";
-    if (i === frontier && !h.checked_today) {
-      pending = opts.transit && h.id === roadHabit
-        ? `<div class="postcard transit"><div class="pc-photo"><span id="tr-year">${S.today.slice(0, 4)}</span></div><p id="tr-step" class="in">Counting your check-ins and pace</p></div>`
-        : `<div class="postcard locked"><div class="pc-photo">${ico("lock")}</div><p>Hold to check in and this postcard arrives</p></div>`;
-    }
-    return `
-      <div class="stop-col ${reached ? "reached" : ""}" data-i="${i}" style="--ci:${i + 1}">
-        <div class="kept-area">${pending}${postcards(mine, "kept", pending ? 1 : 2)}</div>
-        <div class="stop">
-          <span class="stop-dot" style="--c:${STOP_COLORS[i]}">${i + 1}</span>
-          <span class="stop-year">~${y} ${moved}</span>
-          <span class="stop-text">${esc(milestone)}</span>
-          <span class="stop-tip"><b>Stop ${i + 1} · ~${y}</b>${esc(milestone)}<i>${mine.length ? `${mine.length} postcard${mine.length > 1 ? "s" : ""} from here` : reached ? "reached" : `${Math.max(0, i - h.allowed_chapter)} stop${i - h.allowed_chapter === 1 ? "" : "s"} ahead`}</i></span>
-        </div>
-        <div class="ghost-area">${postcards(ghost, "stopped")}</div>
-      </div>`;
-  }).join("");
-
-  $("road").innerHTML = `
-    <div class="road-inner" id="road-inner">
-      <svg class="road-svg" id="road-svg" aria-hidden="true"></svg>
-      <div class="stop-col home"><div class="kept-area"></div>
-        <div class="stop"><span class="stop-dot home-dot">${ico("house")}</span><span class="stop-year">${S.today.slice(0, 4)}</span><span class="stop-text">today</span></div>
-        <div class="ghost-area"><span class="nt-label">the road not taken</span></div></div>
-      ${cols}
-      <div class="stop-col end"><div class="kept-area"></div>
-        <div class="stop"><span class="stop-dot end-dot">${ico("flag")}</span><span class="stop-year">2036</span><span class="stop-text">ten years on</span></div>
-        <div class="ghost-area"></div></div>
-      ${h.quest ? `<span class="road-storm" id="road-storm">${ico("storm")}</span>` : ""}
-      <span class="road-piece" id="road-piece">${avatarHTML(S.profile.avatar?.photo ? 54 : 48, { tier: 0 })}<b>you</b><span class="say" id="piece-say"></span></span>
-    </div>`;
-
-  $("road").querySelectorAll("[data-post]").forEach((el) => (el.onclick = () => {
-    const [tl, id] = el.dataset.post.split(":");
-    const p = POSTS[tl].find((x) => x.id === +id);
-    if (p) openPostcard(p);
-  }));
-  $("road").querySelectorAll("[data-more]").forEach((el) => (el.onclick = () => openStack(h, +el.dataset.more, el.dataset.tl)));
-
-  prevYears[h.id] = h.chapter_dates.map(year);
-  localStorage.setItem("ff-stop-years", JSON.stringify(prevYears));
-  requestAnimationFrame(() => layoutRoad(h));
-  setTimeout(() => { layoutRoad(h); if (wantIntro) revealRoad(); }, 120);  // once photos/fonts settle
-  bindRoadHover();
-  if (opts.transit) {
-    const col = $("road").querySelector(`.stop-col[data-i="${frontier}"]`);
-    col?.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
-  }
-}
-
-function postcards(list, tl, max = tl === "kept" ? 2 : 1) {
-  if (!list.length) return "";
-  const shown = list.slice(0, max);
-  const more = list.length - shown.length;
-  return shown.map((p, k) => `
-    <button class="postcard ${tl} ${k % 2 ? "tilt-r" : "tilt-l"}" data-post="${tl}:${p.id}">
-      <span class="tape"></span>
-      <div class="pc-photo">${photoHTML(p)}</div>
-      <p>${esc(p.caption)}</p>
-      <span class="pc-year">${year(p.live_date || p.future_date)}</span>
-      ${tl === "kept" && KIND_LABEL[p.kind] ? `<span class="pc-kind ${p.kind}">${KIND_LABEL[p.kind]}</span>` : ""}
-    </button>`).join("") + (more > 0 ? `<button class="more" data-more="${list[0].chapter ?? 0}" data-tl="${tl}">+${more} more</button>` : "");
-}
-
 function photoHTML(p) {
   const fb = `<span class="fb">${iconOfPost(p)}</span>`;
   return p.photo ? `${fb}<img src="${p.photo.url}" alt="" decoding="async" referrerpolicy="no-referrer" data-thumb="${p.photo.thumb || ""}" onerror="if(this.dataset.thumb&&this.src!==this.dataset.thumb){this.src=this.dataset.thumb}else{this.remove()}">` : fb;
 }
-
-// Draw the hand-drawn road through the stop dots, then walk the piece to where you are.
-function layoutRoad(h) {
-  const inner = $("road-inner");
-  const svg = $("road-svg");
-  if (!inner || !svg) return;
-  const box = inner.getBoundingClientRect();
-  const center = (el) => { const r = el.getBoundingClientRect(); return [r.left - box.left + r.width / 2, r.top - box.top + r.height / 2]; };
-  const dots = [...inner.querySelectorAll(".stop-dot")].map(center);
-  const ghosts = [...inner.querySelectorAll(".ghost-area")].map((g) => {
-    const r = g.getBoundingClientRect();
-    return vertical() ? [r.left - box.left + 20, r.top - box.top + r.height / 2] : [r.left - box.left + r.width / 2, r.top - box.top + 26];
-  });
-  svg.setAttribute("width", inner.scrollWidth);
-  svg.setAttribute("height", inner.scrollHeight);
-  svg.innerHTML = "";
-  const rc = rough.svg(svg);
-  svg.appendChild(rc.linearPath(ghosts, { stroke: "#cfc6b8", strokeWidth: 3, roughness: 1.8, strokeLineDash: [6, 9], seed: 301 }));
-  svg.appendChild(rc.linearPath(dots, { stroke: "#e2cfae", strokeWidth: 14, roughness: 1.4, seed: 302 }));
-  svg.appendChild(rc.linearPath(dots, { stroke: "#fffaf0", strokeWidth: 2, roughness: 1, strokeLineDash: [8, 12], seed: 303 }));
-
-  // piece: between the stop you've reached and the next, by progress toward the next level
-  const L = S.level_checkins, lvl = h.level;
-  const prev = L[lvl - 1] || 0, next = L[lvl];
-  const frac = next && h.allowed_chapter + 1 === lvl ? Math.min(1, (h.checkins - prev) / (next - prev)) : 0;
-  const a = dots[Math.max(0, h.allowed_chapter + 1)], b = dots[Math.min(dots.length - 1, h.allowed_chapter + 2)];
-  const to = [a[0] + (b[0] - a[0]) * frac, a[1] + (b[1] - a[1]) * frac];
-  const walked = dots.slice(0, Math.max(0, h.allowed_chapter + 1) + 1).concat([to]);
-  svg.appendChild(rc.linearPath(walked, { stroke: "#ef7f97", strokeWidth: 5, roughness: 1.2, seed: 304 }));
-
-  const storm = $("road-storm");
-  if (storm) { storm.style.left = `${b[0]}px`; storm.style.top = `${b[1]}px`; }
-
-  const piece = $("road-piece");
-  const key = `${h.id}`;
-  const from = lastPos[key] || to;
-  const place = ([x, y]) => { piece.style.left = `${x}px`; piece.style.top = `${y}px`; };
-  if (!piece.dataset.placed) {
-    piece.dataset.placed = "1";
-    place(from);
-    if (Math.abs(from[0] - to[0]) + Math.abs(from[1] - to[1]) > 2) {
-      setTimeout(() => { piece.classList.add("moving"); place(to); setTimeout(() => piece.classList.remove("moving"), 1300); }, 90);
-    }
-  } else {
-    place(to);
-  }
-  lastPos[key] = to;
-  localStorage.setItem("ff-piece", JSON.stringify(lastPos));
-}
-
-const vertical = () => window.matchMedia("(max-width: 760px)").matches;
-let resizeT = null;
-window.addEventListener("resize", () => {
-  clearTimeout(resizeT);
-  resizeT = setTimeout(() => S?.habits?.length && !PLAIN && layoutRoad(S.habits.find((x) => x.id === roadHabit)), 150);
-});
 
 // ---------- postcard viewer ----------
 
@@ -691,27 +517,7 @@ function openPostcard(p, arrived = false) {
   }
   bindFlip();
   $("pc-close").onclick = () => ($("pc").hidden = true);
-  if (VIEW === "town") $("pc-close").textContent = "Back to town";
-}
-
-function openStack(h, chapter, tl) {
-  const list = POSTS[tl].filter((p) => p.habit_id === h.id && (p.chapter ?? 0) === chapter);
-  $("pc-body").innerHTML = `
-    <div class="stack sketch">
-      <h2>Stop ${chapter + 1}${tl === "stopped" ? " · the road not taken" : ""}</h2>
-      <p class="muted">${esc(h.chapters[chapter])}</p>
-      <div class="stack-grid">${list.map((p, k) => `
-        <button class="postcard ${tl} ${k % 2 ? "tilt-r" : "tilt-l"}" data-post="${tl}:${p.id}"><span class="tape"></span>
-          <div class="pc-photo">${photoHTML(p)}</div><p>${esc(p.caption)}</p><span class="pc-year">${year(p.live_date || p.future_date)}</span></button>`).join("")}
-      </div>
-      <button class="btn sketch" id="pc-close">Back to the road</button>
-    </div>`;
-  $("pc").hidden = false;
-  $("pc-close").onclick = () => ($("pc").hidden = true);
-  $("pc-body").querySelectorAll("[data-post]").forEach((el) => (el.onclick = () => {
-    const [t, id] = el.dataset.post.split(":");
-    openPostcard(POSTS[t].find((x) => x.id === +id));
-  }));
+  $("pc-close").textContent = VIEW === "inside" ? "Back to the rooms" : "Back to town";
 }
 
 // ---------- story reel ----------
@@ -792,7 +598,7 @@ $("menu").addEventListener("click", closeMenu);
 $("menu-avatar").onclick = () => (S?.profile ? openAvatarSheet() : null);
 $("menu-play").onclick = () => (S?.profile ? playReel() : null);
 $("menu-add").onclick = () => (S?.profile ? openAdd() : null);
-$("menu-intro").onclick = () => { if (!S?.profile) return; sessionStorage.removeItem("ff-intro"); wantIntro = true; window.scrollTo({ top: 0 }); playIntro(); renderRoad(); };
+$("menu-intro").onclick = () => { if (!S?.profile) return; sessionStorage.removeItem("ff-intro"); wantIntro = true; window.scrollTo({ top: 0 }); playIntro(); renderTown(); };
 const soundLabel = () => ($("menu-sound").querySelector("b").textContent = sfx.muted ? "Sound: off" : "Sound: on");
 $("menu-sound").onclick = (e) => { e.stopPropagation(); sfx.toggle(); soundLabel(); if (!sfx.muted) sfx.pop(); };
 soundLabel();
@@ -853,10 +659,10 @@ $("demo-reset").onclick = async () => {
 document.querySelectorAll(".overlay").forEach((o) => o.addEventListener("click", (e) => { if (e.target === o) o.hidden = true; }));
 
 // ---------- your 2036 town ----------
-// Every daily thing is a building on your street. Each check-in lights a window; each new
-// stop on that habit's road adds a floor. Unbuilt floors are a blueprint you see on hover.
+// Every daily thing is a building on your street. Each check-in lights a window and fills a room
+// inside; a full floor of rooms adds a floor. Unbuilt floors are a blueprint you see on hover.
 
-let VIEW = localStorage.getItem("ff-view") || "town";
+let VIEW = localStorage.getItem("ff-view") === "inside" ? "inside" : "town";
 const MAXF = 6;
 const KIND = { guitar: "hall", music: "hall", piano: "hall", dance: "hall", reading: "library", pencil: "studio", palette: "studio", camera: "studio", laptop: "studio",
   running: "gym", bike: "gym", dumbbell: "gym", wave: "gym", spanish: "cafe", chat: "cafe", pan: "cafe",
@@ -868,12 +674,12 @@ const SC = 1.35, X0 = 14, INK = "#2b2420", THREAD = "#5a4232";
 const seen = JSON.parse(localStorage.getItem("ff-town") || "{}");
 let night = new Date().getHours() < 7 || new Date().getHours() >= 19;
 const STYLE = {
-  hall: { W: 160, wall: "#f2d9c6", alt: "#f3dfb0", trim: "#fbf3e6", roof: "#a8302c" },
-  library: { W: 150, wall: "#f4ecda", alt: "#e2e6ee", trim: "#fbf6ea", roof: "#2f6b6e" },
-  cafe: { W: 116, wall: "#f6dca0", alt: "#f4cdd0", trim: "#fcf2dd", roof: "#2f4c78" },
-  home: { W: 134, wall: "#f8f3e7", alt: "#e4eef5", trim: "#fffaf0", roof: "#ad2f2a" },
-  gym: { W: 152, wall: "#e3e7ea", alt: "#ece4d4", trim: "#f6f7f8", roof: "#d0573f" },
-  garden: { W: 140, wall: "#dcefe2", alt: "#e9f2d8", trim: "#f2faf5", roof: "#4f8a5a" },
+  hall: { W: 160, wall: "#f7efe4", alt: "#f6ead2", trim: "#fffaf0", roof: "#d9603a" },
+  library: { W: 150, wall: "#f6f1e6", alt: "#eef1ee", trim: "#fffaf0", roof: "#6ea9c8" },
+  cafe: { W: 116, wall: "#fbf3e0", alt: "#f8e8e4", trim: "#fffaf0", roof: "#e5b43c" },
+  home: { W: 134, wall: "#f9f5ec", alt: "#eef3f4", trim: "#fffaf0", roof: "#e8873f" },
+  gym: { W: 152, wall: "#eef0ee", alt: "#f3ede2", trim: "#fffaf0", roof: "#5a9aa5" },
+  garden: { W: 140, wall: "#eef5ea", alt: "#f4f4e2", trim: "#fffaf0", roof: "#93b05c" },
   studio: { W: 148, wall: "#d39478", alt: "#c9a58c", trim: "#f3dccd", roof: "#77685f" },
 };
 const WIN_COUNT = { hall: [4, 5], library: [2, 4], cafe: [2, 2], home: [2, 3], gym: [4, 4], garden: [3, 4], studio: [3, 3] };
@@ -912,7 +718,7 @@ function buildingSVG(h, idx, built, checkins, fresh, alt) {
     return [wash, ink];
   };
   const floor = (f, wall0, wash, ink) => `<g class="floor ${f >= fresh.floors ? "new" : ""}" style="--f:${f}">
-      <g class="felt base" filter="url(#felt)">${wall0}${wall0.includes("url(") ? "" : wall0.replace(/fill="[^"]*"/, 'fill="url(#knit)"')}</g><g class="felt" filter="url(#felt)">${wash}</g><g class="ink">${ink}</g></g>`;
+      <g class="felt base" filter="url(#felt)">${wall0}</g><g class="felt" filter="url(#felt)">${wash}</g><g class="ink">${ink}</g></g>`;
 
   out += `<ellipse cx="${cx + 4}" cy="${base + 2}" rx="${Wd / 2 + 16}" ry="5" fill="#2b2420" opacity=".16" filter="url(#soft)"/>`;
   for (let f = 0; f < 6; f++) {
@@ -1102,10 +908,10 @@ function buildingSVG(h, idx, built, checkins, fresh, alt) {
       + P.line(x0 + Wd - 43, T - 30, x0 + Wd - 19, T - 30, { strokeWidth: 0.7 });
     roofTop = T - 68;
   }
-  // roofs are knitted: every roof-coloured piece gets a knit overlay
-  wash = wash.replace(new RegExp(`<(path|rect|ellipse)([^>]*)fill="${st.roof}"([^>]*)/>`, "g"), (m, t, a, b) => m + `<${t}${a}fill="url(#knit)"${b}/>`);
+  // roofs are nubbly felt: every roof-coloured piece gets a soft boucle overlay
+  wash = wash.replace(new RegExp(`<(path|rect|ellipse)([^>]*)fill="${st.roof}"([^>]*)/>`, "g"), (m, t, a, b) => m + `<${t}${a}fill="url(#boucle)" opacity=".35"${b}/>`);
   solid += wash;
-  // 3D: stack darker copies up and to the right so every building has a thick knitted side
+  // 3D: stack darker copies up and to the right so every building has a thick felt side
   const ext = solid.replace(/ class="[^"]*"/g, "").replace(/<(circle|ellipse)[^>]*\/>/g, "");
   out = out.replace(/(<g class="floor)/, `<g class="ext">${[6, 5, 4, 3, 2, 1].map((i) => `<g transform="translate(${i * 1.9} ${-i * 1.2})">${ext}</g>`).join("")}</g>$1`);
   out += `<g class="roof ${built > fresh.floors ? "new" : ""}" style="--f:${built - 1}"><g class="felt" filter="url(#felt)">${wash}</g><g class="ink">${ink}</g></g>`;
@@ -1137,13 +943,10 @@ function townArt() {
       <feMerge><feMergeNode in="shadow"/><feMergeNode in="hair"/><feMergeNode in="wool"/></feMerge></filter>`;
   DEFS = `<svg class="town-defs" width="0" height="0" aria-hidden="true"><defs>
     ${felt("felt", 1.4, 2.6, 2.4)}${felt("feltbig", 1.6, 7, 3)}${felt("puffy", 6, 6, 4, .07)}
-    <linearGradient id="skyday" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#24426b"/><stop offset=".5" stop-color="#365b8c"/><stop offset=".78" stop-color="#6f97c4"/><stop offset="1" stop-color="#a7c4de"/></linearGradient>
+    <linearGradient id="skyday" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#9dbfcf"/><stop offset=".6" stop-color="#c9dcda"/><stop offset="1" stop-color="#e6ecdc"/></linearGradient>
+    <radialGradient id="ballg" cx=".35" cy=".3" r=".75"><stop offset="0" stop-color="#fff" stop-opacity=".35"/><stop offset=".5" stop-color="#fff" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity=".28"/></radialGradient>
     <linearGradient id="skynight" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#0f1630"/><stop offset=".6" stop-color="#1c2850"/><stop offset="1" stop-color="#34437a"/></linearGradient>
     <linearGradient id="roundg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".22"/><stop offset=".18" stop-color="#fff" stop-opacity="0"/><stop offset=".6" stop-color="#000" stop-opacity=".08"/><stop offset="1" stop-color="#000" stop-opacity=".3"/></linearGradient>
-    <linearGradient id="kg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".2"/><stop offset=".55" stop-color="#fff" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity=".16"/></linearGradient>
-    ${[["knit", .62], ["knitbig", .95]].map(([id, k]) => `<pattern id="${id}" width="${10 * k}" height="${9 * k}" patternUnits="userSpaceOnUse"><g transform="scale(${k})">
-      ${[[2.75, -28], [7.25, 28]].map(([x, a]) => `<g transform="rotate(${a} ${x} 4.5)"><ellipse cx="${x}" cy="4.5" rx="2.2" ry="4.85" fill="url(#kg)" stroke="#000" stroke-opacity=".26" stroke-width=".7"/>
-        <ellipse cx="${x - .5}" cy="3.6" rx=".65" ry="2.9" fill="#fff" fill-opacity=".22"/></g>`).join("")}</g></pattern>`).join("")}
     <radialGradient id="lg" cx=".38" cy=".32" r=".7"><stop offset="0" stop-color="#fff" stop-opacity=".5"/><stop offset=".5" stop-color="#fff" stop-opacity=".1"/><stop offset="1" stop-color="#000" stop-opacity=".2"/></radialGradient>
     <pattern id="boucle" width="14" height="12" patternUnits="userSpaceOnUse">
       ${[[3, 3, 2.9, 0], [10, 2.4, 2.7, 90], [6.6, 8.4, 3, 200], [0, 8.6, 2.8, 300], [14, 8.6, 2.8, 300], [3, 15, 2.9, 0], [10, 14.4, 2.7, 90], [12.6, 6, 1.9, 140], [1.4, 11.6, 1.8, 40]].map(([x, y, r, a]) =>
@@ -1154,51 +957,52 @@ function townArt() {
     <filter id="grain"><feTurbulence type="fractalNoise" baseFrequency="1.1" numOctaves="3" seed="2"/><feColorMatrix values="0 0 0 0 .3 0 0 0 0 .24 0 0 0 0 .2 0 0 0 .5 0"/></filter>
   </defs></svg>`;
   const P = pen(7), F = (id, inner, extra = "") => `<g filter="url(#${id})" ${extra}>${inner}</g>`;
-  // a coloured shape plus the same shape again filled with a yarn texture
+  // a coloured felt piece, optionally with a soft boucle nub texture on top
   const yarn = (shapes, color, pat, op = 1) => `<g fill="${color}">${shapes}</g><g fill="url(#${pat})" opacity="${op}">${shapes}</g>`;
-  const knitify = (svg, pat = "knit") => svg.replace(/<(path|rect|circle)([^>]*)fill="(#[0-9a-f]{6})"([^>]*)\/>/g, (m, t, a, c, b) => m + `<${t}${a}fill="url(#${pat})"${b}/>`);
+  const ball = (shapes, color) => `<g fill="${color}">${shapes}</g><g fill="url(#ballg)">${shapes}</g>`;
   const blob = (pts) => pts.map(([x, y, r]) => `<circle cx="${x}" cy="${y}" r="${r}"/>`).join("");
-  CLOUD = `<svg viewBox="0 0 200 92">${F("puffy", yarn(blob([[20, 72, 13], [38, 62, 17], [60, 52, 20], [84, 42, 23], [108, 34, 24], [132, 42, 22], [154, 54, 19], [174, 64, 15], [189, 73, 10],
-    [48, 74, 13], [78, 70, 16], [110, 68, 17], [140, 70, 15], [166, 76, 10], [96, 56, 20], [126, 58, 18], [68, 62, 16]]), "#fbf6ea", "boucle"))}</svg>`;
-  const towers = [[60, 70], [95, 112], [128, 58], [180, 92], [216, 132], [252, 76], [900, 84], [936, 126], [968, 66], [1010, 104], [1050, 72], [1180, 96], [1216, 60]];
+  CLOUD = `<svg viewBox="0 0 200 92">${F("puffy", ball(blob([[24, 70, 15], [46, 58, 20], [74, 48, 25], [104, 40, 28], [134, 48, 24], [160, 58, 19], [182, 70, 13],
+    [56, 74, 14], [92, 72, 16], [126, 72, 16], [156, 76, 12]]), "#fdfbf6"))}</svg>`;
   const yAt = (d, x) => {
     const el = document.createElementNS("http://www.w3.org/2000/svg", "path"); el.setAttribute("d", d);
     let lo = 0, hi = el.getTotalLength();
     for (let i = 0; i < 24; i++) { const m = (lo + hi) / 2; if (el.getPointAtLength(m).x < x) lo = m; else hi = m; }
     return el.getPointAtLength(lo).y;
   };
-  const MID = "M0 190C180 136 300 168 430 158S700 112 860 150 1150 136 1400 158", NEAR = "M0 218C220 182 380 214 560 200S900 176 1080 204 1300 192 1400 200";
-  const hillTree = (x, y, r, c) => wr(x - 2, y - 10, 4, 11, "#7a4a2c") + yarn(`<circle cx="${x}" cy="${y - 9 - r * .8}" r="${r}"/>`, c, "boucle", .5);
+  // layered felt hills, back to front, like a felted diorama
+  const LAYERS = [["M0 118C120 66 230 104 330 76S530 34 650 86 870 56 990 94 1230 44 1400 90V260H0z", "#c7d8c6"],
+    ["M0 160C140 104 260 140 370 100S580 146 720 120 950 80 1090 132 1310 106 1400 122V260H0z", "#4f98a1"],
+    ["M0 186C160 140 300 178 450 150S710 182 870 140 1160 168 1400 150V260H0z", "#df8b51"]];
+  const MID = "M0 196C180 146 300 176 430 166S700 122 860 160 1150 146 1400 166", NEAR = "M0 222C220 188 380 218 560 204S900 182 1080 208 1300 196 1400 204";
+  const fball = (x, y, r, c) => wr(x - 1.6, y - 8, 3.2, 9, "#7a5034") + ball(`<circle cx="${x}" cy="${y - 7 - r * .85}" r="${r}"/>`, c);
   const sheep = (x, y) => wr(x - 5, y - 3, 2.4, 5, "#4a3c34") + wr(x + 3, y - 3, 2.4, 5, "#4a3c34")
-    + yarn(blob([[x - 6, y - 7, 6], [x, y - 10, 7], [x + 6, y - 7, 6], [x, y - 5, 6], [x - 3, y - 12, 5], [x + 4, y - 12, 5]]), "#fbf6ea", "boucle")
-    + `<ellipse cx="${x + 12}" cy="${y - 8}" rx="4" ry="4.6" fill="#e8c2a8"/><circle cx="${x + 13.5}" cy="${y - 9}" r=".9" fill="#2b2420"/><ellipse cx="${x + 9}" cy="${y - 11}" rx="2" ry="1.2" fill="#d98c8c"/>`;
-  const midTrees = [[300, 8, "#3f6e2e"], [318, 6, "#4d7f37"], [560, 9, "#3f6e2e"], [700, 7, "#4d7f37"], [714, 5.5, "#3f6e2e"], [1110, 8, "#4d7f37"], [1300, 7, "#3f6e2e"]]
-    .map(([x, r, c]) => hillTree(x, yAt(MID, x) + 4, r, c)).join("");
-  const nearBits = [[150, 11, "#36612a"], [470, 12, "#40702f"], [486, 8, "#4d7f37"], [1000, 11, "#36612a"], [1240, 13, "#40702f"]]
-    .map(([x, r, c]) => hillTree(x, yAt(NEAR, x) + 5, r, c)).join("") + [[640, 0], [668, 4], [1160, 2]].map(([x, d]) => sheep(x, yAt(NEAR, x) + 8 + d)).join("");
+    + ball(blob([[x - 5, y - 7, 6], [x + 1, y - 9, 7], [x + 6, y - 6, 6]]), "#fdfbf6")
+    + `<ellipse cx="${x + 12}" cy="${y - 8}" rx="4" ry="4.6" fill="#3e332d"/>`;
+  const midTrees = [[300, 9, "#dcb33c"], [320, 6, "#93b05c"], [560, 10, "#e07b39"], [700, 8, "#dcb33c"], [716, 6, "#93b05c"], [1110, 9, "#e07b39"], [1300, 8, "#dcb33c"]]
+    .map(([x, r, c]) => fball(x, yAt(MID, x) + 4, r, c)).join("");
+  const nearBits = [[150, 12, "#e07b39"], [470, 13, "#dcb33c"], [490, 8, "#93b05c"], [1000, 12, "#e07b39"], [1240, 14, "#dcb33c"]]
+    .map(([x, r, c]) => fball(x, yAt(NEAR, x) + 5, r, c)).join("") + [[640, 0], [668, 4], [1160, 2]].map(([x, d]) => sheep(x, yAt(NEAR, x) + 8 + d)).join("");
   HILLS = `<svg viewBox="0 0 1400 260" preserveAspectRatio="xMidYMax slice">
-    <g class="far">${F("felt", towers.map(([x, hh], i) => yarn(`<rect x="${x}" y="${200 - hh}" width="30" height="${hh}"/>`, i % 2 ? "#9fb6d0" : "#b3c5da", "knit")).join(""))}</g>
-    <g class="mid">${F("feltbig", yarn(`<path d="${MID}V260H0z"/>`, "#7aa451", "knitbig") + `<path d="${MID}V260H0z" fill="url(#roundg)"/>`)}${F("felt", midTrees)}</g>
-    <g class="near">${F("feltbig", yarn(`<path d="${NEAR}V260H0z"/>`, "#5d8b3b", "knitbig") + `<path d="${NEAR}V260H0z" fill="url(#roundg)"/>`)}${F("felt", nearBits)}</g></svg>`;
-  SKY = `<svg viewBox="0 0 1400 470" preserveAspectRatio="xMidYMin slice"><g filter="url(#feltbig)">
-    <path class="sky-wash" d="M-60 -60H1460V560H-60Z"/><path d="M-60 -60H1460V560H-60Z" fill="url(#knitbig)"/></g></svg>`;
-  SUN = [`<svg viewBox="-40 -40 80 80"><g class="rays">${F("felt", [...Array(10)].map((_, i) => `<path d="M-3.5 -24L0 -36L3.5 -24Z" fill="#f6b84b" transform="rotate(${i * 36})"/>`).join(""))}</g>
-      ${F("puffy", yarn(`<circle r="21"/>`, "#ffd36b", "boucle"))}${P.circle(0, 0, 30, { strokeWidth: 1.2, stroke: "#c98a2a" })}</svg>`,
+    <g class="far">${F("feltbig", LAYERS.map(([d, c]) => `<path d="${d}" fill="${c}"/><path d="${d}" fill="url(#roundg)"/>`).join(""))}</g>
+    <g class="mid">${F("feltbig", `<path d="${MID}V260H0z" fill="#a9c48f"/><path d="${MID}V260H0z" fill="url(#roundg)"/>`)}${F("felt", midTrees)}</g>
+    <g class="near">${F("feltbig", `<path d="${NEAR}V260H0z" fill="#8e9f58"/><path d="${NEAR}V260H0z" fill="url(#roundg)"/>`)}${F("felt", nearBits)}</g></svg>`;
+  SKY = `<svg viewBox="0 0 1400 470" preserveAspectRatio="xMidYMin slice"><g filter="url(#feltbig)"><path class="sky-wash" d="M-60 -60H1460V560H-60Z"/></g></svg>`;
+  SUN = [`<svg viewBox="-40 -40 80 80"><g class="rays">${F("felt", [...Array(10)].map((_, i) => `<path d="M-3.5 -24L0 -36L3.5 -24Z" fill="#f2b14a" transform="rotate(${i * 36})"/>`).join(""))}</g>
+      ${F("puffy", ball(`<circle r="21"/>`, "#f7cd5a"))}</svg>`,
     `<svg viewBox="-40 -40 80 80"><mask id="moonm"><rect x="-40" y="-40" width="80" height="80" fill="#fff"/><circle cx="11" cy="-7" r="17" fill="#000"/></mask>
       ${F("feltbig", `<circle r="20" fill="#fff4cf" mask="url(#moonm)"/>`)}</svg>`];
-  for (const b of ["#335f25", "#3f6e2c"]) {  // knitted ribbed trunk, chunky boucle crown
-    TREE.push(`<svg viewBox="0 0 90 124">${F("felt", yarn(`<path d="M34 122c4-6 5-12 5-22l1-44h10l1 44c0 10 1 16 5 22z"/>`, "#7a4a2c", "knit")
-      + [41, 45, 49].map((x) => `<path d="M${x} 58V118" stroke="#000" stroke-opacity=".22" stroke-width="1.2" fill="none" style="stroke-dasharray:none"/>`).join(""))}
-      <g class="crown">${F("puffy", yarn(blob([[45, 46, 26], [22, 54, 17], [68, 52, 18], [28, 32, 17], [62, 30, 18], [45, 20, 17], [76, 64, 12], [14, 66, 11], [45, 66, 18], [30, 70, 12], [60, 70, 12]]), b, "boucle", .5))}</g></svg>`);
+  for (const b of ["#dcb33c", "#e07b39", "#93b05c"]) {  // a felt ball on a little trunk
+    TREE.push(`<svg viewBox="0 0 90 124">${F("felt", `<path d="M40 122c2-4 3-10 3-20l1-40h4l1 40c0 10 1 16 3 20z" fill="#6f4a30"/>`)}
+      <g class="crown">${F("puffy", ball(`<circle cx="46" cy="46" r="38"/>`, b) + `<circle cx="46" cy="46" r="38" fill="url(#boucle)" opacity=".28"/>`)}</g></svg>`);
   }
   LAMP = `<svg viewBox="0 0 30 92"><circle class="halo" cx="15" cy="14" r="14" fill="#ffd27a"/>
     ${F("felt", wr(13, 18, 4, 72, "#5f6f7d") + wp("M7 19h16l-3 -10h-10z", "#fff2c4") + wr(8, 88, 14, 4, "#5f6f7d"))}</svg>`;
-  BALLOON = `<svg viewBox="0 0 60 92">${F("felt", knitify(`<path d="M30 4C12 4 4 18 4 30c0 16 16 26 22 36h8c6-10 22-20 22-36C56 18 48 4 30 4z" fill="#ef8f86"/>
+  BALLOON = `<svg viewBox="0 0 60 92">${F("felt", (`<path d="M30 4C12 4 4 18 4 30c0 16 16 26 22 36h8c6-10 22-20 22-36C56 18 48 4 30 4z" fill="#ef8f86"/>
       <path d="M30 4c-8 0-12 14-12 26 0 16 6 26 8 36h8c2-10 8-20 8-36 0-12-4-26-12-26z" fill="#ffd36b"/><path d="M30 4c-3 0-4 14-4 26 0 16 1 26 2 36h4c1-10 2-20 2-36 0-12-1-26-4-26z" fill="#f6efe2"/>`
       + wr(22, 76, 16, 12, "#b07c5e")))}${P.path("M26 66L23 76M34 66L37 76", { strokeWidth: 1, stroke: "#6d5444" })}${P.path("M8 30q22 8 44 0", { strokeWidth: 1, stroke: "#b25f55" })}</svg>`;
   STAR = `<svg viewBox="-20 -20 40 40">${F("felt", `<path d="M0 -16L4.7 -5.5 16 -5 7.4 2.6 9.8 14 0 8 -9.8 14 -7.4 2.6 -16 -5 -4.7 -5.5Z" fill="#ffe08a"/>`)}</svg>`;
-  for (const [g, f] of [["#4a7a33", "#ef8fa6"], ["#56873a", "#ffd36b"], ["#3f6e2e", "#f8f1e2"]]) {
-    BUSH.push(`<svg viewBox="0 0 56 34">${F("felt", yarn(blob([[12, 26, 9], [24, 20, 11], [37, 22, 10], [47, 28, 8], [28, 30, 8]]), g, "boucle", .5)
+  for (const [g, f] of [["#7f9a4f", "#ef8fa6"], ["#93b05c", "#f7cd5a"], ["#6f8c45", "#fdfbf6"]]) {
+    BUSH.push(`<svg viewBox="0 0 56 34">${F("felt", ball(blob([[12, 26, 9], [24, 20, 11], [37, 22, 10], [47, 28, 8], [28, 30, 8]]), g)
       + [[14, 20], [26, 13], [38, 18], [46, 26], [21, 27], [33, 26]].map(([x, y]) => `<circle cx="${x}" cy="${y}" r="3.2" fill="${f}"/>`).join(""))}</svg>`);
   }
   for (const up of [true, false]) {
@@ -1218,13 +1022,12 @@ function renderTown(opts = {}) {
   if (!show) { wrap.hidden = true; return; }
   $("views").querySelectorAll("button").forEach((b) => b.classList.toggle("on", b.dataset.view === VIEW));
   wrap.hidden = VIEW !== "town";
-  $("roadwrap").classList.toggle("off", VIEW !== "road");
   if (VIEW !== "town") return;
   townArt();
   const name = S.profile.name, friend = S.profile.cast?.[0]?.name || "Mom";
   const sounds = [], usedKinds = new Set();
   const lots = S.habits.map((h, idx) => {
-    const built = Math.min(MAXF, Math.max(1, h.allowed_chapter + 1));
+    const built = Math.min(MAXF, Math.max(1, h.level));  // one floor per full floor of rooms (check-ins)
     const kind = KIND[h.icon] || "studio";
     const was = seen[h.id] || { floors: built, lit: 999 };
     const fresh = opts.noAnim ? { floors: built, lit: 999 } : was;
@@ -1234,23 +1037,24 @@ function renderTown(opts = {}) {
     if (built > fresh.floors) sounds.push("stamp"); else if (lit > fresh.lit) sounds.push("pop");
     seen[h.id] = { floors: built, lit };
     const mine = POSTS.kept.filter((p) => p.habit_id === h.id);
-    const next = h.chapters[built] ? `<i>Next floor (~${year(h.chapter_dates[built])}): ${esc(lower(h.chapters[built]))}</i>` : `<i>Finished. This one is ten years tall.</i>`;
+    const nc = h.start_level + built;
+    const next = built < MAXF && h.chapters[nc] ? `<i>Next floor (~${year(h.chapter_dates[nc])}): ${esc(lower(h.chapters[nc]))}</i>` : `<i>Finished. This one is ten years tall.</i>`;
     const toNext = h.next_level_at ? `${h.next_level_at - h.checkins} check-in${h.next_level_at - h.checkins === 1 ? "" : "s"} to the next floor` : "";
     return `
       <div class="lot ${opts.working === h.id ? "working" : ""} ${h.checked_today ? "done-today" : ""}" data-h="${h.id}" style="--b:${idx}; width:${art.width}px">
         <div class="lot-tip"><b>${KIND_NAME[kind]} · floor ${built} of 6</b>${esc(h.allowed_milestone ? `Future you ${lower(h.allowed_milestone.milestone)}.` : "")}${next}<small>${toNext}${toNext ? " · " : ""}${lit} of ${total} windows lit</small>
-          <span class="tip-acts"><button data-road="${h.id}">${ico("flag", "inline")} Its postcard road</button>${mine.length ? `<button data-mail="${h.id}">Postcards (${mine.length})</button>` : ""}</span></div>
+          <span class="tip-acts"><button data-in="${h.id}">${ico("flag", "inline")} Go inside</button>${mine.length ? `<button data-mail="${h.id}">Postcards (${mine.length})</button>` : ""}</span></div>
         ${h.quest ? `<div class="lot-storm">${ico("storm")}<span class="rain"></span><b>Comeback quest ${h.quest.progress}/3</b></div>` : ""}
         <div class="lot-sign" style="bottom:${art.signAt + 4}px">${hIcon(h, "inline")} ${esc(h.short)}</div>
         <div class="lot-work">Building floor ${built + 1}…<br><small>your postcard is on its way</small></div>
-        <button class="lot-b" aria-label="${esc(h.short)}: see its postcard road">${art.svg}</button>
+        <button class="lot-b" aria-label="${esc(h.short)}: go inside">${art.svg}</button>
         <span class="lot-say">${esc(friend)}: “${esc(SUPPORT[(h.checkins + idx) % SUPPORT.length].replace("{n}", name).replace("{f}", built))}”</span>
         <button class="mailbox ${mine.length ? "has" : ""}" data-mail="${h.id}" aria-label="Postcards">${mine.length ? MAILBOX.up : MAILBOX.down}${mine.length ? `<b>${mine.length}</b>` : ""}</button>
         <p class="lot-name">${KIND_NAME[kind]}<small>${esc(h.short)} · ${h.checked_today ? "done today ✓" : "not yet today"}</small></p>
         ${h.checked_today ? "" : `<button class="lot-hold" data-hold="${h.id}" ${busy ? "disabled" : ""}><i></i><span>Hold to build</span></button>`}
       </div>
       <span class="prop bush" style="--d:${idx}">${BUSH[idx % 3]}</span>
-      <span class="prop ${idx % 2 ? "lamp" : "tree"}" style="--d:${idx}">${idx % 2 ? LAMP : TREE[idx % 4 === 0 ? 0 : 1]}</span>`;
+      <span class="prop ${idx % 2 ? "lamp" : "tree"}" style="--d:${idx}">${idx % 2 ? LAMP : TREE[(idx / 2) % 3]}</span>`;
   }).join("");
   localStorage.setItem("ff-town", JSON.stringify(seen));
 
@@ -1267,8 +1071,9 @@ function renderTown(opts = {}) {
     </div>
     <div class="hills">${HILLS}</div>
     <div class="street-scroll"><div class="street">
-      <svg class="ground" width="100%" height="64" aria-hidden="true"><g filter="url(#feltbig)"><rect class="g-road" x="-20" y="0" width="120%" height="80"/><rect x="-20" y="0" width="120%" height="80" fill="url(#knit)"/>
-        <rect class="g-walk" x="-20" y="4" width="120%" height="16"/><rect x="-20" y="4" width="120%" height="16" fill="url(#knit)"/></g></svg>
+      <svg class="ground" width="100%" height="64" aria-hidden="true"><g filter="url(#feltbig)"><rect class="g-road" x="-20" y="0" width="120%" height="80"/>
+        <rect class="g-walk" x="-20" y="5" width="120%" height="15" rx="7"/></g>
+        <line x1="0" x2="100%" y1="9" y2="9" stroke="#c9bba0" stroke-width="1.2" stroke-dasharray="4 5"/><line x1="0" x2="100%" y1="16" y2="16" stroke="#c9bba0" stroke-width="1.2" stroke-dasharray="4 5"/></svg>
       <div class="welcome"><b>${esc(name)}ville</b><small>est. ${S.today.slice(0, 4)} · pop. ${pop}</small></div>
       ${lots}
       <div class="lot empty" id="lot-add"><div class="lot-plot"><span>${ico("sprout")}</span><b>Empty lot</b><small>Add a daily thing<br>and build here</small></div></div>
@@ -1277,15 +1082,13 @@ function renderTown(opts = {}) {
     <div class="grain"><svg width="100%" height="100%"><rect width="100%" height="100%" filter="url(#grain)"/></svg></div>`;
 
   const town = $("town");
-  // tap a building: it squishes like wool and its card stays open
+  // tap a building: it squishes like wool, then you walk inside
   town.querySelectorAll(".lot[data-h] .lot-b").forEach((b) => (b.onclick = (e) => {
     e.stopPropagation();
-    const lot = b.closest(".lot"), on = !lot.classList.contains("pinned");
-    town.querySelectorAll(".lot.pinned").forEach((l) => l.classList.remove("pinned"));
-    side(lot); lot.classList.toggle("pinned", on);
     replay(b, "squish"); sfx.pop(); buzz(10);
+    setTimeout(() => goInside(+b.closest(".lot").dataset.h), 260);
   }));
-  town.querySelectorAll("[data-road]").forEach((b) => (b.onclick = (e) => { e.stopPropagation(); roadHabit = +b.dataset.road; setView("road"); }));
+  town.querySelectorAll("[data-in]").forEach((b) => (b.onclick = (e) => { e.stopPropagation(); goInside(+b.dataset.in); }));
   town.querySelectorAll(".lot-hold").forEach(bindHold);
   town.querySelectorAll(".hang").forEach((hg) => {
     hg.onpointerenter = () => replay(hg, "kick");
@@ -1335,6 +1138,61 @@ function renderTown(opts = {}) {
   else if (sounds.length) setTimeout(() => { sfx[sounds.includes("stamp") ? "stamp" : "pop"](); buzz(30); }, sounds.includes("stamp") ? 700 : 300);
 }
 
+// ---------- inside a building ----------
+// A cutaway of one building: floor 1 at the bottom. Each check-in is one room holding that day's
+// postcard; floor N has as many rooms as check-ins it takes to reach it, so a full floor of rooms
+// is exactly what adds a floor to the building in the town.
+let inHabit = null;
+const inSeen = {};
+const dayLabel = (d) => new Date(`${d}T12:00`).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+
+function renderInside(opts = {}) {
+  const wrap = $("insidewrap");
+  wrap.hidden = PLAIN || VIEW !== "inside" || !S.habits.length;
+  if (wrap.hidden) return;
+  if (!S.habits.some((h) => h.id === inHabit)) inHabit = S.habits[0].id;
+  const h = S.habits.find((x) => x.id === inHabit), kind = KIND[h.icon] || "studio", st = STYLE[kind];
+  const L = S.level_checkins, days = h.days || [], mine = POSTS.kept.filter((p) => p.habit_id === h.id);
+  const seenRooms = inSeen[h.id] ?? days.length;
+  inSeen[h.id] = days.length;
+  $("in-tabs").innerHTML = S.habits.map((x) => `<button data-in="${x.id}" class="${x.id === h.id ? "on" : ""}">${hIcon(x, "inline")} ${KIND_NAME[KIND[x.icon] || "studio"]} · ${esc(x.short)}</button>`).join("");
+
+  const floors = L.map((need, f) => {
+    const from = L[f - 1] || 0, n = need - from, done = Math.max(0, Math.min(n, days.length - from));
+    const state = done === n ? "built" : days.length >= from ? "building" : "plan";
+    const ch = h.start_level + f;  // experienced starters begin further along the story
+    const rooms = Array.from({ length: n }, (_, r) => {
+      const k = from + r, day = days[k];
+      if (day) {
+        const p = mine.find((x) => x.created_day === day);
+        return `<button class="room full ${k >= seenRooms ? "pop" : ""} ${p?.kind === "level_up" ? "keystone" : ""}" ${p ? `data-post="${p.id}"` : "disabled"}>
+          <span class="rm-photo">${p ? photoHTML(p) : hIcon(h)}</span><b>${dayLabel(day)}</b><small>${p?.kind === "level_up" ? "floor postcard" : `room ${k + 1}`}</small></button>`;
+      }
+      if (k === days.length) {
+        if (opts.working === h.id) return `<div class="room next working"><span class="rm-photo">${hIcon(h)}</span><b>Moving in…</b><small>postcard on its way</small></div>`;
+        if (h.checked_today) return `<div class="room next wait"><b>Tomorrow</b><small>room ${k + 1} opens</small></div>`;
+        return `<div class="room next"><b>Room ${k + 1}</b><button class="lot-hold" data-hold="${h.id}" ${busy ? "disabled" : ""}><i></i><span>Hold to build</span></button></div>`;
+      }
+      return `<div class="room empty"><small>${k + 1}</small></div>`;
+    }).join("");
+    const status = state === "built" ? "built ✓" : state === "building" ? `${done} of ${n} rooms · ${n - done} more to build it` : `${n} room${n > 1 ? "s" : ""} · starts after check-in ${from}`;
+    return `<section class="fl ${state}" style="--f:${f}">
+      <header><b>Floor ${f + 1}</b><span>${status}</span><i>${h.chapters[ch] ? `~${year(h.chapter_dates[ch])}: future you ${esc(lower(h.chapters[ch]))}` : "A bonus floor: you're already past the last chapter."}</i></header>
+      <div class="rooms">${rooms}</div></section>`;
+  }).reverse().join("");
+
+  $("inside").innerHTML = `<div class="house ${opts.enter ? "enter" : ""}" style="--wall:${st.wall}; --roof:${st.roof}">
+      <div class="roofcap"><span>${KIND_NAME[kind]} · ${esc(h.short)}</span></div>
+      ${floors}
+      <div class="foundation">${days.length} check-in${days.length === 1 ? "" : "s"} · ${Math.min(MAXF, h.level)} of ${MAXF} floors built</div></div>`;
+
+  $("in-tabs").querySelectorAll("[data-in]").forEach((b) => (b.onclick = () => { inHabit = +b.dataset.in; sfx.tick(); renderInside({ enter: true }); }));
+  $("inside").querySelectorAll("[data-post]").forEach((b) => (b.onclick = () => openPostcard(mine.find((p) => p.id === +b.dataset.post))));
+  $("inside").querySelectorAll(".lot-hold").forEach(bindHold);
+  $("in-back").onclick = () => setView("town");
+  if (opts.enter) requestAnimationFrame(() => $("inside").querySelector(".fl.building, .fl.built")?.scrollIntoView({ behavior: "smooth", block: "center" }));
+}
+
 function replay(el, cls) { el.classList.remove(cls); void el.offsetWidth; el.classList.add(cls); }
 
 function revealTown() {
@@ -1350,8 +1208,10 @@ function setView(v) {
   localStorage.setItem("ff-view", v);
   sfx.tick();
   renderTown({ noAnim: true });
-  if (v === "road") renderRoad();
+  renderInside({ enter: v === "inside" });
+  window.scrollTo({ top: $("views").offsetTop - 70, behavior: "smooth" });
 }
+function goInside(id) { inHabit = id; setView("inside"); }
 
 // after a check-in, show the building change before the postcard opens
 async function townMoment(id, levelUp) {
@@ -1364,7 +1224,7 @@ async function townMoment(id, levelUp) {
 
 // ---------- motion & delight ----------
 
-// Opening: a handwritten hello, then the road draws itself and the postcards drop in.
+// Opening: a handwritten hello, then the town drops in.
 let wantIntro = !sessionStorage.getItem("ff-intro") && !PLAIN;
 function playIntro() {
   if (!wantIntro || !S?.profile) { wantIntro = false; return; }
@@ -1381,57 +1241,6 @@ function playIntro() {
   setTimeout(() => el.remove(), 3000);
 }
 
-function revealRoad() {
-  wantIntro = false;
-  const wrap = $("roadwrap");
-  wrap.classList.remove("reveal");
-  void wrap.offsetWidth;
-  wrap.classList.add("reveal");
-  // draw every solid road stroke from start to end, like a pen
-  $("road-svg").querySelectorAll("path").forEach((p, i) => {
-    if (p.getAttribute("stroke-dasharray")) { p.style.animation = "fadein 1s 1.4s both"; return; }
-    const len = p.getTotalLength();
-    p.style.strokeDasharray = len;
-    p.style.strokeDashoffset = len;
-    p.style.transition = `stroke-dashoffset 1.6s cubic-bezier(.6, .1, .3, 1) ${0.25 + (i % 3) * 0.15}s`;
-    requestAnimationFrame(() => (p.style.strokeDashoffset = 0));
-  });
-  setTimeout(() => wrap.classList.remove("reveal"), 3600);
-}
-
-// Hover: postcards tilt toward the cursor; the walker talks; stops show a tooltip card.
-const CHEERS = ["Day {d}! Look how far we've come.", "One more step and the next postcard is ours.",
-  "{n}, I can see stop {s} from here.", "Small steps. Big road.", "Future us says thanks.", "Hold the button. I'll walk."];
-function bindRoadHover() {
-  const road = $("road");
-  if (road.dataset.bound) return;
-  road.dataset.bound = "1";
-  road.addEventListener("pointermove", (e) => {
-    const card = e.target.closest(".postcard:not(.locked):not(.transit)");
-    if (!card) return;
-    const r = card.getBoundingClientRect();
-    const x = (e.clientX - r.left) / r.width - 0.5, y = (e.clientY - r.top) / r.height - 0.5;
-    card.style.setProperty("--tx", `${-y * 14}deg`);
-    card.style.setProperty("--ty", `${x * 16}deg`);
-    card.style.setProperty("--gx", `${(x + 0.5) * 100}%`);
-    card.style.setProperty("--gy", `${(y + 0.5) * 100}%`);
-  });
-  road.addEventListener("pointerout", (e) => {
-    const card = e.target.closest(".postcard");
-    if (card && !card.contains(e.relatedTarget)) { card.style.setProperty("--tx", "0deg"); card.style.setProperty("--ty", "0deg"); }
-  });
-  road.addEventListener("pointerover", (e) => {
-    const piece = e.target.closest(".road-piece");
-    if (!piece || piece.contains(e.relatedTarget)) return;
-    const h = S.habits.find((x) => x.id === roadHabit);
-    const line = CHEERS[Math.floor(Math.random() * CHEERS.length)]
-      .replace("{d}", S.day_offset + 1).replace("{n}", S.profile.name).replace("{s}", Math.min(6, (h?.allowed_chapter ?? 0) + 2));
-    $("piece-say").textContent = line;
-    sfx.tick();
-  });
-}
-
-// numbers count up when the card appears
 function countUp(root) {
   root.querySelectorAll(".me-stats b").forEach((b) => {
     const end = +b.textContent, t0 = performance.now();

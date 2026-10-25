@@ -21,7 +21,7 @@
         <button id="menu-avatar"><span class="mi" data-ico="camera"></span><span><b>Your future self</b><small>Change your photo or character</small></span></button>
         <button id="menu-play"><span class="mi" data-ico="play"></span><span><b>Play your next 10 years</b><small>All your postcards as a story</small></span></button>
         <button id="demo-btn"><span class="mi" data-ico="flame"></span><span><b>Time travel (demo)</b><small>Skip days to see level-ups and slumps fast</small></span></button>
-        <button id="menu-intro"><span class="mi" data-ico="sun"></span><span><b>Replay the opening</b><small>Watch your road draw itself again</small></span></button>
+        <button id="menu-intro"><span class="mi" data-ico="sun"></span><span><b>Replay the opening</b><small>Watch your town come together again</small></span></button>
         <button id="menu-sound"><span class="mi" data-ico="music"></span><span><b>Sound: on</b><small>Paper, stamps, and a little chime</small></span></button>
         <button id="usage-btn"><span class="mi" data-ico="check"></span><span><b>AI usage &amp; safety log</b><small>Tokens per postcard, and what the safety checks caught</small></span></button>
         <button id="menu-reset" class="danger"><span class="mi" data-ico="lock"></span><span><b>Start over</b><small>Erase habits, check-ins, and postcards</small></span></button>
@@ -34,7 +34,7 @@
     <section class="onboard sheet-page" id="onboard" hidden>
       <p class="kicker">It's 2036.</p>
       <h1>Meet the you who kept going.</h1>
-      <p class="muted">Pick one small thing to do every day. Each check-in sends you a postcard from your future, and moves you one step down the road to 2036.</p>
+      <p class="muted">Pick one small thing to do every day. Each check-in sends you a postcard from your future and fills a room in your 2036 town. Fill a floor of rooms and your building grows.</p>
       <form id="onboard-form">
         <label>Your first name<input id="ob-name" required maxlength="30" placeholder="Aisling"></label>
         <label>Who do you most want cheering you on?
@@ -59,19 +59,19 @@
       </div>
       <nav class="views" id="views" hidden>
         <button data-view="town"><span class="mi" data-ico="house"></span>Your 2036 town</button>
-        <button data-view="road"><span class="mi" data-ico="flag"></span>Postcard road</button>
+        <button data-view="inside"><span class="mi" data-ico="flag"></span>Inside the buildings</button>
       </nav>
       <section class="townwrap" id="townwrap" hidden>
-        <p class="road-legend">Hold <b>Hold to build</b> under a building to check in: a window lights up, and every new stop adds a floor. Tap a building for its story and postcards. Tap clouds, trees and the street. Tap the sun for night.</p>
+        <p class="road-legend">Tap a building to go inside. Every check-in fills one room with a postcard, and a full floor of rooms adds a floor here. Tap clouds, trees and the street. Tap the sun for night.</p>
         <div class="town" id="town"></div>
       </section>
-      <section class="roadwrap" id="roadwrap">
-        <div class="road-head">
-          <h2>The road to 2036</h2>
-          <div class="road-tabs" id="road-tabs"></div>
+      <section class="insidewrap" id="insidewrap" hidden>
+        <div class="in-head">
+          <button class="btn sketch" id="in-back">← Back to town</button>
+          <div class="road-tabs" id="in-tabs"></div>
         </div>
-        <p class="road-legend">Each postcard is pinned where it would happen at your real pace. Keep going and they move closer. Below runs <i>the road not taken</i>.</p>
-        <div class="road" id="road"></div>
+        <p class="road-legend">Every check-in moves into a room and brings a postcard from your future. Fill every room on a floor and the building grows a new floor in your town.</p>
+        <div class="inside" id="inside"></div>
       </section>
     </section>
   </main>
@@ -106,7 +106,7 @@
     <div class="card sketch pop">
       <div class="confetti" id="confetti"></div>
       <div class="lu-emoji" id="lu-emoji"></div>
-      <p class="kicker">Stop <span id="lu-level"></span> reached</p>
+      <p class="kicker">Floor <span id="lu-level"></span> built</p>
       <div class="dots" id="lu-dots"></div>
       <h2 id="lu-title"></h2>
       <p class="muted" id="lu-sub"></p>

@@ -2,9 +2,9 @@
 
 Repo: https://github.com/AislingWuPrinceton/future-feed
 
-**Check in on one small habit a day. Each check-in sends you a postcard from your future self and moves you one step down the road to 2036.**
+**Check in on one small habit a day. Each check-in sends you a postcard from your future self and fills a room in your 2036 town.**
 
-Most habit apps only record streaks, so people get bored and quit. Future Feed turns a habit into an unfolding story about your future self, drawn as a hand-drawn notebook: a road from today to 2036 with six stops (one per chapter). Each stop shows the year you'd reach it at your real pace, postcards from your future are pinned above their stop and move closer as you keep going, and the road not taken (the you who stopped) runs below. You check in by pressing and holding, then watch the postcard arrive. Check-ins unlock new chapters, your real pace decides how far those chapters can reach, slumps trigger a "boss," and a second feed shows the you who stopped.
+Most habit apps only record streaks, so people get bored and quit. Future Feed turns a habit into an unfolding story about your future self, shown as a needle-felt town. Each habit is a building. Tap it to go inside: every check-in is a room holding that day's postcard, and floor N has as many rooms as the check-ins it takes to reach it (1, 2, 4, 7, 16, 30), so filling a floor of rooms is what adds a floor to the building outside. Each floor is labeled with the chapter of your future and the year you'd reach it at your real pace. You check in by pressing and holding, then watch the postcard arrive. Check-ins unlock new chapters, your real pace decides how far those chapters can reach, slumps trigger a "boss," and a second feed shows the you who stopped.
 
 ## Run it locally (about 3 minutes)
 
