@@ -691,6 +691,7 @@ function openPostcard(p, arrived = false) {
   }
   bindFlip();
   $("pc-close").onclick = () => ($("pc").hidden = true);
+  if (VIEW === "town") $("pc-close").textContent = "Back to town";
 }
 
 function openStack(h, chapter, tl) {
@@ -766,6 +767,8 @@ function closeReel() {
 $("reel-next").onclick = () => step(1);
 $("reel-prev").onclick = () => step(-1);
 $("reel-x").onclick = closeReel;
+$("pc").addEventListener("click", (e) => { if (e.target === $("pc") || e.target === $("pc-body")) $("pc").hidden = true; });
+document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !$("pc").hidden) $("pc").hidden = true; });
 document.addEventListener("keydown", (e) => {
   if (!reel) return;
   if (e.key === "ArrowRight") step(1);
@@ -1099,6 +1102,8 @@ function buildingSVG(h, idx, built, checkins, fresh, alt) {
       + P.line(x0 + Wd - 43, T - 30, x0 + Wd - 19, T - 30, { strokeWidth: 0.7 });
     roofTop = T - 68;
   }
+  // roofs are knitted: every roof-coloured piece gets a knit overlay
+  wash = wash.replace(new RegExp(`<(path|rect|ellipse)([^>]*)fill="${st.roof}"([^>]*)/>`, "g"), (m, t, a, b) => m + `<${t}${a}fill="url(#knit)"${b}/>`);
   out += `<g class="roof ${built > fresh.floors ? "new" : ""}" style="--f:${built - 1}"><g class="felt" filter="url(#felt)">${wash}</g><g class="ink">${ink}</g></g>`;
   return { svg: `<svg viewBox="0 0 ${SVGW} ${SVGH}" width="${SVGW * SC}" height="${SVGH * SC}">${out}</svg>`, total, lit, width: SVGW * SC, signAt: (SVGH - roofTop) * SC };
 }
@@ -1108,8 +1113,8 @@ let SUN = [], SKY = "", CLOUD = "", HILLS = "", TREE = [], LAMP = "", MAILBOX = 
 function townArt() {
   if (CLOUD) return;
   // felt: fuzzy fibre edges, a puffy bevel lit from the top left, fibre speckle, and a soft shadow underneath
-  const felt = (id, fuzz, puff, lift) => `<filter id="${id}" x="-12%" y="-12%" width="124%" height="130%" color-interpolation-filters="sRGB">
-      <feTurbulence type="fractalNoise" baseFrequency=".85" numOctaves="2" seed="3" result="n"/>
+  const felt = (id, fuzz, puff, lift, freq = .85) => `<filter id="${id}" x="-12%" y="-12%" width="124%" height="130%" color-interpolation-filters="sRGB">
+      <feTurbulence type="fractalNoise" baseFrequency="${freq}" numOctaves="2" seed="3" result="n"/>
       <feDisplacementMap in="SourceGraphic" in2="n" scale="${fuzz}" xChannelSelector="R" yChannelSelector="G" result="fz"/>
       <feTurbulence type="turbulence" baseFrequency="1.8" numOctaves="1" seed="5" result="n2"/>
       <feDisplacementMap in="SourceGraphic" in2="n2" scale="${fuzz * 2.6}" xChannelSelector="R" yChannelSelector="B" result="hair0"/>
@@ -1127,16 +1132,26 @@ function townArt() {
       <feFlood flood-color="#3b2a1e" flood-opacity=".3"/><feComposite in2="so" operator="in" result="shadow"/>
       <feMerge><feMergeNode in="shadow"/><feMergeNode in="hair"/><feMergeNode in="wool"/></feMerge></filter>`;
   DEFS = `<svg class="town-defs" width="0" height="0" aria-hidden="true"><defs>
-    ${felt("felt", 1.8, 2, 1.6)}${felt("feltbig", 3, 5, 3)}
+    ${felt("felt", 1.8, 2.6, 2.4)}${felt("feltbig", 3, 5, 3)}${felt("puffy", 7, 7, 4, .07)}
+    <linearGradient id="kg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".42"/><stop offset=".5" stop-color="#fff" stop-opacity=".06"/><stop offset="1" stop-color="#000" stop-opacity=".3"/></linearGradient>
+    ${[["knit", 1], ["knitbig", 1.7]].map(([id, k]) => `<pattern id="${id}" width="${9 * k}" height="${8 * k}" patternUnits="userSpaceOnUse"><g transform="scale(${k})">
+      <path d="M0 0v8M9 0v8" stroke="#000" stroke-opacity=".16" stroke-width=".8"/>
+      <ellipse cx="2.6" cy="4.2" rx="1.75" ry="4.5" transform="rotate(-36 2.6 4.2)" fill="url(#kg)" stroke="#000" stroke-opacity=".12" stroke-width=".45"/>
+      <ellipse cx="6.4" cy="4.2" rx="1.75" ry="4.5" transform="rotate(36 6.4 4.2)" fill="url(#kg)" stroke="#000" stroke-opacity=".12" stroke-width=".45"/></g></pattern>`).join("")}
+    <radialGradient id="lg" cx=".36" cy=".3" r=".72"><stop offset="0" stop-color="#fff" stop-opacity=".6"/><stop offset=".45" stop-color="#fff" stop-opacity=".08"/><stop offset="1" stop-color="#000" stop-opacity=".34"/></radialGradient>
+    <pattern id="boucle" width="13" height="11" patternUnits="userSpaceOnUse">
+      ${[[3, 3, 3.3], [9.8, 2.6, 3], [0, 8.6, 3.2], [6.4, 8.4, 3.4], [13, 8.6, 3.2], [3, 14, 3.3], [9.8, 13.6, 3]].map(([x, y, r]) => `<circle cx="${x}" cy="${y}" r="${r}" fill="url(#lg)"/>`).join("")}</pattern>
     <filter id="soft" x="-20%" y="-50%" width="140%" height="200%"><feGaussianBlur stdDeviation="3"/></filter>
     <pattern id="brick" width="16" height="8" patternUnits="userSpaceOnUse"><rect width="16" height="8" fill="#d39478"/>
       <path d="M0 .5h16M0 4.5h16M4 .5v4M12 4.5v4" stroke="#9c5a40" stroke-width=".9" stroke-dasharray="1.6 1.2" opacity=".6"/></pattern>
     <filter id="grain"><feTurbulence type="fractalNoise" baseFrequency="1.1" numOctaves="3" seed="2"/><feColorMatrix values="0 0 0 0 .3 0 0 0 0 .24 0 0 0 0 .2 0 0 0 .5 0"/></filter>
   </defs></svg>`;
   const P = pen(7), F = (id, inner, extra = "") => `<g filter="url(#${id})" ${extra}>${inner}</g>`;
-  const cloud = "M18 46c-12 0-14-14-2-16 0-12 16-16 24-8 4-12 24-14 30-2 10-6 26 0 24 12 14 0 16 14 4 14z";
-  CLOUD = `<svg viewBox="0 0 140 54">${F("feltbig", wp(cloud, "#fffdf8"))}
-    ${P.path("M24 42c-8 0-9-9 0-11 0-9 12-12 18-5 3-9 19-10 23-1 8-4 19 0 18 9 10 0 11 8 3 8z", { strokeWidth: 1, stroke: "#c9bfb2" })}</svg>`;
+  // a coloured shape plus the same shape again filled with a yarn texture
+  const yarn = (shapes, color, pat) => `<g fill="${color}">${shapes}</g><g fill="url(#${pat})">${shapes}</g>`;
+  const knitify = (svg, pat = "knit") => svg.replace(/<(path|rect|circle)([^>]*)fill="(#[0-9a-f]{6})"([^>]*)\/>/g, (m, t, a, c, b) => m + `<${t}${a}fill="url(#${pat})"${b}/>`);
+  const blob = (pts) => pts.map(([x, y, r]) => `<circle cx="${x}" cy="${y}" r="${r}"/>`).join("");
+  CLOUD = `<svg viewBox="0 0 140 58">${F("puffy", yarn(blob([[22, 40, 13], [42, 30, 17], [66, 24, 20], [90, 28, 18], [110, 36, 14], [124, 44, 9], [60, 42, 14], [86, 44, 12], [34, 46, 9]]), "#fffaf0", "boucle"))}</svg>`;
   const towers = [[60, 70], [95, 112], [128, 58], [180, 92], [216, 132], [252, 76], [900, 84], [936, 126], [968, 66], [1010, 104], [1050, 72], [1180, 96], [1216, 60]];
   const yAt = (d, x) => {
     const el = document.createElementNS("http://www.w3.org/2000/svg", "path"); el.setAttribute("d", d);
@@ -1145,9 +1160,9 @@ function townArt() {
     return el.getPointAtLength(lo).y;
   };
   const MID = "M0 190C180 136 300 168 430 158S700 112 860 150 1150 136 1400 158", NEAR = "M0 218C220 182 380 214 560 200S900 176 1080 204 1300 192 1400 200";
-  const hillTree = (x, y, r, c) => wr(x - 1.5, y - 9, 3, 10, "#8a6248") + `<circle cx="${x}" cy="${y - 9 - r * .8}" r="${r}" fill="${c}"/>`;
-  const sheep = (x, y) => `<ellipse cx="${x}" cy="${y - 6}" rx="9" ry="6" fill="#fffdf6"/><circle cx="${x + 9}" cy="${y - 8}" r="3.4" fill="#4a3c34"/>`
-    + wr(x - 5, y - 2, 2, 4, "#4a3c34") + wr(x + 3, y - 2, 2, 4, "#4a3c34");
+  const hillTree = (x, y, r, c) => wr(x - 1.5, y - 9, 3, 10, "#8a6248") + yarn(`<circle cx="${x}" cy="${y - 9 - r * .8}" r="${r}"/>`, c, "boucle");
+  const sheep = (x, y) => wr(x - 5, y - 3, 2.4, 5, "#4a3c34") + wr(x + 3, y - 3, 2.4, 5, "#4a3c34")
+    + yarn(blob([[x - 5, y - 6, 5], [x, y - 8, 6], [x + 5, y - 6, 5], [x, y - 4, 5]]), "#fffaf0", "boucle") + `<ellipse cx="${x + 10}" cy="${y - 7}" rx="3.2" ry="3.8" fill="#4a3c34"/>`;
   const midTrees = [[300, 7, "#86b471"], [318, 5, "#9cc785"], [560, 8, "#7aa866"], [700, 6, "#93c07b"], [714, 4.5, "#7aa866"], [1110, 7, "#86b471"], [1300, 6, "#9cc785"]]
     .map(([x, r, c]) => hillTree(x, yAt(MID, x) + 4, r, c)).join("");
   const nearBits = [[150, 9, "#6f9e5c"], [470, 10, "#79a866"], [486, 7, "#8dbb77"], [1000, 9, "#6f9e5c"], [1240, 11, "#79a866"]]
@@ -1155,29 +1170,28 @@ function townArt() {
   HILLS = `<svg viewBox="0 0 1400 260" preserveAspectRatio="xMidYMax slice">
     <g class="far">${F("felt", towers.map(([x, hh], i) => wr(x, 200 - hh, 30, hh, i % 2 ? "#c7d6e6" : "#d6dfe9")).join(""))}
       ${towers.map(([x, hh]) => [...Array(Math.floor(hh / 16))].map((_, i) => `<path d="M${x + 7} ${208 - hh + i * 16}h16" stroke="#8ea3ba" stroke-width="1.2" fill="none"/>`).join("")).join("")}</g>
-    <g class="mid">${F("feltbig", wp("M0 190C180 136 300 168 430 158S700 112 860 150 1150 136 1400 158V260H0z", "#c9deb8"))}
+    <g class="mid">${F("feltbig", yarn(`<path d="${MID}V260H0z"/>`, "#b9d6a4", "knit"))}
       ${P.path("M0 198C180 144 300 176 430 166S700 120 860 158 1150 144 1400 166", { strokeWidth: 1.1, stroke: "#8fae7e" })}${F("felt", midTrees)}</g>
-    <g class="near">${F("feltbig", wp("M0 218C220 182 380 214 560 200S900 176 1080 204 1300 192 1400 200V260H0z", "#a9cf96"))}
+    <g class="near">${F("feltbig", yarn(`<path d="${NEAR}V260H0z"/>`, "#94c07e", "knit"))}
       ${P.path("M0 226C220 190 380 222 560 208S900 184 1080 212 1300 200 1400 208", { strokeWidth: 1.2, stroke: "#6f9a5f" })}${F("felt", nearBits)}</g></svg>`;
   SKY = `<svg viewBox="0 0 1400 470" preserveAspectRatio="xMidYMin slice"><g filter="url(#feltbig)">
-    <path class="sky-wash" d="M-60 -60H1460V560H-60Z"/></g></svg>`;
+    <path class="sky-wash" d="M-60 -60H1460V560H-60Z"/><path d="M-60 -60H1460V560H-60Z" fill="url(#knitbig)"/></g></svg>`;
   SUN = [`<svg viewBox="-40 -40 80 80"><g class="rays">${F("felt", [...Array(10)].map((_, i) => `<path d="M-3.5 -24L0 -36L3.5 -24Z" fill="#f6b84b" transform="rotate(${i * 36})"/>`).join(""))}</g>
-      ${F("feltbig", `<circle r="21" fill="#ffd36b"/>`)}${P.circle(0, 0, 30, { strokeWidth: 1.2, stroke: "#c98a2a" })}</svg>`,
+      ${F("puffy", yarn(`<circle r="21"/>`, "#ffd36b", "boucle"))}${P.circle(0, 0, 30, { strokeWidth: 1.2, stroke: "#c98a2a" })}</svg>`,
     `<svg viewBox="-40 -40 80 80"><mask id="moonm"><rect x="-40" y="-40" width="80" height="80" fill="#fff"/><circle cx="11" cy="-7" r="17" fill="#000"/></mask>
       ${F("feltbig", `<circle r="20" fill="#fff4cf" mask="url(#moonm)"/>`)}</svg>`];
   for (const [a, b, c] of [["#8fbe7d", "#79a86a", "#a6cf92"], ["#a3c98a", "#86b070", "#bcdba3"]]) {
-    TREE.push(`<svg viewBox="0 0 46 76">${F("felt", wr(20, 40, 6, 34, "#9a6b4b"))}
-      <g class="crown">${F("felt", `<circle cx="23" cy="32" r="16" fill="${b}"/><circle cx="14" cy="24" r="10" fill="${a}"/><circle cx="30" cy="20" r="10" fill="${c}"/>`)}
-      ${P.path("M14 30q4 -6 9 -2M26 36q5 -4 8 1M24 18q4 -3 8 0", { strokeWidth: 1, stroke: "#4f7d47" })}</g></svg>`);
+    TREE.push(`<svg viewBox="0 0 46 76">${F("felt", yarn(`<path d="M19 74l1-34h6l1 34z"/>`, "#8f6346", "knit"))}
+      <g class="crown">${F("puffy", yarn(blob([[23, 32, 15], [13, 26, 10], [31, 22, 11], [21, 16, 10], [33, 34, 9], [12, 36, 8]]), b, "boucle"))}</g></svg>`);
   }
   LAMP = `<svg viewBox="0 0 30 92"><circle class="halo" cx="15" cy="14" r="14" fill="#ffd27a"/>
     ${F("felt", wr(13, 18, 4, 72, "#5f6f7d") + wp("M7 19h16l-3 -10h-10z", "#fff2c4") + wr(8, 88, 14, 4, "#5f6f7d"))}</svg>`;
-  BALLOON = `<svg viewBox="0 0 60 92">${F("felt", `<path d="M30 4C12 4 4 18 4 30c0 16 16 26 22 36h8c6-10 22-20 22-36C56 18 48 4 30 4z" fill="#ef8f86"/>
+  BALLOON = `<svg viewBox="0 0 60 92">${F("felt", knitify(`<path d="M30 4C12 4 4 18 4 30c0 16 16 26 22 36h8c6-10 22-20 22-36C56 18 48 4 30 4z" fill="#ef8f86"/>
       <path d="M30 4c-8 0-12 14-12 26 0 16 6 26 8 36h8c2-10 8-20 8-36 0-12-4-26-12-26z" fill="#ffd36b"/><path d="M30 4c-3 0-4 14-4 26 0 16 1 26 2 36h4c1-10 2-20 2-36 0-12-1-26-4-26z" fill="#f6efe2"/>`
-      + wr(22, 76, 16, 12, "#b07c5e"))}${P.path("M26 66L23 76M34 66L37 76", { strokeWidth: 1, stroke: "#6d5444" })}${P.path("M8 30q22 8 44 0", { strokeWidth: 1, stroke: "#b25f55" })}</svg>`;
+      + wr(22, 76, 16, 12, "#b07c5e")))}${P.path("M26 66L23 76M34 66L37 76", { strokeWidth: 1, stroke: "#6d5444" })}${P.path("M8 30q22 8 44 0", { strokeWidth: 1, stroke: "#b25f55" })}</svg>`;
   STAR = `<svg viewBox="-20 -20 40 40">${F("felt", `<path d="M0 -16L4.7 -5.5 16 -5 7.4 2.6 9.8 14 0 8 -9.8 14 -7.4 2.6 -16 -5 -4.7 -5.5Z" fill="#ffe08a"/>`)}</svg>`;
   for (const [g, f] of [["#7fae6c", "#ef8fa6"], ["#8dbb77", "#ffd36b"], ["#79a866", "#f2f0ea"]]) {
-    BUSH.push(`<svg viewBox="0 0 56 34">${F("felt", `<path d="M4 34c-4-10 4-18 12-16 2-10 16-12 20-4 8-4 18 4 16 12 4 2 4 6 2 8z" fill="${g}"/>`
+    BUSH.push(`<svg viewBox="0 0 56 34">${F("felt", yarn(blob([[12, 26, 9], [24, 20, 11], [37, 22, 10], [47, 28, 8], [28, 30, 8]]), g, "boucle")
       + [[14, 20], [26, 13], [38, 18], [46, 26], [21, 27], [33, 26]].map(([x, y]) => `<circle cx="${x}" cy="${y}" r="3.2" fill="${f}"/>`).join(""))}</svg>`);
   }
   for (const up of [true, false]) {
@@ -1246,7 +1260,7 @@ function renderTown(opts = {}) {
     </div>
     <div class="hills">${HILLS}</div>
     <div class="street-scroll"><div class="street">
-      <svg class="ground" width="100%" height="64" aria-hidden="true"><g filter="url(#feltbig)"><rect class="g-walk" x="-20" y="2" width="120%" height="18"/><rect class="g-road" x="-20" y="18" width="120%" height="60"/></g>
+      <svg class="ground" width="100%" height="64" aria-hidden="true"><g filter="url(#feltbig)"><rect class="g-walk" x="-20" y="2" width="120%" height="18"/><rect class="g-road" x="-20" y="18" width="120%" height="60"/><rect x="-20" y="18" width="120%" height="60" fill="url(#knit)"/></g>
         <line x1="0" x2="100%" y1="13" y2="13" stroke="#8d7b66" stroke-width="1.2" stroke-dasharray="3.2 2.4" stroke-linecap="round"/>
         <line class="g-mid" x1="0" x2="100%" y1="44" y2="44" stroke-width="3" stroke-dasharray="18 22" stroke-linecap="round"/></svg>
       <div class="welcome"><b>${esc(name)}ville</b><small>est. ${S.today.slice(0, 4)} · pop. ${pop}</small></div>
