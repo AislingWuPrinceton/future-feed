@@ -5,3 +5,4 @@ data/futurefeed.db
 .DS_Store
 data/futurefeed.db-wal
 data/futurefeed.db-shm
+static/art/raw/

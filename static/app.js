@@ -45,6 +45,8 @@ async function refresh() {
   $("menu-avatar").hidden = $("menu-play").hidden = PLAIN || !onboarded;
   $("menu-add").hidden = !onboarded;
   if (!onboarded) return renderOnboard();
+  if (!refresh.art) refresh.art = loadArt();
+  await refresh.art;
   if (!PLAIN) {
     const [kept, stopped] = await Promise.all([api("/api/feed?timeline=kept"), api("/api/feed?timeline=stopped")]);
     POSTS = { kept, stopped };
@@ -918,6 +920,33 @@ function buildingSVG(h, idx, built, checkins, fresh, alt) {
   return { svg: `<svg viewBox="0 0 ${SVGW} ${SVGH}" width="${SVGW * SC}" height="${SVGH * SC}">${out}</svg>`, total, lit, width: SVGW * SC, signAt: (SVGH - roofTop) * SC };
 }
 
+// Felt photos (made from docs/art_prompts.md, cut by scripts/slice_art.py). The manifest maps each
+// file to its pixel size; anything missing falls back to the drawn version above.
+let ART = {};
+const artUrl = (n) => `/static/art/${n}`;
+async function loadArt() {
+  ART = await fetch("/static/art/manifest.json").then((r) => (r.ok ? r.json() : {})).catch(() => ({}));
+}
+function feltBuilding(kind, built, fresh) {
+  const piece = (role) => ART[`${kind}_${role}.webp`];
+  if (!piece("roof") || !piece("floor") || !piece("ground")) return null;
+  const W = Math.round(STYLE[kind].W * 1.2), hOf = (role) => Math.round((piece(role)[1] * W) / piece(role)[0]);
+  const img = (role, cls, f) => `<img class="i-${role} ${cls}" style="--f:${f}" src="${artUrl(`${kind}_${role}.webp`)}" width="${W}" height="${hOf(role)}" alt="" draggable="false">`;
+  const uppers = Array.from({ length: built - 1 }, (_, i) => img("floor", `floor ${i + 1 >= fresh.floors ? "new" : ""}`, i + 1)).reverse().join("");
+  const ghost = built < MAXF ? `<span class="i-ghost" style="height:${hOf("floor")}px"></span>` : "";
+  const height = hOf("roof") + (built - 1) * hOf("floor") + hOf("ground");
+  return {
+    svg: `<span class="ibld" style="width:${W}px">${ghost}${img("roof", `roof ${built > fresh.floors ? "new" : ""}`, built - 1)}${uppers}${img("ground", "floor", 0)}</span>`,
+    width: W + 24, signAt: height + 4,
+  };
+}
+// "2 of 4 rooms on floor 3": the check-ins still needed for the next floor, as rooms
+function roomsText(h) {
+  const L = S.level_checkins, f = Math.min(h.level, L.length - 1), from = L[f - 1] || 0;
+  if (h.level >= L.length) return "Every room is full";
+  return `${Math.max(0, h.checkins - from)} of ${L[f] - from} rooms on floor ${f + 1}`;
+}
+
 // scenery in the same pen and washes
 let SUN = [], SKY = "", CLOUD = "", HILLS = "", TREE = [], LAMP = "", MAILBOX = { up: "", down: "" }, DEFS = "", BALLOON = "", STAR = "", BUSH = [];
 function townArt() {
@@ -1032,6 +1061,7 @@ function renderTown(opts = {}) {
     const was = seen[h.id] || { floors: built, lit: 999 };
     const fresh = opts.noAnim ? { floors: built, lit: 999 } : was;
     const art = buildingSVG(h, idx, built, h.checkins, fresh, usedKinds.has(kind));
+    Object.assign(art, feltBuilding(kind, built, fresh) || {});
     usedKinds.add(kind);
     const { total, lit } = art;
     if (built > fresh.floors) sounds.push("stamp"); else if (lit > fresh.lit) sounds.push("pop");
@@ -1042,7 +1072,7 @@ function renderTown(opts = {}) {
     const toNext = h.next_level_at ? `${h.next_level_at - h.checkins} check-in${h.next_level_at - h.checkins === 1 ? "" : "s"} to the next floor` : "";
     return `
       <div class="lot ${opts.working === h.id ? "working" : ""} ${h.checked_today ? "done-today" : ""}" data-h="${h.id}" style="--b:${idx}; width:${art.width}px">
-        <div class="lot-tip"><b>${KIND_NAME[kind]} · floor ${built} of 6</b>${esc(h.allowed_milestone ? `Future you ${lower(h.allowed_milestone.milestone)}.` : "")}${next}<small>${toNext}${toNext ? " · " : ""}${lit} of ${total} windows lit</small>
+        <div class="lot-tip"><b>${KIND_NAME[kind]} · floor ${built} of 6</b>${esc(h.allowed_milestone ? `Future you ${lower(h.allowed_milestone.milestone)}.` : "")}${next}<small>${roomsText(h)}${toNext ? ` · ${toNext}` : ""}</small>
           <span class="tip-acts"><button data-in="${h.id}">${ico("flag", "inline")} Go inside</button>${mine.length ? `<button data-mail="${h.id}">Postcards (${mine.length})</button>` : ""}</span></div>
         ${h.quest ? `<div class="lot-storm">${ico("storm")}<span class="rain"></span><b>Comeback quest ${h.quest.progress}/3</b></div>` : ""}
         <div class="lot-sign" style="bottom:${art.signAt + 4}px">${hIcon(h, "inline")} ${esc(h.short)}</div>
@@ -1058,20 +1088,20 @@ function renderTown(opts = {}) {
   }).join("");
   localStorage.setItem("ff-town", JSON.stringify(seen));
 
-  const pop = 1 + (S.profile.cast?.length || 0);
+  const pop = 1 + (S.profile.cast?.length || 0), BGP = !!ART["background.jpg"];
   $("town").className = `town ${night ? "night" : ""}`;
   $("town").innerHTML = `
     ${DEFS}
-    <div class="sky">${SKY}${night ? `<span class="stars"></span>` : ""}</div>
+    <div class="sky">${BGP ? `<img class="bg-photo" src="${artUrl("background.jpg")}" alt="">` : SKY}${night ? `<span class="stars"></span>` : ""}</div>
     <div class="mobile">
       ${[[2, 30, 190], [30, 92, 140], [50, 14, 210]].map(([x, len, w], i) => `<span class="hang cloud-h" style="--x:${x}%; --len:${len}px; --t:${5 + i * 1.3}s; width:${w}px"><i class="thread"></i><button class="cloud" aria-label="A felt cloud">${CLOUD}<span class="drops"></span></button></span>`).join("")}
       ${night ? [[18, 40], [40, 22], [66, 54], [93, 30]].map(([x, len], i) => `<span class="hang star-h" style="--x:${x}%; --len:${len}px; --t:${4 + i}s"><i class="thread"></i><button class="star" aria-label="A felt star">${STAR}</button></span>`).join("")
         : `<span class="hang balloon-h" style="--x:76%; --len:46px; --t:7s"><i class="thread"></i><button class="balloon" aria-label="A felt balloon">${BALLOON}</button></span>`}
       <span class="hang sun-h" style="--x:89%; --len:26px; --t:6.5s"><i class="thread"></i><button class="sun" id="sun" aria-label="Day or night" title="${night ? "Back to day" : "See your town at night"}">${SUN[night ? 1 : 0]}</button></span>
     </div>
-    <div class="hills">${HILLS}</div>
+    ${BGP ? "" : `<div class="hills">${HILLS}</div>`}
     <div class="street-scroll"><div class="street">
-      <svg class="ground" width="100%" height="64" aria-hidden="true"><g filter="url(#feltbig)"><rect class="g-road" x="-20" y="0" width="120%" height="80"/>
+      <svg class="ground" ${BGP ? "hidden" : ""} width="100%" height="64" aria-hidden="true"><g filter="url(#feltbig)"><rect class="g-road" x="-20" y="0" width="120%" height="80"/>
         <rect class="g-walk" x="-20" y="5" width="120%" height="15" rx="7"/></g>
         <line x1="0" x2="100%" y1="9" y2="9" stroke="#c9bba0" stroke-width="1.2" stroke-dasharray="4 5"/><line x1="0" x2="100%" y1="16" y2="16" stroke="#c9bba0" stroke-width="1.2" stroke-dasharray="4 5"/></svg>
       <div class="welcome"><b>${esc(name)}ville</b><small>est. ${S.today.slice(0, 4)} · pop. ${pop}</small></div>
