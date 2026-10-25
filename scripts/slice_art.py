@@ -1,8 +1,8 @@
 """Turn the generated felt pictures in static/art/raw/ into the pieces the town uses (static/art/).
 
-- background.png, room.png  -> resized backdrops
+- background*.png, scene_*.png, room_*.png -> resized backdrops (same name, .jpg)
 - <kind>.png (hall, library, ...) -> <kind>_roof / <kind>_floor / <kind>_ground cut-outs
-- scenery.png -> scenery_<n> cut-outs, numbered left to right, top to bottom
+- scenery*.png -> <name>_<n> cut-outs, numbered left to right, top to bottom
 
 Works with transparent PNGs or with a plain white background (removed by flood fill from the edges).
 Run: .venv/bin/python scripts/slice_art.py
@@ -16,6 +16,7 @@ from PIL import Image, ImageDraw, ImageFilter
 ROOT = Path(__file__).resolve().parent.parent / "static" / "art"
 RAW = ROOT / "raw"
 KINDS = ["hall", "library", "cafe", "home", "gym", "garden", "studio"]
+BACKDROPS = {"background": 2000, "scene": 1600, "room": 600}  # file-name prefix -> max width
 KEY = (255, 0, 255)
 
 
@@ -82,14 +83,15 @@ def save(img, name, width):
 
 def main():
     ROOT.mkdir(exist_ok=True)
-    for name, width in (("background", 2000), ("room", 400)):
-        f = RAW / f"{name}.png"
-        if f.exists():
-            img = Image.open(f).convert("RGB")
-            if img.width > width:
-                img = img.resize((width, round(img.height * width / img.width)), Image.LANCZOS)
-            img.save(ROOT / f"{name}.jpg", quality=86, optimize=True)
-            print(f"{name}.jpg {img.width}x{img.height}")
+    for f in sorted(RAW.glob("*.png")):  # background*, scene_*, room_* -> plain resized jpgs
+        width = BACKDROPS.get(f.stem.split("_")[0])
+        if not width:
+            continue
+        img = Image.open(f).convert("RGB")
+        if img.width > width:
+            img = img.resize((width, round(img.height * width / img.width)), Image.LANCZOS)
+        img.save(ROOT / f"{f.stem}.jpg", quality=86, optimize=True)
+        print(f"{f.stem}.jpg {img.width}x{img.height}")
     for kind in KINDS:
         f = RAW / f"{kind}.png"
         if not f.exists():
@@ -102,12 +104,11 @@ def main():
             continue
         for p, role in zip((found[i] for i in keep), ("roof", "floor", "ground")):
             save(p, f"{kind}_{role}", 420)
-    f = RAW / "scenery.png"
-    if f.exists():
+    for f in sorted(RAW.glob("scenery*.png")):  # scenery.png -> scenery_0.., scenery2.png -> scenery2_0..
         parts = pieces(cut_out(Image.open(f)))
-        print(f"scenery: {len(parts)} pieces")
+        print(f"{f.stem}: {len(parts)} pieces")
         for i, p in enumerate(parts):
-            save(p, f"scenery_{i}", 360)
+            save(p, f"{f.stem}_{i}", 360)
     # name -> [width, height], so the page can lay buildings out before the pictures load
     sizes = {f.name: list(Image.open(f).size) for f in sorted(ROOT.iterdir()) if f.suffix in (".webp", ".jpg")}
     (ROOT / "manifest.json").write_text(json.dumps(sizes, indent=1))
