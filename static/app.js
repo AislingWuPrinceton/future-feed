@@ -53,6 +53,7 @@ async function refresh() {
   renderMe();
   renderToday();
   if (wantIntro) playIntro();
+  renderTown();
   renderRoad();
   if (!PLAIN && !refresh.counted) { countUp($("me")); refresh.counted = true; }
   if (STUDY && $("sb-date")) $("sb-date").textContent = `Day ${S.day_offset + 1}`;
@@ -359,6 +360,7 @@ async function checkin(id) {
     return refresh();
   }
   renderToday();
+  renderTown({ working: id, noAnim: true });
   renderRoad({ transit: true });
   const stop = animateTransit();
   try {
@@ -370,6 +372,7 @@ async function checkin(id) {
     busy = false;
     await refresh();
     const post = POSTS.kept.find((p) => p.id === r.post_id);
+    await townMoment(id, r.kind === "level_up");
     if (r.kind === "level_up") {
       const h = S.habits.find((x) => x.id === id);
       $("lu-level").textContent = Math.max(1, h.allowed_chapter + 1);
@@ -431,6 +434,7 @@ const lastPos = JSON.parse(localStorage.getItem("ff-piece") || "{}");
 function renderRoad(opts = {}) {
   const wrap = $("roadwrap");
   if (PLAIN || !S.habits.length) { wrap.hidden = true; return; }
+  if (VIEW !== "road") { wrap.hidden = false; return; }  // laid out when its tab opens
   wrap.hidden = false;
   if (!S.habits.some((h) => h.id === roadHabit)) roadHabit = S.habits[0].id;
   const h = S.habits.find((x) => x.id === roadHabit);
@@ -517,7 +521,7 @@ function postcards(list, tl, max = tl === "kept" ? 2 : 1) {
 
 function photoHTML(p) {
   const fb = `<span class="fb">${iconOfPost(p)}</span>`;
-  return p.photo ? `${fb}<img src="${p.photo.url}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">` : fb;
+  return p.photo ? `${fb}<img src="${p.photo.url}" alt="" decoding="async" referrerpolicy="no-referrer" data-thumb="${p.photo.thumb || ""}" onerror="if(this.dataset.thumb&&this.src!==this.dataset.thumb){this.src=this.dataset.thumb}else{this.remove()}">` : fb;
 }
 
 // Draw the hand-drawn road through the stop dots, then walk the piece to where you are.
@@ -771,6 +775,7 @@ document.addEventListener("keydown", (e) => {
 
 // ---------- menu ----------
 
+document.querySelectorAll("#views [data-view]").forEach((b) => (b.onclick = () => setView(b.dataset.view)));
 document.querySelectorAll(".mi[data-ico]").forEach((m) => (m.innerHTML = ico(m.dataset.ico)));
 const closeMenu = () => { $("menu").hidden = true; $("menu-btn").setAttribute("aria-expanded", "false"); };
 $("menu-btn").onclick = (e) => {
@@ -843,6 +848,229 @@ $("demo-reset").onclick = async () => {
 };
 
 document.querySelectorAll(".overlay").forEach((o) => o.addEventListener("click", (e) => { if (e.target === o) o.hidden = true; }));
+
+// ---------- your 2036 town ----------
+// Every daily thing is a building on your street. Each check-in lights a window; each new
+// stop on that habit's road adds a floor. Unbuilt floors are a blueprint you see on hover.
+
+let VIEW = localStorage.getItem("ff-view") || "town";
+const FH = 36, BW = 150, ROOF = 64, MAXF = 6, SVGW = BW + 20, SVGH = MAXF * FH + ROOF, LIFT = 56;
+const KIND = { guitar: "hall", music: "hall", piano: "hall", dance: "hall", reading: "library", pencil: "library",
+  running: "gym", bike: "gym", dumbbell: "gym", wave: "gym", spanish: "cafe", chat: "cafe", pan: "cafe",
+  saving: "home", heart: "home", lotus: "garden", sprout: "garden", drop: "garden", moon: "garden", sun: "garden" };
+const KIND_NAME = { hall: "Music hall", library: "Library", gym: "Gym", cafe: "Café", home: "Home", garden: "Greenhouse", studio: "Studio" };
+const WALLS = ["#f7b6c2", "#ffd86b", "#9ed39b", "#9cc6f0", "#c9b5f0", "#f6a15b"];
+const ROOFS = ["#ef7f97", "#f6a15b", "#5fae7a", "#5b8fd1", "#9a7fd6", "#c98d5e"];
+const seen = JSON.parse(localStorage.getItem("ff-town") || "{}");
+let night = new Date().getHours() < 7 || new Date().getHours() >= 19;
+const svgEl = (w, h) => {
+  const s = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  s.setAttribute("viewBox", `0 0 ${w} ${h}`);
+  s.setAttribute("width", w); s.setAttribute("height", h);
+  return s;
+};
+const R = { stroke: "#2b2420", strokeWidth: 2, roughness: 1.2, bowing: 1, fillStyle: "solid" };
+const group = (cls, parts, style = "") => {
+  const g = document.createElementNS("http://www.w3.org/2000/svg", "g");
+  g.setAttribute("class", cls);
+  if (style) g.setAttribute("style", style);
+  parts.forEach((p) => g.appendChild(p));
+  return g;
+};
+
+// one building as an SVG string; floors and windows carry classes so CSS can animate them
+function buildingSVG(h, idx, built, lit, fresh) {
+  const svg = svgEl(SVGW, SVGH), rc = rough.svg(svg);
+  const kind = KIND[h.icon] || "studio", wall = WALLS[idx % 6], roofC = ROOFS[idx % 6];
+  const x0 = 10, base = SVGH - 2, s = h.id * 97;
+  let w = 0;  // window counter, bottom-left to top-right
+  for (let f = 0; f < MAXF; f++) {
+    const top = base - (f + 1) * FH - (f >= built ? LIFT : 0);  // blueprint floors float above the roof
+    if (f >= built) {  // blueprint
+      const yr = (h.chapter_dates[f] || "").slice(0, 4);
+      const g = group("bp", [rc.rectangle(x0 + 4, top + 2, BW - 8, FH - 2, { stroke: "#5b8fd1", strokeWidth: 1.3, roughness: 0.8, strokeLineDash: [5, 5], seed: s + f })]);
+      const t = document.createElementNS("http://www.w3.org/2000/svg", "text");
+      Object.entries({ x: x0 + BW / 2, y: top + FH / 2 + 6, "text-anchor": "middle", class: "bp-t" }).forEach(([k, v]) => t.setAttribute(k, v));
+      t.textContent = `floor ${f + 1} · ~${yr}`;
+      g.appendChild(t);
+      svg.appendChild(g);
+      continue;
+    }
+    const parts = [rc.rectangle(x0, top, BW, FH, { ...R, fill: wall, seed: s + f })];
+    const slots = f === 0 ? [12, 112] : [12, 62, 112];
+    for (const sx of slots) {
+      const on = w < lit, isNew = on && w >= fresh.lit;
+      const win = rc.rectangle(x0 + sx, top + 9, 26, 19, { ...R, strokeWidth: 1.6, fill: on ? "#ffd86b" : night ? "#56658a" : "#e6f2fd", seed: s + 40 + w });
+      win.setAttribute("class", `win ${on ? "lit" : ""} ${isNew ? "new-lit" : ""}`);
+      win.setAttribute("style", `--w:${w}`);
+      parts.push(win);
+      w++;
+    }
+    if (f === 0) {
+      parts.push(rc.rectangle(x0 + 61, top + 6, 28, FH - 6, { ...R, fill: "#8a5a3c", seed: s + 30 }));
+      parts.push(rc.circle(x0 + 84, top + 22, 3, { ...R, fill: "#ffd86b", strokeWidth: 1, seed: s + 31 }));
+      if (kind === "cafe") parts.push(rc.path(`M${x0 + 4} ${top + 2} L${x0 + BW - 4} ${top + 2} L${x0 + BW - 10} ${top - 8} L${x0 + 10} ${top - 8} Z`,
+        { ...R, fill: "#ef7f97", fillStyle: "hachure", hachureGap: 6, seed: s + 32 }));
+    }
+    svg.appendChild(group(`floor ${f >= fresh.floors ? "new" : ""}`, parts, `--f:${f}`));
+  }
+  // roof sits on the highest built floor
+  const T = base - built * FH, cx = x0 + BW / 2, roof = [];
+  if (kind === "hall" || kind === "home" || kind === "cafe") {
+    roof.push(rc.path(`M${x0 - 6} ${T} L${cx} ${T - 46} L${x0 + BW + 6} ${T} Z`, { ...R, fill: roofC, seed: s + 50 }));
+    if (kind === "home") roof.push(rc.rectangle(x0 + BW - 40, T - 44, 14, 26, { ...R, fill: "#c98d5e", seed: s + 51 }));
+    else roof.push(rc.circle(cx, T - 18, 16, { ...R, fill: "#fffaf0", seed: s + 52 }));
+  } else if (kind === "library") {
+    roof.push(rc.path(`M${x0 + 8} ${T} Q${cx} ${T - 72} ${x0 + BW - 8} ${T} Z`, { ...R, fill: roofC, seed: s + 53 }));
+    roof.push(rc.line(cx, T - 36, cx, T - 58, { ...R, seed: s + 54 }));
+    roof.push(rc.path(`M${cx} ${T - 58} L${cx + 16} ${T - 53} L${cx} ${T - 48} Z`, { ...R, fill: "#ffd86b", seed: s + 55 }));
+  } else if (kind === "garden") {
+    roof.push(rc.path(`M${x0 - 4} ${T} L${cx} ${T - 40} L${x0 + BW + 4} ${T} Z`, { ...R, fill: "#cfe7fb", fillStyle: "cross-hatch", hachureGap: 7, seed: s + 56 }));
+    roof.push(rc.circle(cx, T - 50, 14, { ...R, fill: "#9ed39b", seed: s + 57 }));
+  } else {  // gym, studio: flat roof with a flag or an antenna
+    roof.push(rc.rectangle(x0 - 5, T - 9, BW + 10, 9, { ...R, fill: roofC, seed: s + 58 }));
+    roof.push(rc.line(x0 + 24, T - 9, x0 + 24, T - 50, { ...R, seed: s + 59 }));
+    roof.push(kind === "gym"
+      ? rc.path(`M${x0 + 24} ${T - 50} L${x0 + 50} ${T - 43} L${x0 + 24} ${T - 36} Z`, { ...R, fill: "#ef7f97", seed: s + 60 })
+      : rc.circle(x0 + 24, T - 52, 9, { ...R, fill: "#ffd86b", seed: s + 61 }));
+  }
+  svg.appendChild(group(`roof ${built > fresh.floors ? "new" : ""}`, roof, `--f:${built - 1}`));
+  return svg.outerHTML;
+}
+
+let CLOUD = "", HILLS = "", MAILBOX = { up: "", down: "" };
+function townArt() {
+  if (CLOUD) return;
+  let svg = svgEl(120, 50), rc = rough.svg(svg);
+  svg.appendChild(rc.path("M14 40 Q4 40 6 31 Q8 22 20 24 Q24 10 40 13 Q50 2 66 10 Q82 4 88 18 Q104 16 106 28 Q112 40 98 40 Z",
+    { ...R, strokeWidth: 1.6, fill: "#ffffff", seed: 7 }));
+  CLOUD = svg.outerHTML;
+  svg = svgEl(1400, 240); rc = rough.svg(svg);
+  svg.setAttribute("preserveAspectRatio", "xMidYMax slice");
+  const far = group("far", [rc.path("M0 150 Q160 70 330 130 Q520 40 720 120 Q900 60 1080 125 Q1250 80 1400 120 L1400 240 L0 240 Z",
+    { ...R, strokeWidth: 1.5, fill: "#cfe8c4", seed: 11 })]);
+  const near = group("near", [rc.path("M0 190 Q220 130 430 180 Q640 120 860 185 Q1080 140 1400 175 L1400 240 L0 240 Z",
+    { ...R, strokeWidth: 1.5, fill: "#a9d89a", seed: 12 })]);
+  svg.append(far, near);
+  HILLS = svg.outerHTML;
+  for (const up of [true, false]) {
+    svg = svgEl(40, 52); rc = rough.svg(svg);
+    svg.append(rc.line(14, 30, 14, 52, { ...R, seed: 21 }),
+      rc.path("M4 16 Q4 6 14 6 L32 6 L32 30 L4 30 Z", { ...R, fill: "#9cc6f0", seed: 22 }),
+      group("mb-flag", [up ? rc.path("M32 10 L32 -4 L40 -4 L40 3 L34 3", { ...R, fill: "#ef7f97", seed: 23 })
+        : rc.path("M32 18 L44 18 L44 24 L32 24", { ...R, fill: "#ef7f97", seed: 24 })]));
+    svg.setAttribute("viewBox", "0 -8 46 60");
+    MAILBOX[up ? "up" : "down"] = svg.outerHTML;
+  }
+}
+
+const SUPPORT = ["Go {n}! I can hear you from here.", "Floor {f}! I'm so proud of you.", "Save me a seat at the top, {n}.",
+  "Look at this place. You built that.", "See you tomorrow, same time?"];
+
+function renderTown(opts = {}) {
+  const wrap = $("townwrap");
+  const show = !PLAIN && S.habits.length;
+  $("views").hidden = !show;
+  if (!show) { wrap.hidden = true; return; }
+  $("views").querySelectorAll("button").forEach((b) => b.classList.toggle("on", b.dataset.view === VIEW));
+  wrap.hidden = VIEW !== "town";
+  $("roadwrap").classList.toggle("off", VIEW !== "road");
+  if (VIEW !== "town") return;
+  townArt();
+  const name = S.profile.name, friend = S.profile.cast?.[0]?.name || "Mom";
+  const sounds = [];
+  const lots = S.habits.map((h, idx) => {
+    const built = Math.min(MAXF, Math.max(1, h.allowed_chapter + 1));
+    const total = built * 3 - 1, lit = Math.min(total, h.checkins);
+    const was = seen[h.id] || { floors: built, lit };
+    const fresh = opts.noAnim ? { floors: built, lit } : was;
+    if (built > fresh.floors) sounds.push("stamp"); else if (lit > fresh.lit) sounds.push("pop");
+    seen[h.id] = { floors: built, lit };
+    const kind = KIND[h.icon] || "studio";
+    const mine = POSTS.kept.filter((p) => p.habit_id === h.id);
+    const next = h.chapters[built] ? `<i>Next floor (~${year(h.chapter_dates[built])}): ${esc(lower(h.chapters[built]))}</i>` : `<i>Finished. This one is ten years tall.</i>`;
+    const toNext = h.next_level_at ? `${h.next_level_at - h.checkins} check-in${h.next_level_at - h.checkins === 1 ? "" : "s"} to the next floor` : "";
+    return `
+      <div class="lot ${opts.working === h.id ? "working" : ""} ${h.checked_today ? "done-today" : ""}" data-h="${h.id}" style="--b:${idx}">
+        <div class="lot-tip"><b>${KIND_NAME[kind]} · floor ${built} of 6</b>${esc(h.allowed_milestone ? `Future you ${lower(h.allowed_milestone.milestone)}.` : "")}${next}<small>${toNext}${toNext ? " · " : ""}${lit} of ${total} windows lit</small></div>
+        ${h.quest ? `<div class="lot-storm">${ico("storm")}<span class="rain"></span><b>Comeback quest ${h.quest.progress}/3</b></div>` : ""}
+        <div class="lot-sign" style="bottom:${built * FH + ROOF - 6}px">${hIcon(h, "inline")} ${esc(h.short)}</div>
+        <div class="lot-work">Building floor ${built + 1}…<br><small>your postcard is on its way</small></div>
+        <button class="lot-b" aria-label="${esc(h.short)}: see its postcard road">${buildingSVG(h, idx, built, lit, fresh)}</button>
+        <span class="lot-say">${esc(friend)}: “${esc(SUPPORT[(h.checkins + idx) % SUPPORT.length].replace("{n}", name).replace("{f}", built))}”</span>
+        <button class="mailbox ${mine.length ? "has" : ""}" data-mail="${h.id}" aria-label="Postcards">${mine.length ? MAILBOX.up : MAILBOX.down}${mine.length ? `<b>${mine.length}</b>` : ""}</button>
+        <p class="lot-name">${KIND_NAME[kind]}<small>${esc(h.short)} · ${h.checked_today ? "done today ✓" : "not yet today"}</small></p>
+      </div>`;
+  }).join("");
+  localStorage.setItem("ff-town", JSON.stringify(seen));
+
+  const pop = 1 + (S.profile.cast?.length || 0);
+  $("town").className = `town ${night ? "night" : ""}`;
+  $("town").innerHTML = `
+    <div class="sky">
+      <span class="cloud c1">${CLOUD}</span><span class="cloud c2">${CLOUD}</span><span class="cloud c3">${CLOUD}</span>
+      ${night ? `<span class="stars"></span>` : ""}
+    </div>
+    <div class="hills">${HILLS}</div>
+    <div class="street-scroll"><div class="street">
+      <div class="welcome"><b>${esc(name)}ville</b><small>est. ${S.today.slice(0, 4)} · pop. ${pop}</small></div>
+      ${lots}
+      <div class="lot empty" id="lot-add"><div class="lot-plot"><span>${ico("sprout")}</span><b>Empty lot</b><small>Add a daily thing<br>and build here</small></div></div>
+      <span class="walker" id="walker">${avatarHTML(S.profile.avatar?.photo ? 38 : 36, { tier: 0 })}<span class="say">Day ${S.day_offset + 1} in ${esc(name)}ville.</span></span>
+    </div></div>
+    <button class="sun" id="sun" aria-label="Day or night" title="${night ? "Back to day" : "See your town at night"}">${night ? "" : "<i></i>"}</button>`;
+
+  const town = $("town");
+  town.querySelectorAll(".lot[data-h] .lot-b").forEach((b) => (b.onclick = () => {
+    roadHabit = +b.closest(".lot").dataset.h; setView("road");
+  }));
+  town.querySelectorAll("[data-mail]").forEach((b) => (b.onclick = () => {
+    const mine = POSTS.kept.filter((p) => p.habit_id === +b.dataset.mail);
+    if (mine.length) { sfx.paper(); openPostcard(mine[0]); } else b.classList.add("nomail");
+  }));
+  town.querySelectorAll(".lot[data-h]").forEach((l) => (l.onmouseenter = () => {
+    sfx.tick();
+    const r = l.getBoundingClientRect(), t = town.getBoundingClientRect();  // keep the tip card inside the town
+    l.classList.toggle("tip-r", r.right + 230 > t.right);
+  }));
+  $("lot-add").onclick = openAdd;
+  $("sun").onclick = () => { night = !night; sfx.chime(); renderTown({ noAnim: true }); };
+  if (!town.dataset.bound) {
+    town.dataset.bound = "1";
+    town.addEventListener("pointermove", (e) => {  // parallax: the hills and clouds drift against the cursor
+      const r = town.getBoundingClientRect();
+      town.style.setProperty("--px", ((e.clientX - r.left) / r.width - 0.5).toFixed(3));
+      town.style.setProperty("--py", ((e.clientY - r.top) / r.height - 0.5).toFixed(3));
+    });
+  }
+  if (wantIntro) revealTown();
+  else if (sounds.length) setTimeout(() => { sfx[sounds.includes("stamp") ? "stamp" : "pop"](); buzz(30); }, sounds.includes("stamp") ? 700 : 300);
+}
+
+function revealTown() {
+  wantIntro = false;
+  const t = $("town");
+  t.classList.add("reveal");
+  setTimeout(() => sfx.paper(), 900);
+  setTimeout(() => t.classList.remove("reveal"), 4200);
+}
+
+function setView(v) {
+  VIEW = v;
+  localStorage.setItem("ff-view", v);
+  sfx.tick();
+  renderTown({ noAnim: true });
+  if (v === "road") renderRoad();
+}
+
+// after a check-in, show the building change before the postcard opens
+async function townMoment(id, levelUp) {
+  if (VIEW !== "town") return;
+  const lot = $("town").querySelector(`.lot[data-h="${id}"]`);
+  lot?.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
+  lot?.classList.add("celebrate");
+  await new Promise((ok) => setTimeout(ok, levelUp ? 1700 : 1100));
+}
 
 // ---------- motion & delight ----------
 

@@ -96,11 +96,13 @@ def compose_post(habit, kind, st, life_event="", combo_with=None):
     with db.connect() as c:
         used = [json.loads(r["photo"])["url"] for r in c.execute("SELECT photo FROM posts WHERE photo IS NOT NULL")
                 if r["photo"] and r["photo"] != "null"]
-    custom_pool = game.template_for(habit).get("photos") if habit.get("custom") else None
+    custom_pool = refill_photos(habit) if habit.get("custom") else None
     # prefer photos whose title/tags actually mention the habit (avoids odd off-topic stock shots)
     anchor = game.template_for(habit)["short"].lower() if custom_pool else \
         {"guitar": "guitar", "running": "run", "reading": "book", "spanish": None, "saving": None}.get(habit["key"])
     photo = agents.pick_photo(run_id, s["photo_query"], habit["key"], avoid=used, pool=custom_pool, anchor=anchor)
+    if not photo:  # empty or fully-blocked pool: an everyday scene still beats a blank card
+        photo = agents.pick_photo(run_id, s["photo_query"], "life", avoid=used)
     # The you who stopped lives a different day: an everyday scene without the habit.
     stopped_photo = agents.pick_photo(run_id, s["stopped_photo_query"], "life", avoid=used)
     rng = random.Random(run_id)
@@ -350,8 +352,23 @@ def make_custom(body):
                 "icon": lad["icon"] if lad["icon"] in game.ICONS else "custom",
                 "emoji": lad["emoji"][:4] or "✨", "unit": "minutes", "measure": "hours",
                 "chapters": chapters, "sources": ["Milestones designed by the Ladder agent (estimates)."],
+                "photo_queries": lad["photo_queries"][:6],
                 "photos": [p for p in agents.fetch_photos(lad["photo_queries"]) if agents.keyword_ok(p)]}
     return template
+
+
+def refill_photos(habit):
+    """A custom habit whose photo search came back empty (Openverse timeout) tries again, once per post."""
+    t = game.template_for(habit)
+    if len(t.get("photos") or []) >= 3:
+        return t["photos"]
+    queries = t.get("photo_queries") or [t["label"], t["short"] + " hobby", t["short"] + " practice"]
+    found = [p for p in agents.fetch_photos(queries) if agents.keyword_ok(p)]
+    if found:
+        t["photos"] = found
+        with db.connect() as c:
+            c.execute("UPDATE habits SET custom = ? WHERE id = ?", (json.dumps(t, ensure_ascii=False), habit["id"]))
+    return t.get("photos") or []
 
 
 @app.post("/api/habits")
