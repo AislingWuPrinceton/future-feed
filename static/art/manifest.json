@@ -1,0 +1,282 @@
+{
+ "background.jpg": [
+  1536,
+  1024
+ ],
+ "background_autumn.jpg": [
+  1536,
+  1024
+ ],
+ "background_night.jpg": [
+  1536,
+  1024
+ ],
+ "background_spring.jpg": [
+  1536,
+  1024
+ ],
+ "background_sunset.jpg": [
+  1536,
+  1024
+ ],
+ "background_winter.jpg": [
+  1536,
+  1024
+ ],
+ "cafe_floor.webp": [
+  420,
+  182
+ ],
+ "cafe_ground.webp": [
+  420,
+  207
+ ],
+ "cafe_roof.webp": [
+  420,
+  204
+ ],
+ "garden_floor.webp": [
+  420,
+  186
+ ],
+ "garden_ground.webp": [
+  420,
+  197
+ ],
+ "garden_roof.webp": [
+  420,
+  173
+ ],
+ "gym_floor.webp": [
+  420,
+  148
+ ],
+ "gym_ground.webp": [
+  420,
+  149
+ ],
+ "gym_roof.webp": [
+  420,
+  81
+ ],
+ "hall_floor.webp": [
+  420,
+  151
+ ],
+ "hall_ground.webp": [
+  420,
+  164
+ ],
+ "hall_roof.webp": [
+  420,
+  168
+ ],
+ "home_floor.webp": [
+  420,
+  184
+ ],
+ "home_ground.webp": [
+  420,
+  213
+ ],
+ "home_roof.webp": [
+  420,
+  188
+ ],
+ "library_floor.webp": [
+  420,
+  207
+ ],
+ "library_ground.webp": [
+  420,
+  219
+ ],
+ "library_roof.webp": [
+  420,
+  280
+ ],
+ "prop_balloon.webp": [
+  223,
+  326
+ ],
+ "prop_bench.webp": [
+  333,
+  230
+ ],
+ "prop_bike.webp": [
+  332,
+  265
+ ],
+ "prop_bush.webp": [
+  234,
+  203
+ ],
+ "prop_cat.webp": [
+  328,
+  199
+ ],
+ "prop_cloud_1.webp": [
+  301,
+  194
+ ],
+ "prop_cloud_2.webp": [
+  283,
+  188
+ ],
+ "prop_fence.webp": [
+  329,
+  234
+ ],
+ "prop_lamp.webp": [
+  112,
+  344
+ ],
+ "prop_mailbox.webp": [
+  148,
+  309
+ ],
+ "prop_moon.webp": [
+  237,
+  251
+ ],
+ "prop_sheep.webp": [
+  271,
+  249
+ ],
+ "prop_sun.webp": [
+  244,
+  239
+ ],
+ "prop_tree_green.webp": [
+  257,
+  336
+ ],
+ "prop_tree_orange.webp": [
+  252,
+  332
+ ],
+ "prop_tree_yellow.webp": [
+  250,
+  339
+ ],
+ "prop_tulips.webp": [
+  236,
+  294
+ ],
+ "room.jpg": [
+  600,
+  600
+ ],
+ "room_apricot.jpg": [
+  600,
+  600
+ ],
+ "room_blue.jpg": [
+  600,
+  600
+ ],
+ "room_blush.jpg": [
+  600,
+  600
+ ],
+ "room_cafe.jpg": [
+  600,
+  600,
+  0.336,
+  0.152,
+  0.688,
+  0.496
+ ],
+ "room_empty.jpg": [
+  600,
+  600,
+  0.324,
+  0.129,
+  0.652,
+  0.418
+ ],
+ "room_garden.jpg": [
+  600,
+  600,
+  0.367,
+  0.172,
+  0.641,
+  0.48
+ ],
+ "room_gym.jpg": [
+  600,
+  600,
+  0.383,
+  0.109,
+  0.699,
+  0.477
+ ],
+ "room_hall.jpg": [
+  600,
+  600,
+  0.336,
+  0.113,
+  0.672,
+  0.406
+ ],
+ "room_home.jpg": [
+  600,
+  600,
+  0.414,
+  0.145,
+  0.707,
+  0.438
+ ],
+ "room_library.jpg": [
+  600,
+  600,
+  0.387,
+  0.145,
+  0.719,
+  0.52
+ ],
+ "room_party.jpg": [
+  600,
+  600,
+  0.375,
+  0.188,
+  0.676,
+  0.484
+ ],
+ "room_sage.jpg": [
+  600,
+  600
+ ],
+ "room_studio.jpg": [
+  600,
+  600,
+  0.359,
+  0.117,
+  0.672,
+  0.477
+ ],
+ "scene_levelup.jpg": [
+  1536,
+  1024
+ ],
+ "scene_story.jpg": [
+  1536,
+  1024
+ ],
+ "scene_welcome.jpg": [
+  1536,
+  1024
+ ],
+ "studio_floor.webp": [
+  420,
+  156
+ ],
+ "studio_ground.webp": [
+  420,
+  157
+ ],
+ "studio_roof.webp": [
+  420,
+  101
+ ]
+}

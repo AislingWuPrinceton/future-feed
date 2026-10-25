@@ -764,6 +764,7 @@ body.study .page { padding-bottom: 120px; }
   .views button { font-size: 21px; padding: 6px 12px 6px 8px; }
   .town { height: 500px; }
   .cloud-h { zoom: .58; } .balloon-h { zoom: .8; }
+  .town.photo .street > .lot, .town.photo .street > .prop { zoom: .68; }
   .lot-tip { width: 180px; }
 }
 @media (prefers-reduced-motion: reduce) {
@@ -829,6 +830,57 @@ body.study .page { padding-bottom: 120px; }
 .ibld .i-ghost { width: 92%; margin-bottom: 6px; border: 2px dashed rgba(91, 143, 209, .7); border-radius: 8px; background: rgba(91, 143, 209, .08); opacity: 0; transition: opacity .3s; }
 .lot:hover .ibld .i-ghost { opacity: 1; }
 .town.night .ibld img { filter: brightness(.55) saturate(.85); }
-.bg-photo { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 50% 100%; transform: scale(1.04) translateX(calc(var(--px) * -10px)); transition: transform .6s, filter .8s; }
+/* the landscape photo is sized so its cream path (at --p of its height) runs under the buildings, 50px up */
+.town.photo { container-type: inline-size; background: #b9cfd9; }
+.bg-photo { --w: max(100cqw + 40px, 980px); position: absolute; left: 50%; width: var(--w); height: auto; max-width: none;
+  bottom: calc(50px - (1 - var(--p)) * var(--w) * .6667); transform: translateX(calc(-50% + var(--px) * -10px)); transition: transform .6s, filter .8s; }
 .town.night .bg-photo { filter: brightness(.42) saturate(.7) hue-rotate(15deg); }
+.town.night.native .bg-photo { filter: none; }
+.town.photo .sky::after { content: ""; position: absolute; inset: auto 0 0; height: 46%; pointer-events: none;
+  background: linear-gradient(transparent, rgba(40, 30, 20, .12)); }
+/* felt photo props */
+.pic { display: block; width: 100%; height: auto; user-select: none; -webkit-user-drag: none; }
+.cloud .pic { filter: drop-shadow(0 6px 6px rgba(60, 50, 40, .18)); }
+.cloud:hover .pic { transform: scale(1.06); transition: transform .3s cubic-bezier(.3, 1.6, .5, 1); }
+.sun .pic { position: relative; filter: drop-shadow(0 4px 6px rgba(120, 80, 20, .3)); }
+.sun .spinball { animation: spin 60s linear infinite; }
+.balloon .pic { filter: drop-shadow(0 6px 5px rgba(60, 40, 20, .2)); }
+.prop .pic { filter: drop-shadow(3px 4px 3px rgba(60, 40, 20, .3)); }
+.prop.tree .pic.crown { transform-origin: 50% 100%; }
+.prop.deco { flex: none; margin: 0 -6px 46px; z-index: 2; }
+.prop.deco:hover { transform: translateY(-4px) rotate(-3deg); transition: transform .2s; }
+.prop.lamp .pic { position: relative; }
+.prop.lamp i.halo { position: absolute; left: 50%; top: 2%; width: 40px; height: 40px; margin-left: -20px; border-radius: 50%; background: #ffd27a; opacity: 0; transition: opacity .6s; }
+.town.night .prop.lamp i.halo { opacity: .5; filter: blur(8px); }
+.mailbox .pic { height: 100%; width: auto; filter: drop-shadow(2px 3px 2px rgba(60, 40, 20, .3)); }
+.town.night .prop .pic, .town.night .mailbox .pic { filter: brightness(.55) saturate(.8); }
+.town.night .prop.lamp .pic { filter: brightness(.9); }
+.town.night .cloud .pic { opacity: .7; }
 .lot.working .ibld .i-ghost { opacity: 1; animation: blueprint 1s ease-in-out infinite alternate; }
+
+/* felt-photo rooms: the room picture fills the tile, the postcard hangs in its picture frame */
+.room .tag { display: flex; flex-direction: column; align-items: center; line-height: 1.15; }
+.rooms.pics { grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 14px; }
+.room.rpic { aspect-ratio: 1; min-height: 0; padding: 7px; justify-content: flex-end; border: 0; border-radius: 10px;
+  background: var(--bg) center / cover; box-shadow: inset 0 0 0 3px rgba(255, 250, 240, .55), 0 4px 8px rgba(60, 40, 20, .28); }
+.room.rpic .rm-photo { position: absolute; flex: none; min-height: 0; border: 0; border-radius: 2px; box-shadow: inset 0 0 6px rgba(60, 40, 20, .35);
+  left: calc(var(--x0) * 100%); top: calc(var(--y0) * 100%); width: calc((var(--x1) - var(--x0)) * 100%); height: calc((var(--y1) - var(--y0)) * 100%); }
+.room.rpic .tag { background: rgba(255, 250, 240, .92); border-radius: 9px; padding: 2px 9px 3px; box-shadow: 0 2px 4px rgba(60, 40, 20, .2); }
+.room.rpic.full:hover { transform: translateY(-3px) scale(1.03); }
+.room.rpic.next { border: 0; outline: 3px dashed var(--pink); outline-offset: 2px; justify-content: flex-end; gap: 6px; }
+.room.rpic.next.working { animation: breathe2 1.2s ease-in-out infinite alternate; }
+@keyframes breathe2 { to { filter: brightness(1.12) saturate(1.15); } }
+.room.rpic.wait { opacity: .8; }
+.room.rpic.empty, .fl:not(.plan) .room.rpic.empty { min-height: 0; aspect-ratio: 1; border: 0; opacity: .5; filter: saturate(.5); justify-content: flex-end; }
+.room.rpic.empty small { background: rgba(255, 250, 240, .85); border-radius: 50%; width: 26px; height: 26px; display: grid; place-items: center; }
+@media (max-width: 760px) {
+  .rooms.pics { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 8px; }
+  .room.rpic .tag small { display: none; }
+}
+
+/* felt scenes: opening, level-up, story intro */
+.ob-scene { display: block; width: calc(100% + 56px); max-width: none; margin: -30px -28px 18px; aspect-ratio: 3 / 2; object-fit: cover;
+  border-radius: var(--wobble-sm) var(--wobble-sm) 0 0; border-bottom: 2px solid var(--ink); }
+.lu-scene { display: block; width: calc(100% + 48px); max-width: none; margin: -24px -24px 0; aspect-ratio: 3 / 2; object-fit: cover; border-bottom: 2px solid var(--ink); }
+.lu-scene:not([hidden]) + .lu-emoji { position: relative; margin-top: -58px; }
+.slide.intro h1, .slide.intro p { text-shadow: 0 3px 16px rgba(30, 20, 10, .55); }
