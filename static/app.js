@@ -1388,7 +1388,8 @@ function renderTown(opts = {}) {
   town.querySelectorAll(".lot[data-h] .lot-b").forEach((b) => (b.onclick = (e) => {
     e.stopPropagation();
     replay(b, "squish"); sfx.pop(); buzz(10);
-    setTimeout(() => goInside(+b.closest(".lot").dataset.h), 260);
+    const h = S.habits.find((x) => x.id === +b.closest(".lot").dataset.h);
+    setTimeout(() => (ART["room_empty.jpg"] ? openWalk(h) : goInside(h.id)), 260);  // walk straight into its felt dollhouse
   }));
   town.querySelectorAll("[data-in]").forEach((b) => (b.onclick = (e) => { e.stopPropagation(); goInside(+b.dataset.in); }));
   town.querySelectorAll(".lot-hold").forEach(bindHold);
@@ -1757,7 +1758,8 @@ function startTour() {
 function maybeTour() {
   if (!GUIDE || localStorage.getItem("ff-tour") || startTour.queued) return;
   startTour.queued = true;
-  setTimeout(startTour, wantIntro || document.querySelector(".intro") ? 3400 : 600);
+  setTimeout(() => (document.querySelector(".walk, .story") ? (startTour.queued = false) : startTour()),  // not on top of the dollhouse; try again next time
+    wantIntro || document.querySelector(".intro") ? 3400 : 600);
 }
 $("menu-guide").onclick = () => { closeMenu(); window.scrollTo({ top: 0 }); showStory(() => setTimeout(startTour, 450)); };
 
