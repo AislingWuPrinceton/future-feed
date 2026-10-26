@@ -673,10 +673,10 @@ function openRoom(p, room, when) {
   if (!ART[`${room}.jpg`]) return openPostcard(p);
   $("pc-body").className = "pc-big room-open";
   $("pc-body").innerHTML = `<div class="room-view">
-      <div class="room-big"><div class="room big ${roomPic(room)}"><span class="rm-photo">${photoHTML(p)}</span>${when ? `<span class="tag"><b>${esc(when)}</b></span>` : ""}</div></div>
-      <div class="room-side">${cardHTML(p)}
-        <div class="pc-actions"><button class="btn sketch" id="pc-turn">Turn it over ↻</button><button class="btn sketch" id="pc-close">Back to the rooms</button></div>
+      <div class="room-big"><div class="room big ${roomPic(room)}"><span class="rm-photo">${photoHTML(p)}</span>${when ? `<span class="tag"><b>${esc(when)}</b></span>` : ""}</div>
         <details class="room-style"><summary>${ico("palette", "inline")} Decorate this room</summary>${stylePicker("room", roomStyles(), p.room && ART[`${p.room}.jpg`] ? p.room : "", "Usual")}</details></div>
+      <div class="room-side">${cardHTML(p)}
+        <div class="pc-actions"><button class="btn sketch" id="pc-turn">Turn it over ↻</button><button class="btn sketch" id="pc-close">Back to the rooms</button></div></div>
     </div>`;
   $("pc").hidden = false;
   sfx.paper();
@@ -1466,11 +1466,15 @@ const dayLabel = (d) => new Date(`${d}T12:00`).toLocaleDateString("en-US", { mon
 
 // a felt room photo behind a room; the postcard hangs in the picture frame the slicer found on its back wall
 const EMPTY_ROOMS = ["room_sage", "room_blue", "room_apricot", "room_blush", "room"];
+// rooms painted without a picture frame get one drawn on a bare stretch of wall (kept clear of the windows)
+const DRAWN_FRAME = { room: [.44, .13, .76, .45], room_apricot: [.2, .13, .52, .45], room_blue: [.42, .13, .74, .45],
+  room_blush: [.24, .13, .58, .45], room_sage: [.42, .13, .74, .45] };
 function roomPic(name) {
   const a = ART[`${name}.jpg`];
   if (!a) return "";
-  const [x0, y0, x1, y1] = a.length >= 6 ? a.slice(2) : [.36, .14, .68, .46];
-  return `rpic" style="--bg:url(${artUrl(`${name}.jpg`)}); --x0:${x0}; --y0:${y0}; --x1:${x1}; --y1:${y1}`;
+  const painted = a.length >= 6;
+  const [x0, y0, x1, y1] = painted ? a.slice(2) : DRAWN_FRAME[name] || [.36, .14, .68, .46];
+  return `rpic ${painted ? "" : "framed"}" style="--bg:url(${artUrl(`${name}.jpg`)}); --x0:${x0}; --y0:${y0}; --x1:${x1}; --y1:${y1}`;
 }
 
 function renderInside(opts = {}) {
