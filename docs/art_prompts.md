@@ -39,8 +39,6 @@ A wide landscape diorama with deep perspective, camera at eye level just above t
 | `background_autumn_night.png` | `Season and light: a calm autumn night, deep navy felt sky with tiny cream felt stars, mustard and rust felt-ball trees in soft moonlight, little pumpkins, distant cottages with warm glowing yellow windows.` | 秋天晚上 |
 | `background_winter_night.png` | `Season and light: a quiet snowy winter night, deep navy felt sky with tiny cream felt stars, everything covered in soft white wool snow glowing blue in the moonlight, distant cottages with warm glowing yellow windows.` | 冬天晚上 |
 
----
-
 > 春、秋、冬的晚上那三张，现在是用 `scripts/make_nights.py` 从白天的图调出来的。想换成真正生成的图，就按上表的名字放进 raw/，再跑 `scripts/slice_art.py`。
 
 ---
