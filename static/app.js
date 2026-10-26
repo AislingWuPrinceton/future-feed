@@ -1528,6 +1528,7 @@ function renderInside(opts = {}) {
         <p class="kicker">Inside your ${lookName(h).toLowerCase()}</p>
         <h2>${hIcon(h, "inline")} ${esc(h.short)}</h2>
         <p class="muted">${days.length} room${days.length === 1 ? "" : "s"} lived in · ${full} of ${MAXF} floors built</p>
+        ${ART["room_empty.jpg"] ? `<button class="btn primary sketch walk-in" id="walk-in">${ico("person", "inline")} Walk inside</button>` : ""}
         ${prog ? `<span class="tip-bar"><i style="width:${(prog.done / prog.n) * 100}%"></i></span><small>Floor ${full + 1}: ${prog.done} of ${prog.n} rooms · ${prog.n - prog.done} more check-in${prog.n - prog.done === 1 ? "" : "s"} to finish it</small>` : `<small>Every floor is built. Ten years tall.</small>`}
       </div>
     </div>
@@ -1540,6 +1541,7 @@ function renderInside(opts = {}) {
   $("in-tabs").querySelectorAll("[data-in]").forEach((b) => (b.onclick = () => { inHabit = +b.dataset.in; sfx.tick(); renderInside({ enter: true }); }));
   $("inside").querySelectorAll("[data-post]").forEach((b) => (b.onclick = () => openRoom(mine.find((p) => p.id === +b.dataset.post), b.dataset.room, b.querySelector("b")?.textContent)));
   $("inside").querySelectorAll(".lot-hold").forEach(bindHold);
+  if ($("walk-in")) $("walk-in").onclick = () => openWalk(h);
   if ($("restyle")) {
     $("restyle").onclick = () => { const pn = $("restyle-panel"); pn.hidden = !pn.hidden; sfx.tick(); };
     bindStylePicker($("restyle-panel"), async (n) => {
@@ -1758,3 +1760,171 @@ function maybeTour() {
   setTimeout(startTour, wantIntro || document.querySelector(".intro") ? 3400 : 600);
 }
 $("menu-guide").onclick = () => { closeMenu(); window.scrollTo({ top: 0 }); showStory(() => setTimeout(startTour, 450)); };
+
+// ---------- walk inside: a felt dollhouse cut open at the front ----------
+// Every floor is a corridor of rooms (your room pictures), a felt staircase on the left joins it to the next,
+// and your little self walks room to room and climbs the stairs while the camera follows.
+
+const DH = { R: 300, STAIR: 190, SLAB: 26, ROOF: 170, GROUND: 70 };
+let walk = null;
+
+function dollFloors(h) {
+  const kind = KIND[h.icon] || "studio", mine = POSTS.kept.filter((p) => p.habit_id === h.id);
+  const L = S.level_checkins, days = h.days || [...new Set(mine.map((p) => p.created_day).filter(Boolean))].sort();
+  const floors = [];
+  L.forEach((need, f) => {
+    const from = L[f - 1] || 0, n = need - from;
+    if (days.length < from) return;  // not started yet: stays in the future
+    floors.push({ f, n, rooms: Array.from({ length: n }, (_, r) => {
+      const k = from + r, day = days[k];
+      if (day) {
+        const p = mine.find((x) => x.created_day === day), key = p?.kind === "level_up";
+        const rn = p?.room && ART[`${p.room}.jpg`] ? p.room : key && ART["room_party.jpg"] ? "room_party" : `room_${kind}`;
+        return { k, day, p, rn, key, state: "full" };
+      }
+      if (k === days.length) return { k, rn: "room_empty", state: h.checked_today ? "wait" : "next" };
+      return { k, rn: EMPTY_ROOMS[k % EMPTY_ROOMS.length], state: "empty" };
+    }) });
+  });
+  return floors;
+}
+
+function openWalk(h) {
+  if (!ART["room_empty.jpg"]) return;
+  townArt();
+  const floors = dollFloors(h), { R, STAIR, SLAB, ROOF, GROUND } = DH;
+  const W = STAIR + Math.max(...floors.map((fl) => fl.n)) * R + 30;
+  const H = GROUND + floors.length * (R + SLAB) + ROOF;
+  const yOf = (i) => H - GROUND - i * (R + SLAB);  // the top of floor i's slab, where feet stand
+  const roofC = STYLE[KIND[h.icon] || "studio"]?.roof || "#c9744a";
+  const topW = STAIR + floors[floors.length - 1].n * R;
+  // felt pieces drawn in SVG under the town's felt filters
+  const slabs = floors.map((fl, i) => {
+    const y = yOf(i), w = STAIR + fl.n * R;
+    const hole = i > 0 ? `<rect x="${STAIR * .45}" y="${y}" width="${w - STAIR * .45}" height="${SLAB}" rx="6"/>` : `<rect x="0" y="${y}" width="${w}" height="${SLAB}" rx="6"/>`;
+    return `<g filter="url(#feltbig)" fill="#b98a5e">${hole}</g>
+      <g filter="url(#felt)" fill="#f4e6cf"><rect x="0" y="${y - R}" width="${STAIR}" height="${R}" rx="4"/></g>
+      <g filter="url(#felt)" fill="#9c6b45"><rect x="${w - 4}" y="${y - R - 6}" width="18" height="${R + SLAB + 6}" rx="6"/></g>`;
+  }).join("");
+  const stairs = floors.slice(0, -1).map((fl, i) => {  // eight felt steps from this floor up to the next
+    const y0 = yOf(i), y1 = yOf(i + 1), steps = 8, sw = (STAIR - 30) / steps, sh = (y0 - y1) / steps;
+    let d = `M ${STAIR - 6} ${y0}`;
+    for (let s = 0; s < steps; s++) d += ` L ${STAIR - 6 - s * sw} ${y0 - (s + 1) * sh} L ${STAIR - 6 - (s + 1) * sw} ${y0 - (s + 1) * sh}`;
+    d += ` L ${STAIR - 6 - steps * sw} ${y0} Z`;
+    return `<g filter="url(#feltbig)" fill="#c99a6b"><path d="${d}"/></g>
+      <g filter="url(#felt)" fill="none" stroke="#8a5a3a" stroke-width="5"><path d="M ${STAIR - 2} ${y0 - 60} L ${STAIR - 12 - steps * sw} ${y1 - 50}"/></g>`;
+  }).join("");
+  const topY = yOf(floors.length) + SLAB;
+  const roof = `<g filter="url(#feltbig)" fill="${roofC}"><path d="M -24 ${topY} L ${topW / 2} ${topY - ROOF + 20} L ${topW + 24} ${topY} Z"/></g>
+    <g filter="url(#felt)" fill="#b05a3a"><rect x="${topW * .72}" y="${topY - ROOF + 30}" width="34" height="70" rx="4"/></g>
+    <g filter="url(#feltbig)" fill="#b98a5e"><rect x="0" y="${topY - SLAB}" width="${topW}" height="${SLAB}" rx="6"/></g>`;
+  const ground = `<g filter="url(#feltbig)" fill="#8fb36d"><rect x="-400" y="${H - GROUND}" width="${W + 800}" height="${GROUND + 40}" rx="20"/></g>
+    <g filter="url(#felt)" fill="#7a4e30"><path d="M ${STAIR * .2} ${H - GROUND} v -150 q ${STAIR * .3} -40 ${STAIR * .6} 0 v 150 Z"/></g>`;
+  const rooms = floors.map((fl, i) => fl.rooms.map((r, j) => {
+    const x = STAIR + j * R, y = yOf(i) - R;
+    const tag = r.state === "full" ? `<span class="tag"><b>${dayLabel(r.day)}</b><small>${r.key ? "floor postcard" : `room ${r.k + 1}`}</small></span>`
+      : r.state === "next" ? `<span class="tag"><b>Room ${r.k + 1}</b><small>next to fill</small></span><button class="lot-hold" data-hold="${h.id}"><i></i><span>Hold to build</span></button>`
+      : r.state === "wait" ? `<span class="tag"><b>Tomorrow</b><small>room ${r.k + 1} opens</small></span>` : `<span class="tag"><b>Room ${r.k + 1}</b><small>still empty</small></span>`;
+    const [cls, look = ""] = roomPic(r.rn).split('" style="');  // roomPic is written to sit inside class="..."
+    return `<div class="dh-room room ${r.state} ${cls}" data-f="${i}" data-s="${j}" style="${look}; left:${x}px; top:${y}px; width:${R}px; height:${R}px">
+      ${r.p ? `<span class="rm-photo">${photoHTML(r.p)}</span>` : ""}${tag}</div>`;
+  }).join("")).join("");
+  const el = document.createElement("div");
+  el.className = "walk";
+  const bg = townBackdrop();
+  el.innerHTML = `${DEFS}
+    <div class="walk-sky" style="background-image:${bg ? `url(${artUrl(`${bg.name}.jpg`)})` : "none"}"></div>
+    <div class="walk-world" style="width:${W}px; height:${H}px">
+      <svg class="dh-back" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" style="overflow:visible">${ground}${roof}</svg>
+      ${rooms}
+      <svg class="dh-front" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" style="overflow:visible">${slabs}${stairs}</svg>
+      <span class="dh-me">${avatarHTML(84, { tier: 0 })}<span class="say"></span></span>
+    </div>
+    <div class="walk-hud">
+      <button class="btn sketch" id="walk-x">← Back</button>
+      <p class="walk-where" id="walk-where"></p>
+      <span class="walk-pad"><button data-go="up" aria-label="Upstairs">▲</button><button data-go="left" aria-label="Left">◀</button><button data-go="open" aria-label="Open">●</button><button data-go="right" aria-label="Right">▶</button><button data-go="down" aria-label="Downstairs">▼</button></span>
+    </div>
+    <p class="walk-help">Click a room to walk there · arrow keys to walk, ▲▼ for the stairs · Enter opens the room you're in</p>`;
+  document.body.appendChild(el);
+  document.body.classList.add("walking-open");
+  const world = el.querySelector(".walk-world"), me = el.querySelector(".dh-me");
+  const pos = { f: 0, s: -1 };  // s = -1 is the stairwell
+  const xy = (f, s) => ({ x: s < 0 ? STAIR * .55 : STAIR + s * R + R * .3, y: yOf(f) - 8 });  // stand a little left of centre, clear of the label
+  const scale = () => Math.min(1, innerWidth / (R * (innerWidth < 600 ? 1.5 : 3.1)), (innerHeight - 90) / (R * 1.9));  // phones: about one room wide
+  const camera = (f, s, ms = 800) => {
+    const { x, y } = xy(f, s), k = scale();
+    world.style.transition = `transform ${ms}ms cubic-bezier(.3, .8, .3, 1)`;
+    world.style.transform = `translate(${innerWidth / 2 - x * k}px, ${innerHeight * .62 - (y - R * .45) * k}px) scale(${k})`;
+  };
+  const place = (f, s, ms) => {
+    const { x, y } = xy(f, s);
+    me.style.transition = `left ${ms}ms linear, top ${ms}ms linear`;
+    me.style.left = `${x}px`; me.style.top = `${y}px`;
+    camera(f, s, ms + 200);
+  };
+  const wait = (ms) => new Promise((ok) => setTimeout(ok, ms));
+  const roomAt = (f, s) => floors[f]?.rooms[s];
+  const where = () => {
+    const r = roomAt(pos.f, pos.s);
+    el.querySelector("#walk-where").innerHTML = `<b>${esc(lookName(h))} · floor ${floors[pos.f].f + 1}</b><small>${pos.s < 0 ? "the stairs" : r.state === "full" ? `${dayLabel(r.day)} · Enter to read it` : r.state === "next" ? "the next room: check in to fill it" : r.state === "wait" ? "opens tomorrow" : "still empty"}</small>`;
+    el.querySelectorAll(".dh-room").forEach((d) => d.classList.toggle("here", +d.dataset.f === pos.f && +d.dataset.s === pos.s));
+  };
+  let busy = false;
+  async function go(f, s) {  // walk along the corridor, take the stairs floor by floor, then walk to the room
+    if (busy || f < 0 || f >= floors.length || s < -1 || s >= floors[f].n) return;
+    busy = true; me.classList.add("moving");
+    const hop = async (tf, ts) => {
+      const dist = Math.abs(xy(tf, ts).x - xy(pos.f, pos.s).x) + Math.abs(xy(tf, ts).y - xy(pos.f, pos.s).y);
+      const ms = Math.max(260, dist * 2.4);
+      me.classList.toggle("left", xy(tf, ts).x < xy(pos.f, pos.s).x);
+      place(tf, ts, ms); sfx.tick();
+      pos.f = tf; pos.s = ts; where();
+      await wait(ms);
+    };
+    if (f !== pos.f) {
+      if (pos.s !== -1) await hop(pos.f, -1);
+      while (pos.f !== f) await hop(pos.f + Math.sign(f - pos.f), -1);
+    }
+    if (s !== pos.s) await hop(f, s);
+    me.classList.remove("moving"); busy = false;
+    const r = roomAt(f, s);
+    if (r?.state === "full") say(r.key ? "A whole floor, built!" : "My room from " + dayLabel(r.day) + ".");
+  }
+  function say(t) { const b = me.querySelector(".say"); b.textContent = t; replay(b, "show"); }
+  const openHere = () => { const r = roomAt(pos.f, pos.s); if (r?.state === "full" && r.p) openRoom(r.p, r.rn, dayLabel(r.day)); else if (r) replay(el.querySelector(`.dh-room[data-f="${pos.f}"][data-s="${pos.s}"]`), "nope"); };
+  el.querySelectorAll(".dh-room").forEach((d) => (d.onclick = (e) => {
+    if (e.target.closest(".lot-hold")) return;
+    const f = +d.dataset.f, s = +d.dataset.s;
+    if (f === pos.f && s === pos.s) openHere(); else go(f, s);
+  }));
+  el.querySelectorAll(".lot-hold").forEach(bindHold);
+  el.querySelectorAll("[data-go]").forEach((b) => (b.onclick = () => key({ up: "ArrowUp", down: "ArrowDown", left: "ArrowLeft", right: "ArrowRight", open: "Enter" }[b.dataset.go])));
+  function key(k) {
+    if (!$("pc").hidden) return;
+    if (k === "ArrowLeft") go(pos.f, Math.max(-1, pos.s - 1));
+    else if (k === "ArrowRight") go(pos.f, Math.min(floors[pos.f].n - 1, pos.s + 1));
+    else if (k === "ArrowUp") go(Math.min(floors.length - 1, pos.f + 1), -1);
+    else if (k === "ArrowDown") go(Math.max(0, pos.f - 1), -1);
+    else if (k === "Enter" || k === " ") openHere();
+    else if (k === "Escape") close();
+  }
+  const onKey = (e) => { if (["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Enter", " ", "Escape"].includes(e.key) && !e.target.closest?.("input, textarea")) { e.preventDefault(); key(e.key); } };
+  const onResize = () => camera(pos.f, pos.s, 0);
+  addEventListener("keydown", onKey); addEventListener("resize", onResize);
+  function close() {
+    removeEventListener("keydown", onKey); removeEventListener("resize", onResize);
+    el.classList.add("bye"); document.body.classList.remove("walking-open");
+    setTimeout(() => el.remove(), 350); walk = null;
+  }
+  el.querySelector("#walk-x").onclick = close;
+  walk = { close };
+  // come in through the front door, then walk to your newest room
+  const { x, y } = xy(0, -1);
+  me.style.left = `${x - 60}px`; me.style.top = `${y}px`;
+  camera(0, -1, 0); where();
+  let last = { f: 0, s: 0 };
+  floors.forEach((fl, i) => fl.rooms.forEach((r, j) => { if (r.state !== "empty") last = { f: i, s: j }; }));
+  setTimeout(() => { place(0, -1, 500); setTimeout(() => go(last.f, last.s), 600); }, 300);
+  sfx.paper();
+}

@@ -1203,3 +1203,45 @@ body.study .page { padding-bottom: 120px; }
 .room-style .style-pick { background: var(--card); border: 2px solid var(--ink); border-radius: var(--wobble-sm); padding: 8px; margin-top: 6px; }
 
 .sp-err { flex: none; align-self: center; max-width: 220px; margin: 0; font-size: 12px; color: #b9506b; }
+
+/* ---------- walk inside: the felt dollhouse ---------- */
+.walk { position: fixed; inset: 0; z-index: 35; overflow: hidden; background: #e9dcc4; animation: fadein .35s ease-out; transition: opacity .3s; }
+.walk.bye { opacity: 0; }
+body.walking-open { overflow: hidden; }
+.walk-sky { position: absolute; inset: -30px; background: center 70% / cover; filter: blur(6px) saturate(.85) brightness(1.02); opacity: .85; }
+.walk-world { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
+.dh-back, .dh-front { position: absolute; left: 0; top: 0; pointer-events: none; }
+.dh-front { z-index: 2; }
+.dh-room { position: absolute; z-index: 1; cursor: pointer; border-radius: 0 !important; box-shadow: inset 0 0 0 3px rgba(120, 80, 50, .25), inset 0 -18px 30px rgba(60, 40, 20, .18) !important; }
+.dh-room.empty { filter: saturate(.75) brightness(.97); }
+.dh-room.empty .tag, .dh-room.wait .tag { opacity: .85; }
+.dh-room.next { box-shadow: inset 0 0 0 5px #ffe08a, inset 0 0 40px rgba(255, 200, 80, .5) !important; }
+.dh-room.here::after { content: ""; position: absolute; left: 30%; bottom: 4px; width: 40%; height: 12px; translate: -50% 0; border-radius: 50%; background: rgba(255, 220, 120, .55); filter: blur(4px); }
+.dh-room .tag { position: absolute; right: 14px; bottom: 14px; white-space: nowrap; }
+.dh-room.full:hover { filter: brightness(1.05); }
+.dh-room .lot-hold { position: absolute; left: 50%; bottom: 52px; translate: -50% 0; }
+.dh-room.nope { animation: nope .4s; }
+.dh-me { position: absolute; z-index: 3; translate: -50% -100%; pointer-events: none; filter: drop-shadow(0 6px 4px rgba(40, 25, 15, .35)); }
+.dh-me .avx { display: block; }
+.dh-me.moving .avx { animation: step .32s ease-in-out infinite; }
+.dh-me.left .avx { transform: scaleX(-1); }
+.dh-me .say { position: absolute; bottom: 100%; left: 50%; translate: -50% -6px; white-space: nowrap; background: #fff; border: 2px solid var(--ink); border-radius: 14px;
+  padding: 3px 10px; font-size: 13px; font-weight: 800; opacity: 0; transform: scale(.7); transition: opacity .2s, transform .3s; }
+.dh-me .say.show { animation: sayit 2.4s ease forwards; }
+@keyframes sayit { 0% { opacity: 0; transform: scale(.7); } 12%, 80% { opacity: 1; transform: none; } 100% { opacity: 0; } }
+.walk-hud { position: absolute; left: 0; right: 0; top: 0; z-index: 5; display: flex; align-items: center; gap: 14px; padding: 12px 16px;
+  background: linear-gradient(rgba(250, 244, 232, .95), rgba(250, 244, 232, 0)); }
+.walk-hud .btn { width: auto; margin: 0; padding: 6px 14px; }
+.walk-where { margin: 0; display: flex; flex-direction: column; line-height: 1.15; }
+.walk-where b { font: 700 24px var(--hand); } .walk-where small { color: var(--muted); font-size: 12px; }
+.walk-pad { margin-left: auto; display: grid; grid-template-columns: repeat(3, 34px); grid-template-rows: repeat(3, 30px); gap: 3px; }
+.walk-pad button { border: 2px solid var(--ink); background: #fffaf0; border-radius: 9px; font-size: 13px; cursor: pointer; box-shadow: 2px 2px 0 rgba(43, 36, 32, .25); }
+.walk-pad button:hover { background: var(--yellow); }
+.walk-pad [data-go="up"] { grid-column: 2; grid-row: 1; } .walk-pad [data-go="left"] { grid-column: 1; grid-row: 2; }
+.walk-pad [data-go="open"] { grid-column: 2; grid-row: 2; } .walk-pad [data-go="right"] { grid-column: 3; grid-row: 2; }
+.walk-pad [data-go="down"] { grid-column: 2; grid-row: 3; }
+.walk-help { position: absolute; left: 50%; bottom: 12px; translate: -50% 0; z-index: 5; margin: 0; background: rgba(255, 250, 240, .9); border: 1.5px solid var(--ink);
+  border-radius: 999px; padding: 4px 14px; font-size: 12px; white-space: nowrap; }
+.walk-in { width: auto; margin: 10px 0 0; padding: 8px 18px; display: inline-flex; align-items: center; gap: 6px; }
+.walk-in .ico { width: 20px; height: 20px; }
+@media (max-width: 760px) { .walk-help { display: none; } .walk-where b { font-size: 19px; } }
