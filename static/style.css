@@ -1203,3 +1203,25 @@ body.study .page { padding-bottom: 120px; }
 .room-style .style-pick { background: var(--card); border: 2px solid var(--ink); border-radius: var(--wobble-sm); padding: 8px; margin-top: 6px; }
 
 .sp-err { flex: none; align-self: center; max-width: 220px; margin: 0; font-size: 12px; color: #b9506b; }
+
+/* ---------- manage your habits ---------- */
+.manage-sheet { max-width: 620px; max-height: calc(100vh - 40px); overflow: auto; }
+.mg-row { border: 2px solid var(--line); border-radius: var(--wobble-sm); padding: 10px 12px; margin: 10px 0; background: #fffaf0; transition: border-color .2s; }
+.mg-row.focus { border-color: var(--ink); box-shadow: 0 0 0 3px #ffe9a8; }
+.mg-top { display: flex; align-items: center; gap: 10px; }
+.mg-ico .ico { width: 34px; height: 34px; }
+.mg-name { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.mg-name small { color: var(--muted); font-size: 12px; }
+.mg-amt { display: flex; align-items: center; gap: 6px; margin: 0; font-size: 12px; color: var(--muted); }
+.mg-amt input { width: 64px; padding: 5px 8px; border: 2px solid var(--line); border-radius: 8px; text-align: right; margin: 0; }
+.mg-missed { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 8px; font-size: 12px; color: var(--muted); }
+.mg-missed > span { font-weight: 700; color: var(--ink); margin-right: 2px; }
+.mg-day { border: 1.5px dashed rgba(43, 36, 32, .4); background: #fff; border-radius: 999px; padding: 3px 10px; font: 700 12px Nunito, sans-serif; cursor: pointer;
+  transition: background .2s, transform .2s; }
+.mg-day:hover:not(:disabled) { background: var(--yellow); border-style: solid; transform: translateY(-1px); }
+.mg-day.pick { background: #ffe9a8; border: 2px solid var(--ink); }
+.mg-day:disabled { opacity: .7; cursor: wait; }
+.mg-acts { display: flex; justify-content: flex-end; gap: 14px; margin-top: 8px; }
+.mg-acts .link, .undo-ci { font-family: Nunito, sans-serif; font-size: 12px; font-weight: 700; text-decoration: underline; }
+.link.danger { color: #b9506b; }
+.undo-ci { margin-top: 12px; border: 0; background: none; cursor: pointer; position: relative; z-index: 6; }

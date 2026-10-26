@@ -409,9 +409,10 @@ function renderMail() {
     e.stopPropagation();
     const day = b.dataset.day;
     if (!POSTS.kept.some((x) => x.created_day === day)) {
-      replay(b, "nope");
-      if (b.classList.contains("today")) $("today").scrollIntoView({ behavior: "smooth", block: "center" });
-      return;
+      if (b.classList.contains("today")) { replay(b, "nope"); $("today").scrollIntoView({ behavior: "smooth", block: "center" }); return; }
+      const ago = (new Date(S.today + "T12:00:00") - new Date(day + "T12:00:00")) / 864e5;
+      if (ago >= 1 && ago <= BACKFILL_DAYS && S.habits.length) return openManage({ day });  // a missed day: catch it up
+      return replay(b, "nope");
     }
     sfx.tick();
     pick(b.classList.contains("picked") ? null : day);  // tap the same stamp again to go back to the latest
@@ -676,12 +677,14 @@ function openRoom(p, room, when) {
       <div class="room-big"><div class="room big ${roomPic(room)}"><span class="rm-photo">${photoHTML(p)}</span>${when ? `<span class="tag"><b>${esc(when)}</b></span>` : ""}</div>
         <details class="room-style"><summary>${ico("palette", "inline")} Decorate this room</summary>${stylePicker("room", roomStyles(), p.room && ART[`${p.room}.jpg`] ? p.room : "", "Usual")}</details></div>
       <div class="room-side">${cardHTML(p)}
-        <div class="pc-actions"><button class="btn sketch" id="pc-turn">Turn it over ↻</button><button class="btn sketch" id="pc-close">Back to the rooms</button></div></div>
+        <div class="pc-actions"><button class="btn sketch" id="pc-turn">Turn it over ↻</button><button class="btn sketch" id="pc-close">Back to the rooms</button></div>
+        ${p.created_day ? `<button class="link danger undo-ci" id="undo-ci">Checked in by mistake? Undo this check-in</button>` : ""}</div>
     </div>`;
   $("pc").hidden = false;
   sfx.paper();
   bindFlip();
   $("pc-close").onclick = () => ($("pc").hidden = true);
+  $("undo-ci")?.addEventListener("click", () => undoCheckin(p));
   bindStylePicker($("pc-body").querySelector(".room-style"), async (n) => {
     await api(`/api/posts/${p.id}/room`, { name: n });
     p.room = n;
@@ -1759,3 +1762,74 @@ function maybeTour() {
     wantIntro || document.querySelector(".intro") ? 3400 : 600);
 }
 $("menu-guide").onclick = () => { closeMenu(); window.scrollTo({ top: 0 }); showStory(() => setTimeout(startTour, 450)); };
+
+
+// ---------- manage your habits: amounts, a missed day, taking a building down ----------
+
+const BACKFILL_DAYS = 7;
+function missedDays(h) {  // the last week's days without a check-in (newest first)
+  const done = new Set(h.days || []), out = [];
+  for (let k = 1; k <= BACKFILL_DAYS; k++) {
+    const d = new Date(S.today + "T12:00:00"); d.setDate(d.getDate() - k);
+    const iso = d.toISOString().slice(0, 10);
+    if (!done.has(iso) && (!h.started_on || iso >= h.started_on)) out.push(iso);  // not before you started it
+  }
+  return out;
+}
+function openManage(focus = {}) {
+  const list = $("manage-list");
+  $("manage-err").textContent = "";
+  list.innerHTML = S.habits.map((h) => {
+    const missed = missedDays(h);
+    return `<div class="mg-row ${focus.habit === h.id ? "focus" : ""}" data-h="${h.id}">
+      <div class="mg-top"><span class="mg-ico">${hIcon(h)}</span>
+        <span class="mg-name"><b>${esc(h.label || h.short)}</b><small>${esc(lookName(h))} · floor ${Math.min(MAXF, h.level)} of 6 · ${h.checkins} check-in${h.checkins === 1 ? "" : "s"}</small></span>
+        <label class="mg-amt"><input type="number" min="1" max="240" value="${h.amount}" data-amt><span>${h.unit === "dollars" ? "$ / day" : "min / day"}</span></label>
+      </div>
+      ${PLAIN ? "" : `<div class="mg-missed"><span>Missed a day?</span>${missed.length ? missed.map((d) => `<button class="mg-day ${focus.day === d ? "pick" : ""}" data-day="${d}">${new Date(d + "T12:00:00").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}</button>`).join("") : `<small>Nothing missed this week.</small>`}</div>`}
+      <div class="mg-acts">${PLAIN ? "" : `<button class="link mg-open">Go inside</button>`}<button class="link danger mg-remove">Remove this building</button></div>
+    </div>`;
+  }).join("") || `<p class="muted">No habits yet.</p>`;
+  list.querySelectorAll(".mg-row").forEach((row) => {
+    const id = +row.dataset.h, h = S.habits.find((x) => x.id === id);
+    row.querySelector("[data-amt]").onchange = async (e) => {
+      try { await api(`/api/habits/${id}`, { amount: +e.target.value }, "PATCH"); sfx.tick(); refresh(); }
+      catch (err) { $("manage-err").textContent = err.message; e.target.value = h.amount; }
+    };
+    row.querySelector(".mg-open")?.addEventListener("click", () => { $("manage").hidden = true; goInside(id); });
+    row.querySelectorAll(".mg-day").forEach((b) => (b.onclick = () => catchUp(h, b.dataset.day, b)));
+    row.querySelector(".mg-remove").onclick = async () => {
+      if (!confirm(`Remove ${h.short}? Its building, ${h.checkins} check-in${h.checkins === 1 ? "" : "s"} and their postcards will be gone for good.`)) return;
+      try { await api(`/api/habits/${id}`, undefined, "DELETE"); sfx.paper(); await refresh(); openManage(); }
+      catch (err) { $("manage-err").textContent = err.message; }
+    };
+  });
+  $("manage").hidden = false;
+  list.querySelector(".mg-row.focus")?.scrollIntoView({ block: "center" });
+}
+async function catchUp(h, day, btn) {  // a check-in for a day you did it but forgot to tap
+  if (busy) return;
+  busy = true;
+  const label = btn.textContent;
+  btn.disabled = true; btn.textContent = PLAIN ? "Saving…" : "Writing your postcard…";
+  try {
+    const r = await api(`/api/habits/${h.id}/missed${Q}`, { day });
+    busy = false;
+    await refresh();
+    $("manage").hidden = true;
+    const post = POSTS.kept.find((p) => p.id === r.post_id);
+    if (post) openPostcard(post, true);
+  } catch (err) {
+    busy = false; btn.disabled = false; btn.textContent = label;
+    $("manage-err").textContent = err.message;
+  }
+}
+async function undoCheckin(p) {  // from a room: take that day's check-in back
+  const h = S.habits.find((x) => x.id === p.habit_id);
+  if (!h || !confirm(`Undo the ${h.short} check-in on ${dayLabel(p.created_day)}? Its room empties and this postcard goes away.`)) return;
+  try { await api(`/api/habits/${h.id}/checkins/${p.created_day}`, undefined, "DELETE"); $("pc").hidden = true; sfx.paper(); refresh(); }
+  catch (err) { alert(err.message); }
+}
+$("menu-manage").onclick = () => { closeMenu(); openManage(); };
+$("manage-close").onclick = () => ($("manage").hidden = true);
+$("manage-add").onclick = () => { $("manage").hidden = true; openAdd(); };

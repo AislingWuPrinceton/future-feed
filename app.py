@@ -466,6 +466,92 @@ def checkin(habit_id: int, plain: bool = False):
     return {**result, "level_before": before["level"], "level_after": after["level"]}
 
 
+# ---------- manage your habits: edit, remove a building, undo a check-in, catch up a missed day ----------
+
+BACKFILL_DAYS = 7  # how far back a missed check-in can be added
+
+
+def habit_or_404(habit_id):
+    habit = next((h for h in active_habits() if h["id"] == habit_id), None)
+    if not habit:
+        raise HTTPException(404, "Habit not found.")
+    return habit
+
+
+class HabitEdit(BaseModel):
+    amount: int | None = None
+    goal: str | None = None
+
+
+@app.patch("/api/habits/{habit_id}")
+def edit_habit(habit_id: int, body: HabitEdit):
+    habit_or_404(habit_id)
+    with db.connect() as c:
+        if body.amount is not None:
+            if not 1 <= body.amount <= 240:
+                raise HTTPException(400, "Pick an amount between 1 and 240.")
+            c.execute("UPDATE habits SET amount = ? WHERE id = ?", (body.amount, habit_id))
+        if body.goal is not None:
+            c.execute("UPDATE habits SET goal = ? WHERE id = ?", (body.goal.strip()[:100], habit_id))
+    return {"ok": True}
+
+
+@app.delete("/api/habits/{habit_id}")
+def remove_habit(habit_id: int):
+    """Take a building down for good: the habit, its check-ins, its postcards and anything waiting for it."""
+    habit_or_404(habit_id)
+    with db.connect() as c:
+        for table in ("checkins", "posts", "quests", "drafts"):
+            c.execute(f"DELETE FROM {table} WHERE habit_id = ?", (habit_id,))
+        c.execute("DELETE FROM habits WHERE id = ?", (habit_id,))
+    return {"ok": True}
+
+
+@app.delete("/api/habits/{habit_id}/checkins/{day}")
+def undo_checkin(habit_id: int, day: str):
+    """Take back one day's check-in (a mistake): its room empties and that day's postcards go with it."""
+    habit_or_404(habit_id)
+    with db.connect() as c:
+        if not c.execute("DELETE FROM checkins WHERE habit_id = ? AND day = ?", (habit_id, day)).rowcount:
+            raise HTTPException(404, "No check-in that day.")
+        c.execute("DELETE FROM posts WHERE habit_id = ? AND created_day = ?", (habit_id, day))
+        c.execute("DELETE FROM drafts WHERE habit_id = ?", (habit_id,))  # pre-written postcards counted on the old total
+    return {"ok": True}
+
+
+class MissedIn(BaseModel):
+    day: str
+
+
+@app.post("/api/habits/{habit_id}/missed")
+def missed_checkin(habit_id: int, body: MissedIn, plain: bool = False):
+    """Catch up a day you did it but forgot to check in (up to a week back). It gets its room and a postcard."""
+    from datetime import date, timedelta
+    habit = habit_or_404(habit_id)
+    try:
+        day = date.fromisoformat(body.day)
+    except ValueError:
+        raise HTTPException(400, "That isn't a date.")
+    today = game.today()
+    if not (today - timedelta(days=BACKFILL_DAYS) <= day < today):
+        raise HTTPException(400, f"You can catch up any of the last {BACKFILL_DAYS} days, not today or the future.")
+    if day < date.fromisoformat(habit["started_on"]):
+        raise HTTPException(400, "That's before you started this one.")
+    before = game.stats(habit)
+    with db.connect() as c:
+        if c.execute("SELECT 1 FROM checkins WHERE habit_id = ? AND day = ?", (habit_id, day.isoformat())).fetchone():
+            raise HTTPException(400, "You already checked in that day.")
+        c.execute("INSERT INTO checkins (habit_id, day) VALUES (?,?)", (habit_id, day.isoformat()))
+        c.execute("DELETE FROM drafts WHERE habit_id = ?", (habit_id,))
+    after = game.stats(habit)
+    if plain:
+        return {"post_id": None, "kind": "plain", "usage": [], "level_before": before["level"], "level_after": after["level"]}
+    result = generate_post(habit, "level_up" if after["level"] > before["level"] else "daily")
+    with db.connect() as c:  # the postcard belongs to the day you caught up
+        c.execute("UPDATE posts SET created_day = ? WHERE run_id = (SELECT run_id FROM posts WHERE id = ?)", (day.isoformat(), result["post_id"]))
+    return {**result, "level_before": before["level"], "level_after": after["level"]}
+
+
 @app.get("/api/feed")
 def feed(timeline: str = "kept"):
     if timeline not in ("kept", "stopped"):
