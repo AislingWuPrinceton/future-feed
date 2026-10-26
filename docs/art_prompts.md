@@ -44,7 +44,9 @@ A wide landscape diorama with deep perspective, camera at eye level just above t
 
 ---
 
-## 二、七种楼（每张竖版 1024×1536，透明或纯白背景）
+## 二、楼（每张竖版 1024×1536，透明或纯白背景）
+
+> 想加新款式：按下面的格式生成，起一个英文小写文件名（如 `bookshop.png`）放进 raw/，跑 `scripts/slice_art.py`，它就会自动出现在"选楼的款式"里。房间同理：`room_<名字>.png`（比如 `room_attic.png`）会自动出现在"Decorate this room"里。
 
 每张图里是**同一栋楼拆开的三块**，从上到下：屋顶、一层"中间楼层"、一层"一楼"。三块要一样宽，中间留空白，这样我可以把中间楼层叠很多层，让楼一层层长高。
 

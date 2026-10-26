@@ -1,7 +1,8 @@
 """Turn the generated felt pictures in static/art/raw/ into the pieces the town uses (static/art/).
 
 - background*.png, scene_*.png, room_*.png -> resized backdrops (same name, .jpg)
-- <kind>.png (hall, library, ...) -> <kind>_roof / <kind>_floor / <kind>_ground cut-outs
+- any other <name>.png (hall, library, bakery, ...) is a building -> <name>_roof / <name>_floor / <name>_ground cut-outs;
+  it shows up in the building style picker by itself
 - scenery*.png -> prop_<name> cut-outs (see PROPS), numbered <sheet>_<n> if the count is off
 
 Works with transparent PNGs or with a plain white background (removed by flood fill from the edges).
@@ -115,7 +116,9 @@ def main():
         if f.stem.startswith("room"):
             frames[f"{f.stem}.jpg"] = frame_box(img)
         print(f"{f.stem}.jpg {img.width}x{img.height} {frames.get(f.stem + '.jpg') or ''}")
-    for kind in KINDS:
+    # every other picture in raw/ is a building: roof, upper floor and ground floor, top to bottom
+    others = sorted(f.stem for f in RAW.glob("*.png") if not f.stem.startswith(("background", "scene", "room", "scenery")))
+    for kind in dict.fromkeys(KINDS + others):
         f = RAW / f"{kind}.png"
         if not f.exists():
             continue
