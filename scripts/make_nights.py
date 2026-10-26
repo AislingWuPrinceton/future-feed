@@ -1,7 +1,7 @@
 """Make a moonlit night version of each season's town backdrop (static/art/background_<season>_night.jpg).
 
 A night picture you generate yourself wins: put background_<season>_night.png in static/art/raw/ and run
-scripts/slice_art.py instead. Summer's night is the hand-made background_night.jpg.
+scripts/slice_art.py instead. (The older background_night.jpg has snowy peaks, so it is only a fallback.)
 Run: .venv/bin/python scripts/make_nights.py
 """
 from pathlib import Path
@@ -13,7 +13,7 @@ from PIL import Image, ImageFilter
 
 ROOT = Path(__file__).resolve().parent.parent / "static" / "art"
 RAW = ROOT / "raw"
-SEASONS = ["spring", "autumn", "winter"]
+SEASONS = {"spring": "background_spring", "summer": "background", "autumn": "background_autumn", "winter": "background_winter"}
 NAVY = np.array([22, 30, 62], float)
 
 
@@ -50,12 +50,12 @@ def night(img, seed):
 
 
 def main():
-    for i, s in enumerate(SEASONS):
+    for i, (s, day) in enumerate(SEASONS.items()):
         name = f"background_{s}_night"
         if (RAW / f"{name}.png").exists():
             print(f"{name}: your own picture is in raw/, skipped (run slice_art.py)")
             continue
-        src = ROOT / f"background_{s}.jpg"
+        src = ROOT / f"{day}.jpg"
         if not src.exists():
             continue
         out = night(Image.open(src), i)

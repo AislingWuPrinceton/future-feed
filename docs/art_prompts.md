@@ -30,16 +30,17 @@ A wide landscape diorama with deep perspective, camera at eye level just above t
 | 文件名 | 接在后面的那句 | 什么时候用 |
 |---|---|---|
 | ⭐ `background.png` | `Season and light: a bright clear morning in late summer, pale powder-blue felt sky, a few soft white felt clouds near the horizon, sage-green meadow, hills in sage green, teal blue and burnt orange.` | 白天（默认） |
-| ⭐ `background_night.png`（夏天晚上） | `Season and light: a calm night, deep navy-blue felt sky with tiny cream felt stars and a crescent felt moon, the distant cottages have warm glowing yellow windows, everything in soft blue moonlight.` | 点太阳切到晚上时 |
+| `background_night.png`（旧的晚上图，有雪山，现在只做备用） | `Season and light: a calm night, deep navy-blue felt sky with tiny cream felt stars and a crescent felt moon, the distant cottages have warm glowing yellow windows, everything in soft blue moonlight.` | 点太阳切到晚上时 |
 | `background_sunset.png` | `Season and light: golden hour sunset, peach and rose felt sky, a low round orange felt sun near the horizon, long soft warm light across the meadow.` | 傍晚 |
 | `background_autumn.png` | `Season and light: crisp autumn afternoon, felt-ball trees in mustard yellow, burnt orange and rust red, a few fallen felt leaves on the meadow, tiny pumpkins near a distant cottage.` | 9–11 月 |
 | `background_winter.png` | `Season and light: snowy winter morning, everything covered in soft white wool snow, pale grey-blue sky, small felt pine trees, smoke curling from distant chimneys.` | 12–2 月 |
 | `background_spring.png` | `Season and light: early spring, soft pink felt cherry-blossom trees, fresh light-green meadow with tiny white and yellow felt flowers, pastel sky.` | 3–5 月 |
 | `background_spring_night.png` | `Season and light: a calm spring night, deep navy felt sky with tiny cream felt stars, pink cherry-blossom trees in soft moonlight, distant cottages with warm glowing yellow windows.` | 春天晚上 |
+| `background_summer_night.png` | `Season and light: a warm summer night, deep navy felt sky with tiny cream felt stars and a few glowing fireflies, green hills with no snow, distant cottages with warm glowing yellow windows.` | 夏天晚上 |
 | `background_autumn_night.png` | `Season and light: a calm autumn night, deep navy felt sky with tiny cream felt stars, mustard and rust felt-ball trees in soft moonlight, little pumpkins, distant cottages with warm glowing yellow windows.` | 秋天晚上 |
 | `background_winter_night.png` | `Season and light: a quiet snowy winter night, deep navy felt sky with tiny cream felt stars, everything covered in soft white wool snow glowing blue in the moonlight, distant cottages with warm glowing yellow windows.` | 冬天晚上 |
 
-> 春、秋、冬的晚上那三张，现在是用 `scripts/make_nights.py` 从白天的图调出来的。想换成真正生成的图，就按上表的名字放进 raw/，再跑 `scripts/slice_art.py`。
+> 春、夏、秋、冬的晚上那四张，现在是用 `scripts/make_nights.py` 从白天的图调出来的。想换成真正生成的图，就按上表的名字放进 raw/，再跑 `scripts/slice_art.py`。
 
 ---
 

@@ -1098,7 +1098,7 @@ let CLOUDS = [], DECO = [];
 // which felt landscape is behind the town: night, sunset, or the app date's season; and how far down
 // each picture its cream path runs (the buildings stand on it)
 const PATH_Y = { background: .79, background_night: .79, background_autumn: .74, background_spring: .75, background_sunset: .73, background_winter: .82 };
-// each season has its own night picture (background_<season>_night); summer's is background_night
+// each season has its own night picture (background_<season>_night); the older background_night is only a fallback
 // the four seasons you can pick in the town's corner; picking the one in use again goes back to following the date
 const SEASONS = [["spring", "Spring", "background_spring"], ["summer", "Summer", "background"], ["autumn", "Autumn", "background_autumn"], ["winter", "Winter", "background_winter"]];
 let season = localStorage.getItem("ff-season");
@@ -1108,7 +1108,7 @@ function dateSeason() {
 }
 function townBackdrop() {
   const hr = new Date().getHours(), sz = SEASONS.find((x) => x[0] === (season || dateSeason()));
-  const want = night ? `${sz[2]}_night` : !season && hr >= 17 && hr < 19 ? "background_sunset" : sz[2];
+  const want = night ? `background_${sz[0]}_night` : !season && hr >= 17 && hr < 19 ? "background_sunset" : sz[2];
   const name = [want, night && "background_night", "background"].find((n) => n && ART[`${n}.jpg`]) || null;
   return name && { name, p: PATH_Y[name.replace("_night", "")] || .79, native: night && name.endsWith("_night") };
 }
@@ -1169,7 +1169,7 @@ function renderTown(opts = {}) {
     ${DEFS}
     <div class="sky">${BGP ? `<img class="bg-photo" style="--p:${bg.p}" src="${artUrl(`${bg.name}.jpg`)}" alt="">` : SKY}${night && !bg?.native ? `<span class="stars"></span>` : ""}</div>
     ${BGP ? `<div class="seasons" role="group" aria-label="Season">${SEASONS.filter((x) => ART[`${x[2]}.jpg`]).map(([k, label, file]) => {
-      const on = (season || dateSeason()) === k, pic = night && ART[`${file}_night.jpg`] ? `${file}_night` : file;
+      const on = (season || dateSeason()) === k, pic = night && ART[`background_${k}_night.jpg`] ? `background_${k}_night` : file;
       return `<button class="season ${on ? "on" : ""}" data-season="${k}" aria-pressed="${on}" title="${on && season ? "Back to following the date" : `See your town in ${label.toLowerCase()}`}"><i style="background-image:url(${artUrl(`${pic}.jpg`)})"></i><span>${label}</span></button>`;
     }).join("")}</div>` : ""}
     <div class="mobile">
