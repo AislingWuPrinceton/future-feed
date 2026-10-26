@@ -58,6 +58,7 @@ async function refresh() {
   renderInside();
   if (!PLAIN && !refresh.counted) { countUp($("me")); refresh.counted = true; }
   if (STUDY && $("sb-date")) $("sb-date").textContent = `Day ${S.day_offset + 1}`;
+  maybeTour();
 }
 
 // ---------- onboarding / add habit ----------
@@ -151,6 +152,7 @@ function renderOnboard() {
     $("ob-bestie").closest("label").hidden = true;
   }
   if (!$("ob-habits").children.length) pickList($("ob-habits"), "guitar");
+  if (GUIDE && !sessionStorage.getItem("ff-story")) showStory();
 }
 
 // A custom habit waits on the Ladder agent and may be refused for safety.
@@ -773,6 +775,8 @@ $("demo-reset").onclick = async () => {
   $("ob-habits").innerHTML = "";
   localStorage.removeItem("ff-piece");
   localStorage.removeItem("ff-stop-years");
+  localStorage.removeItem("ff-tour"); sessionStorage.removeItem("ff-story"); sessionStorage.removeItem("ff-intro");  // a fresh start gets the story and tour again
+  wantIntro = !PLAIN; startTour.queued = false;
   refresh();
 };
 
@@ -1549,3 +1553,115 @@ if (PLAIN) {  // control group: a neutral habit tracker, nothing about the futur
 if (new URLSearchParams(location.search).has("dev")) window.ff = { openPostcard, posts: () => POSTS, state: () => S, renderTown };
 studyBar();
 refresh();
+
+// ---------- first-time guide: a three-page story before sign-up, then a spotlight tour of the screen ----------
+
+const GUIDE = !PLAIN;  // the plain (control) version never hears about future selves or towns
+function storyPages() {
+  const pic = (n) => (ART[n] ? artUrl(n) : "");
+  const bld = (kind, floors, d) => {
+    const has = ART[`${kind}_roof.webp`];
+    if (!has) return "";
+    return `<span class="st-bld" style="--d:${d}s">${`<img src="${artUrl(`${kind}_roof.webp`)}" alt="">`}${[...Array(floors)].map((_, i) =>
+      `<img class="st-floor" style="--k:${floors - i}" src="${artUrl(`${kind}_${i === floors - 1 ? "ground" : "floor"}.webp`)}" alt="">`).join("")}</span>`;
+  };
+  return [
+    { art: `<img class="st-photo" src="${pic("scene_welcome.jpg")}" alt="">`,
+      kicker: "It's 2036.", title: "Somewhere down this road is a you who kept going.",
+      text: "Not a perfect you. Just the one who did a small thing every day, for ten years." },
+    { art: `<div class="st-card"><span class="tape"></span><span class="st-cphoto" style="background-image:url(${pic("room_hall.jpg")})"></span>
+        <p class="st-from"><b>you.2036</b> · ten years from today</p><p class="st-cap">Played the whole song at my sister's wedding. My hands didn't shake once.</p></div>`,
+      kicker: "Postcards from your future", title: "Every check-in, future you writes back.",
+      text: "Do today's small thing and hold the button. A postcard arrives: a moment from the life that habit is building, a few years ahead." },
+    { art: `<div class="st-town" style="background-image:url(${pic("background.jpg")})">${bld("library", 1, .2)}${bld("cafe", 2, .5)}${bld("hall", 3, .8)}</div>`,
+      kicker: "Your 2036 town", title: "Each habit builds a home in your town.",
+      text: "Every check-in fills a room with its postcard. Fill a floor and the building grows taller. Keep going and a whole town rises." },
+  ];
+}
+function showStory(done) {
+  if (!GUIDE) return done?.();
+  document.querySelector(".story")?.remove();
+  const pages = storyPages();
+  let i = 0;
+  const el = document.createElement("div");
+  el.className = "story";
+  document.body.appendChild(el);
+  const close = () => { el.classList.add("bye"); setTimeout(() => el.remove(), 400); sessionStorage.setItem("ff-story", "1"); done?.(); };
+  const draw = () => {
+    const p = pages[i], last = i === pages.length - 1;
+    el.innerHTML = `<div class="story-in sketch">
+        <button class="story-skip" aria-label="Skip">Skip</button>
+        <div class="story-art">${p.art}</div>
+        <p class="kicker">${p.kicker}</p><h2>${p.title}</h2><p class="muted">${p.text}</p>
+        <div class="story-nav"><span class="story-dots">${pages.map((_, k) => `<i class="${k === i ? "on" : ""}"></i>`).join("")}</span>
+          ${i ? `<button class="btn sketch" data-go="-1">Back</button>` : ""}
+          <button class="btn primary sketch" data-go="1">${last ? "Meet your future self →" : "Next"}</button></div></div>`;
+    el.querySelector(".story-skip").onclick = close;
+    el.querySelectorAll("[data-go]").forEach((b) => (b.onclick = () => {
+      const k = i + +b.dataset.go;
+      sfx.paper();
+      if (k >= pages.length) return close();
+      i = k; draw();
+    }));
+  };
+  draw();
+}
+
+const TOUR = [
+  { sel: "#today .hold, #today .habit-row", title: "1 · Do it, then hold", text: "Did today's small thing? Press and hold its button for a second. That's a check-in." },
+  { sel: "#me .me-mail", title: "2 · A postcard arrives", text: "Each check-in brings a postcard from you in the future. The newest ones wait here, and the stamps show your week." },
+  { sel: "#town", title: "3 · Your 2036 town", text: "Every habit is a building. Each check-in fills one room, and a full floor of rooms makes the building one storey taller.", view: "town" },
+  { sel: "#town .lot[data-h] .lot-b", title: "4 · Step inside", text: "Tap a building to walk in. Every room holds the postcard from the day you earned it.", view: "town" },
+  { sel: "#town .seasons", title: "5 · Play with it", text: "Pick a season, tap the sun for night, shake the trees. It's your town.", view: "town" },
+  { sel: "#menu-btn", title: "6 · More in the menu", text: "Play your next 10 years as a story, add another habit, or see this guide again." },
+];
+function startTour() {
+  if (!GUIDE || !S?.profile) return;
+  document.querySelector(".tour")?.remove();
+  let i = 0;
+  const el = document.createElement("div");
+  el.className = "tour";
+  el.innerHTML = `<div class="tour-hole"></div><div class="tour-tip sketch"></div>`;
+  document.body.appendChild(el);
+  const hole = el.querySelector(".tour-hole"), tip = el.querySelector(".tour-tip");
+  const end = () => { localStorage.setItem("ff-tour", "1"); el.classList.add("bye"); setTimeout(() => el.remove(), 300); removeEventListener("resize", place); removeEventListener("scroll", place); };
+  function target() { for (const sel of TOUR[i].sel.split(", ")) { const t = document.querySelector(sel); if (t) return t; } return null; }  // first selector that exists wins
+  function place() {
+    const t = target();
+    if (!t) return;
+    const r = t.getBoundingClientRect(), pad = 8;
+    Object.assign(hole.style, { left: `${r.left - pad}px`, top: `${r.top - pad}px`, width: `${r.width + pad * 2}px`, height: `${r.height + pad * 2}px` });
+    const below = r.bottom + 14 + tip.offsetHeight < innerHeight || r.top < tip.offsetHeight + 24;
+    const x = Math.max(12, Math.min(innerWidth - tip.offsetWidth - 12, r.left + r.width / 2 - tip.offsetWidth / 2));
+    tip.style.left = `${x}px`;
+    tip.style.top = `${below ? Math.min(innerHeight - tip.offsetHeight - 12, r.bottom + pad + 10) : r.top - pad - 10 - tip.offsetHeight}px`;
+  }
+  function show() {
+    const s = TOUR[i];
+    if (s.view && VIEW !== s.view) setView(s.view);
+    if (!target()) { i++; return i < TOUR.length ? show() : end(); }  // e.g. no habits yet
+    tip.innerHTML = `<b>${s.title}</b><p>${s.text}</p>
+      <div class="tour-nav"><button class="tour-skip">Skip tour</button><span class="tour-count">${i + 1} / ${TOUR.length}</span>
+        ${i ? `<button class="btn sketch" data-t="-1">Back</button>` : ""}<button class="btn primary sketch" data-t="1">${i === TOUR.length - 1 ? "Start building" : "Next"}</button></div>`;
+    tip.querySelector(".tour-skip").onclick = end;
+    tip.querySelectorAll("[data-t]").forEach((b) => (b.onclick = () => {
+      sfx.tick();
+      i += +b.dataset.t;
+      if (i >= TOUR.length) return end();
+      show();
+    }));
+    target().scrollIntoView({ behavior: "smooth", block: "center", inline: "center" });
+    el.classList.add("moving");
+    place();
+    setTimeout(() => { place(); el.classList.remove("moving"); }, 450);
+  }
+  addEventListener("resize", place); addEventListener("scroll", place, { passive: true });
+  show();
+}
+// first visit on this device: tour once the opening has played
+function maybeTour() {
+  if (!GUIDE || localStorage.getItem("ff-tour") || startTour.queued) return;
+  startTour.queued = true;
+  setTimeout(startTour, wantIntro || document.querySelector(".intro") ? 3400 : 600);
+}
+$("menu-guide").onclick = () => { closeMenu(); window.scrollTo({ top: 0 }); showStory(() => setTimeout(startTour, 450)); };
