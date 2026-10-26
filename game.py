@@ -48,7 +48,7 @@ def template_for(habit):
 ICONS = ["guitar", "spanish", "chat", "running", "reading", "saving", "dance", "music", "lotus", "palette", "pencil",
          "dumbbell", "piano", "pan", "sprout", "laptop", "bike", "wave", "drop", "moon", "heart", "sun", "camera",
          "apple", "coffee", "headphones", "globe", "mountain", "ball", "paw", "broom", "bed", "mic", "puzzle", "plane",
-         "tree", "flame", "house", "custom"]
+         "tree", "flame", "house", "pill", "phone", "clock", "flower", "custom"]
 ICON_WORDS = [("dance", "danc ballet salsa tango hip-hop"), ("piano", "piano keyboard"),
               ("music", "sing song violin drum ukulele cello flute music"), ("lotus", "meditat yoga breath mindful stretch"),
               ("palette", "paint draw sketch art watercolor"), ("pencil", "writ journal diary poem blog novel"),

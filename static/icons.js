@@ -199,6 +199,29 @@ const DRAW = {
     rc.path("M30 38 L58 12", line({ fill: "none", seed: 439 })),
     rc.path("M8 52 Q14 46 20 50", line({ fill: "none", stroke: C.gray, seed: 440 })),
   ],
+  pill: (rc) => [
+    rc.path("M10 38 L28 20 L40 32 L22 50 Q16 56 10 50 Q4 44 10 38 Z", o(C.rose, { seed: 441 })),
+    rc.path("M28 20 L36 12 Q42 6 48 12 Q54 18 48 24 L40 32 Z", o(C.white, { seed: 442 })),
+    rc.circle(50, 48, 14, o(C.yellow, { seed: 443 })), rc.line(45, 48, 55, 48, line({ strokeWidth: 1.4, seed: 444 })),
+  ],
+  phone: (rc) => [
+    rc.rectangle(18, 4, 28, 54, o(C.dark, { seed: 445 })),
+    rc.rectangle(21, 9, 22, 40, o(C.sky, { seed: 446 })),
+    rc.circle(32, 53, 4, o(C.gray, { seed: 447 })),
+    rc.path("M48 18 Q58 30 48 42", line({ fill: "none", stroke: C.rose, strokeWidth: 2.4, seed: 448 })),
+  ],
+  clock: (rc) => [
+    rc.circle(32, 36, 44, o(C.cream, { seed: 449 })),
+    rc.circle(14, 12, 12, o(C.rose, { seed: 450 })), rc.circle(50, 12, 12, o(C.rose, { seed: 451 })),
+    rc.path("M32 36 L32 22 M32 36 L42 40", line({ fill: "none", strokeWidth: 3, seed: 452 })),
+    rc.line(20, 56, 16, 62, line({ strokeWidth: 3, seed: 453 })), rc.line(44, 56, 48, 62, line({ strokeWidth: 3, seed: 454 })),
+  ],
+  flower: (rc) => [
+    rc.line(32, 34, 32, 60, line({ stroke: "#4a8a3a", strokeWidth: 3, seed: 455 })),
+    rc.path("M32 50 Q20 40 14 46 Q22 54 32 50 Z", o(C.green, { seed: 456 })),
+    ...[[32, 10], [44, 20], [40, 34], [24, 34], [20, 20]].map(([x, y], i) => rc.circle(x, y, 16, o(C.pink, { seed: 457 + i }))),
+    rc.circle(32, 23, 11, o(C.yellow, { seed: 462 })),
+  ],
   custom: (rc) => [
     rc.path("M32 4 L37 25 L58 30 L37 35 L32 58 L27 35 L6 30 L27 25 Z", o(C.yellow, { seed: 34 })),
     rc.path("M52 6 L54 12 L60 14 L54 16 L52 22 L50 16 L44 14 L50 12 Z", o(C.lilac, { seed: 35 })),
@@ -349,7 +372,7 @@ export function ico(name, cls = "") {
 // what a custom habit can wear: picked from this grid, or left to the Ladder agent
 export const PICKER_ICONS = ["reading", "pencil", "chat", "spanish", "globe", "laptop", "puzzle", "palette", "camera", "music",
   "guitar", "piano", "mic", "headphones", "dance", "running", "bike", "wave", "dumbbell", "ball", "mountain", "lotus", "heart",
-  "moon", "bed", "sun", "drop", "apple", "pan", "coffee", "sprout", "tree", "paw", "broom", "house", "saving", "plane", "flame"];
+  "moon", "bed", "sun", "drop", "apple", "pan", "coffee", "sprout", "tree", "flower", "paw", "broom", "house", "saving", "plane", "flame", "pill", "phone", "clock"];
 export const HABIT_ICON = (key) => (key in DRAW && !["custom"].includes(key) ? key : "custom");
 export const CHARACTER_ICON = { "🦊": "fox", "🐼": "panda", "🐱": "cat", "🐰": "bunny", "🐻": "bear", "🐨": "koala",
   "🐸": "frog", "🦁": "lion", "🐧": "penguin", "🙂": "person" };

@@ -788,7 +788,8 @@ const KIND = { guitar: "hall", music: "hall", piano: "hall", dance: "hall", read
   running: "gym", bike: "gym", dumbbell: "gym", wave: "gym", spanish: "cafe", chat: "cafe", pan: "cafe",
   saving: "home", heart: "home", lotus: "garden", sprout: "garden", drop: "garden", moon: "garden", sun: "garden",
   mic: "hall", headphones: "hall", puzzle: "library", globe: "library", plane: "cafe", coffee: "cafe", apple: "cafe",
-  mountain: "gym", ball: "gym", flame: "gym", paw: "home", broom: "home", bed: "home", house: "home", tree: "garden" };
+  mountain: "gym", ball: "gym", flame: "gym", paw: "home", broom: "home", bed: "home", house: "home", tree: "garden",
+  pill: "garden", phone: "home", clock: "gym", flower: "garden" };
 const KIND_NAME = { hall: "Music hall", library: "Library", gym: "Gym", cafe: "Café", home: "Home", garden: "Greenhouse", studio: "Studio" };
 // what each building looks like from the street. A habit's kind still picks its rooms; the look is the facade,
 // and no two habits share one while there are looks left: the first free one that suits the habit, else any free one
