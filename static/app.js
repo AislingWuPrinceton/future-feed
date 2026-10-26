@@ -357,7 +357,7 @@ function renderMail() {
   const fill = (posts, title, day) => {
     const fan = wrap.querySelector("#fan"), n = posts.length;
     wrap.querySelector("#fan-title").textContent = title;
-    fan.style.setProperty("--fs", `${n > 1 ? Math.min(26, 58 / (n - 1)) : 0}px`);
+    fan.style.setProperty("--n1", Math.max(1, n - 1)); fan.style.setProperty("--mid", (n - 1) / 2);
     fan.className = `fan ${day ? "dealt" : ""}`;
     fan.innerHTML = n ? posts.map((p, i) => { const h = habitOf(p); return `<button class="fan-card" data-fan="${i}" style="--i:${i}" aria-label="Postcard: ${esc(p.caption)}">
         <span class="fan-photo">${photoHTML(p)}</span><span class="fan-yr">${year(p.live_date || p.future_date)}</span>
