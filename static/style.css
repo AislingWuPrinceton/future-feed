@@ -1188,7 +1188,15 @@ body.study .page { padding-bottom: 120px; }
   padding: 10px 14px 4px; box-shadow: 3px 4px 0 rgba(43, 36, 32, .2); animation: poppop .25s ease-out; }
 .restyle-panel[hidden] { display: none; }
 .room-style { width: 100%; max-width: 520px; margin-top: 12px; position: relative; z-index: 6; }
-.room-style summary { cursor: pointer; font: 700 20px var(--hand); text-align: center; list-style: none; }
-.room-style summary::before { content: "✎ "; }
+.room-style { text-align: center; }
+/* a real button, so it reads on the dark overlay too */
+.room-style summary { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; list-style: none; background: var(--yellow); color: var(--ink);
+  border: 2px solid var(--ink); border-radius: var(--wobble-sm); padding: 6px 16px; font: 800 14px Nunito, sans-serif; box-shadow: 3px 3px 0 var(--ink);
+  transition: transform .2s cubic-bezier(.3, 1.6, .5, 1), box-shadow .2s; animation: nudge 3s ease-in-out 1s 2; }
+.room-style summary:hover { transform: translate(-1px, -2px); box-shadow: 4px 5px 0 var(--ink); }
+.room-style summary .ico { width: 20px; height: 20px; }
+.room-style[open] summary { background: #fffaf0; }
+.room-style[open] summary::after { content: "▴"; font-size: 12px; }
+.room-style:not([open]) summary::after { content: "▾"; font-size: 12px; }
 .room-style summary::-webkit-details-marker { display: none; }
 .room-style .style-pick { background: var(--card); border: 2px solid var(--ink); border-radius: var(--wobble-sm); padding: 8px; margin-top: 6px; }

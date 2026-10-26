@@ -676,7 +676,7 @@ function openRoom(p, room, when) {
       <div class="room-big"><div class="room big ${roomPic(room)}"><span class="rm-photo">${photoHTML(p)}</span>${when ? `<span class="tag"><b>${esc(when)}</b></span>` : ""}</div></div>
       <div class="room-side">${cardHTML(p)}
         <div class="pc-actions"><button class="btn sketch" id="pc-turn">Turn it over ↻</button><button class="btn sketch" id="pc-close">Back to the rooms</button></div>
-        <details class="room-style"><summary>Decorate this room</summary>${stylePicker("room", roomStyles(), p.room && ART[`${p.room}.jpg`] ? p.room : "", "Usual")}</details></div>
+        <details class="room-style"><summary>${ico("palette", "inline")} Decorate this room</summary>${stylePicker("room", roomStyles(), p.room && ART[`${p.room}.jpg`] ? p.room : "", "Usual")}</details></div>
     </div>`;
   $("pc").hidden = false;
   sfx.paper();
