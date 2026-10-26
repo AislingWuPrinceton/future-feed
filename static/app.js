@@ -1,4 +1,4 @@
-import { renderAll, ico, HABIT_ICON, CHARACTER_ICON } from "./icons.js";
+import { renderAll, ico, HABIT_ICON, CHARACTER_ICON, PICKER_ICONS } from "./icons.js";
 import rough from "./vendor/rough.esm.js";
 import { sfx, buzz } from "./sound.js";
 
@@ -69,11 +69,15 @@ function pickItem(t, on) {
   return `
     <div class="pick-item sketch ${on ? "on" : ""}" data-key="${t.key}">
       <div class="pick-top">
-        <span class="em">${hico(t.key)}</span>
+        ${custom ? `<button type="button" class="em icon-btn" data-icon="" aria-label="Choose an icon" title="Choose an icon">${hico("custom")}<small>icon</small></button>` : `<span class="em">${hico(t.key)}</span>`}
         ${custom ? `<input class="cname" maxlength="40" placeholder="Something else: meditate, draw, piano…">` : `<span class="name">${t.label}</span>`}
         <input type="number" class="amt" min="1" max="240" value="${t.default_amount}" aria-label="amount">
         <span class="unit">${t.unit === "dollars" ? "$ / day" : "min / day"}</span>
       </div>
+      ${custom ? `<div class="icon-pick" hidden>
+        <button type="button" class="ip ai on" data-icon=""><span class="ai-spark">${hico("custom")}</span><span><b>Let AI choose</b><small>from what you type</small></span></button>
+        ${PICKER_ICONS.map((n) => `<button type="button" class="ip" data-icon="${n}" title="${n}">${ico(n)}</button>`).join("")}
+      </div>` : ""}
       <div class="pick-more">
         <label>Where are you starting?
           <select class="lvl">${START.map((x, i) => `<option value="${i}">${x}</option>`).join("")}</select></label>
@@ -87,6 +91,7 @@ function pickList(el, preselect) {
   const all = [...S.templates, { key: "custom", label: "Something else", unit: "minutes", default_amount: 15 }];
   el.innerHTML = all.map((t) => pickItem(t, t.key === preselect)).join("");
   el.querySelectorAll(".pick-item").forEach((item) => {
+    bindIconPick(item);
     item.addEventListener("click", (e) => {
       if (e.target.closest("input, select, label")) {
         if (e.target.classList.contains("cname") && !item.classList.contains("on")) selectPick(el, item, true);
@@ -108,7 +113,29 @@ const picked = (el) => [...el.querySelectorAll(".pick-item.on")].map((i) => ({
   start_level: +i.querySelector(".lvl").value,
   goal: i.querySelector(".goal").value.trim(),
   name: i.querySelector(".cname")?.value.trim() || "",
+  icon: i.querySelector(".icon-btn")?.dataset.icon || "",
 }));
+
+// the star on a custom habit opens a grid of icons; "Let AI choose" leaves it to the Ladder agent
+function bindIconPick(item) {
+  const btn = item.querySelector(".icon-btn"), grid = item.querySelector(".icon-pick");
+  if (!btn) return;
+  btn.onclick = (e) => {
+    e.stopPropagation();
+    if (!item.classList.contains("on")) item.click();
+    grid.hidden = !grid.hidden; btn.classList.toggle("open", !grid.hidden); sfx.tick();
+  };
+  grid.querySelectorAll(".ip").forEach((b) => (b.onclick = (e) => {
+    e.stopPropagation();
+    const n = b.dataset.icon;
+    btn.dataset.icon = n;
+    btn.innerHTML = `${n ? ico(n) : hico("custom")}<small>${n ? "change" : "icon"}</small>`;
+    btn.classList.toggle("chosen", !!n);
+    grid.querySelectorAll(".ip").forEach((x) => x.classList.toggle("on", x === b));
+    grid.hidden = true; btn.classList.remove("open");
+    replay(btn, "boing"); sfx.pop();
+  }));
+}
 
 let readOnboardAvatar = () => ({ character: "🦊" });
 
@@ -165,6 +192,7 @@ function openAdd() {
   $("another-custom").onclick = () => {
     $("another-custom").insertAdjacentHTML("beforebegin", pickItem({ key: "custom", unit: "minutes", default_amount: 15 }, true));
     const item = $("another-custom").previousElementSibling;
+    bindIconPick(item);
     item.addEventListener("click", (e) => { if (!e.target.closest("input, select, label")) selectPick($("add-habits"), item, !item.classList.contains("on")); });
     item.querySelector(".cname").focus();
   };
@@ -758,7 +786,9 @@ let VIEW = localStorage.getItem("ff-view") === "inside" ? "inside" : "town";
 const MAXF = 6;
 const KIND = { guitar: "hall", music: "hall", piano: "hall", dance: "hall", reading: "library", pencil: "studio", palette: "studio", camera: "studio", laptop: "studio",
   running: "gym", bike: "gym", dumbbell: "gym", wave: "gym", spanish: "cafe", chat: "cafe", pan: "cafe",
-  saving: "home", heart: "home", lotus: "garden", sprout: "garden", drop: "garden", moon: "garden", sun: "garden" };
+  saving: "home", heart: "home", lotus: "garden", sprout: "garden", drop: "garden", moon: "garden", sun: "garden",
+  mic: "hall", headphones: "hall", puzzle: "library", globe: "library", plane: "cafe", coffee: "cafe", apple: "cafe",
+  mountain: "gym", ball: "gym", flame: "gym", paw: "home", broom: "home", bed: "home", house: "home", tree: "garden" };
 const KIND_NAME = { hall: "Music hall", library: "Library", gym: "Gym", cafe: "Café", home: "Home", garden: "Greenhouse", studio: "Studio" };
 // what each building looks like from the street. A habit's kind still picks its rooms; the look is the facade,
 // and no two habits share one while there are looks left: the first free one that suits the habit, else any free one

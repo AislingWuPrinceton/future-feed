@@ -323,6 +323,7 @@ class HabitIn(BaseModel):
     start_level: int = 0
     goal: str = ""
     name: str = ""   # only for key == "custom"
+    icon: str = ""   # custom only: picked by the user; empty lets the Ladder agent choose
 
 
 def make_custom(body):
@@ -349,7 +350,8 @@ def make_custom(body):
         db.log_event(run_id, "ladder_rejected", json.dumps(lad["chapters"])[:500])
         raise HTTPException(502, "Couldn't build a sensible plan for that one. Try wording it differently.")
     template = {"key": "custom", "label": lad["label"][:40] or name, "short": (lad["short"] or name)[:14],
-                "icon": lad["icon"] if lad["icon"] in game.ICONS else "custom",
+                "icon": body.icon if body.icon in game.ICONS and body.icon != "custom"
+                        else lad["icon"] if lad["icon"] in game.ICONS else "custom",
                 "emoji": lad["emoji"][:4] or "✨", "unit": "minutes", "measure": "hours",
                 "chapters": chapters, "sources": ["Milestones designed by the Ladder agent (estimates)."],
                 "photo_queries": lad["photo_queries"][:6],

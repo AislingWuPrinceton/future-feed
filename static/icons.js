@@ -140,6 +140,65 @@ const DRAW = {
     rc.path("M8 13 Q8 6 15 6 L49 6 Q56 6 56 13 L56 35 Q56 42 49 42 L28 42 L16 54 L19 42 L15 42 Q8 42 8 35 Z", o(C.sky, { seed: 210 })),
     rc.circle(22, 24, 6, ink({ seed: 211 })), rc.circle(32, 24, 6, ink({ seed: 212 })), rc.circle(42, 24, 6, ink({ seed: 213 })),
   ],
+  apple: (rc) => [
+    rc.path("M32 18 Q44 8 52 20 Q60 34 50 48 Q42 60 32 54 Q22 60 14 48 Q4 34 12 20 Q20 8 32 18 Z", o(C.rose, { seed: 401 })),
+    rc.line(32, 18, 34, 6, line({ strokeWidth: 3, seed: 402 })),
+    rc.path("M35 10 Q44 2 50 8 Q42 14 35 10 Z", o(C.green, { seed: 403 })),
+  ],
+  coffee: (rc) => [
+    rc.path("M10 24 L46 24 L42 56 L14 56 Z", o(C.cream, { seed: 404 })),
+    rc.path("M46 30 Q58 30 56 40 Q54 48 44 46", line({ fill: "none", strokeWidth: 3, seed: 405 })),
+    rc.ellipse(28, 25, 34, 6, o(C.brown, { seed: 406 })),
+    rc.path("M20 18 Q16 12 20 6 M30 18 Q26 12 30 6 M40 18 Q36 12 40 6", line({ fill: "none", stroke: C.gray, seed: 407 })),
+  ],
+  headphones: (rc) => [
+    rc.path("M12 38 Q12 8 32 8 Q52 8 52 38", line({ fill: "none", strokeWidth: 4, seed: 408 })),
+    rc.rectangle(6, 34, 14, 22, o(C.rose, { seed: 409 })), rc.rectangle(44, 34, 14, 22, o(C.rose, { seed: 410 })),
+  ],
+  globe: (rc) => [
+    rc.circle(32, 32, 50, o(C.blue, { seed: 411 })),
+    rc.path("M18 18 Q26 14 30 22 Q26 30 18 30 Q12 26 18 18 Z M36 34 Q46 30 50 40 Q44 52 36 48 Q32 42 36 34 Z", o(C.green, { seed: 412 })),
+    rc.ellipse(32, 32, 22, 50, line({ fill: "none", strokeWidth: 1, seed: 413 })),
+  ],
+  mountain: (rc) => [
+    rc.polygon([[2, 56], [24, 16], [46, 56]], o(C.green, { seed: 414 })),
+    rc.polygon([[22, 56], [44, 22], [62, 56]], o(C.blue, { seed: 415 })),
+    rc.polygon([[38, 31], [44, 22], [50, 31], [46, 29], [42, 32]], o(C.white, { seed: 416 })),
+    rc.circle(14, 12, 10, o(C.yellow, { seed: 417 })),
+  ],
+  ball: (rc) => [
+    rc.circle(32, 32, 50, o(C.orange, { seed: 418 })),
+    rc.path("M8 32 L56 32 M32 8 L32 56 M14 14 Q26 32 14 50 M50 14 Q38 32 50 50", line({ fill: "none", strokeWidth: 1.6, seed: 419 })),
+  ],
+  paw: (rc) => [
+    rc.ellipse(32, 44, 26, 20, o(C.tan, { seed: 420 })),
+    rc.circle(14, 28, 11, o(C.tan, { seed: 421 })), rc.circle(24, 16, 11, o(C.tan, { seed: 422 })),
+    rc.circle(40, 16, 11, o(C.tan, { seed: 423 })), rc.circle(50, 28, 11, o(C.tan, { seed: 424 })),
+  ],
+  broom: (rc) => [
+    rc.line(44, 4, 30, 38, line({ stroke: C.brown, strokeWidth: 4, seed: 425 })),
+    rc.path("M26 34 L38 40 L36 60 L10 52 Z", o(C.yellow, { seed: 426 })),
+    rc.path("M18 48 L14 56 M24 50 L22 58 M30 52 L30 60", line({ fill: "none", strokeWidth: 1.2, seed: 427 })),
+  ],
+  bed: (rc) => [
+    rc.rectangle(6, 34, 52, 14, o(C.lilac, { seed: 428 })),
+    rc.rectangle(8, 28, 16, 8, o(C.white, { seed: 429 })),
+    rc.line(6, 20, 6, 56, line({ strokeWidth: 3.5, seed: 430 })), rc.line(58, 40, 58, 56, line({ strokeWidth: 3.5, seed: 431 })),
+    rc.path("M40 8 L48 8 L40 18 L48 18", line({ fill: "none", strokeWidth: 2, seed: 432 })),
+  ],
+  mic: (rc) => [
+    rc.rectangle(22, 4, 20, 32, o(C.gray, { seed: 433 })),
+    rc.path("M14 26 Q14 46 32 46 Q50 46 50 26", line({ fill: "none", strokeWidth: 3, seed: 434 })),
+    rc.line(32, 46, 32, 56, line({ strokeWidth: 3, seed: 435 })), rc.line(22, 58, 42, 58, line({ strokeWidth: 3, seed: 436 })),
+  ],
+  puzzle: (rc) => [
+    rc.path("M10 14 L26 14 Q24 6 32 6 Q40 6 38 14 L54 14 L54 30 Q62 28 62 36 Q62 44 54 42 L54 58 L10 58 L10 42 Q18 44 18 36 Q18 28 10 30 Z", o(C.green, { seed: 437 })),
+  ],
+  plane: (rc) => [
+    rc.path("M4 34 L58 12 Q62 12 60 18 L36 54 L30 38 Z", o(C.white, { seed: 438 })),
+    rc.path("M30 38 L58 12", line({ fill: "none", seed: 439 })),
+    rc.path("M8 52 Q14 46 20 50", line({ fill: "none", stroke: C.gray, seed: 440 })),
+  ],
   custom: (rc) => [
     rc.path("M32 4 L37 25 L58 30 L37 35 L32 58 L27 35 L6 30 L27 25 Z", o(C.yellow, { seed: 34 })),
     rc.path("M52 6 L54 12 L60 14 L54 16 L52 22 L50 16 L44 14 L50 12 Z", o(C.lilac, { seed: 35 })),
@@ -287,6 +346,10 @@ export function ico(name, cls = "") {
   return `<span class="ico ${cls}">${CACHE[name] || CACHE.custom || ""}</span>`;
 }
 
+// what a custom habit can wear: picked from this grid, or left to the Ladder agent
+export const PICKER_ICONS = ["reading", "pencil", "chat", "spanish", "globe", "laptop", "puzzle", "palette", "camera", "music",
+  "guitar", "piano", "mic", "headphones", "dance", "running", "bike", "wave", "dumbbell", "ball", "mountain", "lotus", "heart",
+  "moon", "bed", "sun", "drop", "apple", "pan", "coffee", "sprout", "tree", "paw", "broom", "house", "saving", "plane", "flame"];
 export const HABIT_ICON = (key) => (key in DRAW && !["custom"].includes(key) ? key : "custom");
 export const CHARACTER_ICON = { "🦊": "fox", "🐼": "panda", "🐱": "cat", "🐰": "bunny", "🐻": "bear", "🐨": "koala",
   "🐸": "frog", "🦁": "lion", "🐧": "penguin", "🙂": "person" };
