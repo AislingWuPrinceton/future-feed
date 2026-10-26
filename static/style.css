@@ -142,7 +142,10 @@ form input:focus, .pick-more select:focus, .pick-more input:focus { outline: non
 .avopt .ico { width: 80%; height: 80%; }
 
 /* ---------- dashboard: me + today ---------- */
-.dash { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr); gap: 22px; align-items: start; }
+.dash { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr); gap: 22px; align-items: stretch; }
+/* both columns end on the same line: whichever is shorter stretches its last card */
+#today { display: flex; flex-direction: column; } #today > .today-card { flex: 1; }
+#me > .me-mail { flex: 1; align-content: center; }
 .me-card, .today-card { background: var(--card); padding: 18px 20px; box-shadow: 5px 6px 0 rgba(43, 36, 32, .1); }
 .me-card { display: flex; gap: 18px; align-items: center; transform: rotate(-.6deg); }
 .me-av { border: 0; background: none; padding: 0; cursor: pointer; }
