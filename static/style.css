@@ -673,7 +673,7 @@ body.study .page { padding-bottom: 120px; }
 .town.night .lot-name { color: #fffaf0; } .town.night .lot-name small { color: #e9dcc6; }
 .lot.done-today .lot-name small { color: #d6f5bf; }
 
-.lot-tip { position: absolute; left: calc(100% - 8px); top: 92px; width: 224px; z-index: 8; transform: translate(-8px, 0) rotate(1deg) scale(.95); opacity: 0; pointer-events: none;
+.lot-tip { position: absolute; left: 0; top: 0; width: 224px; z-index: 8; transform-origin: 50% 100%; transform: translateY(8px) scale(.95); opacity: 0; pointer-events: none;
   background: var(--card); border: 2px solid var(--ink); border-radius: var(--wobble-sm); padding: 9px 12px; font-size: 13px; line-height: 1.38;
   box-shadow: 3px 3px 0 var(--ink); transition: opacity .2s, transform .35s cubic-bezier(.3, 1.6, .5, 1); }
 .lot-tip b { display: block; font-family: var(--hand); font-size: 22px; line-height: 1; margin-bottom: 3px; }
@@ -688,8 +688,6 @@ body.study .page { padding-bottom: 120px; }
 .tip-acts button + button { background: #fff; }
 .tip-acts button:hover { transform: translate(-1px, -1px); box-shadow: 3px 3px 0 var(--ink); }
 .lot:not(.pinned) .tip-acts { display: none; }
-.lot.tip-r .lot-tip { left: auto; right: calc(100% - 8px); transform: translate(8px, 0) rotate(-1deg) scale(.95); }
-.lot.tip-r:hover .lot-tip, .lot.tip-r.pinned .lot-tip { transform: rotate(1deg); }
 .lot:hover { z-index: 9; }
 
 .lot-say { position: absolute; bottom: 112px; left: 50%; transform: translate(-50%, 8px) scale(.7); opacity: 0; z-index: 7; white-space: nowrap; pointer-events: none;
@@ -927,7 +925,6 @@ body.study .page { padding-bottom: 120px; }
 .town.photo .lot.back .mailbox { bottom: 96px; scale: .8; }
 .town.photo .lot.back .lot-name { display: none; }
 .town.photo .lot.back .lot-hold { bottom: 62px; }
-.town.photo .lot.back .lot-tip { top: 140px; }
 /* a new building rises out of the ground in a puff of wool */
 .lot.rise .lot-b { animation: lotrise 1.5s cubic-bezier(.2, 1.1, .4, 1) .4s both; }
 @keyframes lotrise { 0% { clip-path: inset(100% -20% 0 -20%); translate: 0 30px; } 70% { translate: 0 -6px; } 100% { clip-path: inset(-20% -20% -20% -20%); translate: 0 0; } }

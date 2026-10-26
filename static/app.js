@@ -1189,9 +1189,15 @@ function renderTown(opts = {}) {
     const mine = POSTS.kept.filter((p) => p.habit_id === +b.dataset.mail);
     if (mine.length) { sfx.paper(); openPostcard(mine[0]); } else b.classList.add("nomail");
   }));
-  const side = (l) => {  // keep the tip card inside the town
-    const r = l.getBoundingClientRect(), t = town.getBoundingClientRect();
-    l.classList.toggle("tip-r", r.right + 230 > t.right);
+  const side = (l) => {  // the tip card sits centered just above the roof, kept inside the town
+    const tip = l.querySelector(".lot-tip"), b = l.querySelector(".ibld, .lot-b");
+    if (!tip || !b) return;
+    const L = l.getBoundingClientRect(), B = b.getBoundingClientRect(), T = town.getBoundingClientRect();
+    const k = L.width / l.offsetWidth || 1;  // the street is zoomed down on phones
+    const w = tip.offsetWidth * k, h = tip.offsetHeight * k;
+    const x = Math.max(T.left + 8, Math.min(T.right - w - 8, B.left + B.width / 2 - w / 2));
+    const y = Math.max(T.top + 8, B.top - h - 12);
+    tip.style.left = `${(x - L.left) / k}px`; tip.style.top = `${(y - L.top) / k}px`;
   };
   town.querySelectorAll(".lot[data-h]").forEach((l) => (l.onmouseenter = () => { sfx.tick(); side(l); }));
   $("lot-add").onclick = openAdd;
