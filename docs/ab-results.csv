@@ -1,0 +1,7 @@
+participant,date,order,habit,A_motivation,A_predicted_days,A_future_self,A_enjoy,A_keep_using,A_explore_seconds,A_observations,B_motivation,B_predicted_days,B_future_self,B_enjoy,B_keep_using,B_explore_seconds,B_observations,preference,why,unrealistic_or_uncomfortable,pull,slump_feeling,slump_comment,current_habit_app,quote_ok,followup_did_habit,notes
+P1,2026-10-25,AB,running,3,3,3,3,Maybe,,,6,7,7,7,Yes,,,B,"more interesting, more engaging",too cute for a man,Watching my building grow,Discouraging,,No,Yes,,
+P2,2026-10-25,BA,drawing,,,,,,,,7,7,7,5,Yes,,,B,I can enjoy the process of building my own town & see the future me,same postcard picture it's fake,The postcard from future me,Neutral,,Notion,Yes,,
+P3,2026-10-26,AB,basketball,2,1,2,2,No,167,,7,6,7,7,Yes,393,,B,"it's more fun with more features, and I can see the future me. Got motivated",nah,Watching my building grow,Didn't notice it,,no,Yes,,
+P4,2026-10-26,BA,running,2,2,1,2,Maybe,49,felt nothing to do,6,7,5,7,Yes,131,,B,I can feel motivated and keep doing it,no,The postcard from future me,Discouraging,,no,Yes,,
+P5,2026-10-26,,dancing,,,,,,,,7,6,7,7,Yes,240,,B,I feel more motivation to do a thing,It's perfect,Nothing really,Didn't notice it,,No,Yes,,
+P6,2026-10-26,BA,writing,2,1,2,2,No,251,,6,5,5,5,Maybe,217,quite interesting,B,"it's more fun, I like to build my own building and collect my things",no,The postcard from future me,Motivating,,no,Yes,,

@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Future Feed A/B results</title>
+<style>
+  :root { --surface: #fcfcfb; --ink: #0b0b0b; --ink2: #52514e; --muted: #8a8984; --grid: #e7e6e2; --a: #2a78d6; --b: #eb6834; }
+  body { margin: 0; background: var(--surface); color: var(--ink); font: 15px/1.45 -apple-system, "Segoe UI", Nunito, sans-serif; }
+  .wrap { max-width: 980px; margin: 0 auto; padding: 28px 22px 40px; }
+  h1 { font-size: 22px; margin: 0 0 4px; } .sub { color: var(--ink2); margin: 0 0 18px; }
+  .legend { display: flex; gap: 18px; margin: 0 0 10px; color: var(--ink2); font-size: 13px; }
+  .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; vertical-align: -1px; }
+  .panels { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
+  @media (max-width: 760px) { .panels { grid-template-columns: repeat(2, minmax(0, 1fr)); } .tiles { grid-template-columns: 1fr !important; } }
+  .panel h2 { font-size: 14px; margin: 0; } .panel p { margin: 0 0 4px; color: var(--ink2); font-size: 12.5px; }
+  svg text { font-size: 11px; fill: var(--muted); }
+  .tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin-top: 24px; }
+  .tile { border: 1px solid var(--grid); border-radius: 10px; padding: 12px 14px; }
+  .tile b { display: block; font-size: 26px; line-height: 1.1; } .tile span { color: var(--ink2); font-size: 13px; }
+  .tip { position: fixed; pointer-events: none; background: #fff; border: 1px solid var(--grid); border-radius: 8px; padding: 6px 9px; font-size: 12.5px;
+    box-shadow: 0 4px 14px rgba(0,0,0,.12); opacity: 0; transition: opacity .1s; }
+  details { margin-top: 22px; } table { border-collapse: collapse; font-size: 13px; margin-top: 8px; }
+  td, th { border-bottom: 1px solid var(--grid); padding: 5px 10px; text-align: left; } th { color: var(--ink2); font-weight: 600; }
+  .note { color: var(--ink2); font-size: 12.5px; margin-top: 18px; }
+</style></head><body><div class="wrap">
+<h1>Everyone who tried both versions scored Future Feed higher on all four questions</h1>
+<p class="sub">Paired answers from the 4 participants who completed both rounds (2 did A first, 2 did B first). Each line is one person.</p>
+<div class="legend"><span><i style="background:var(--a)"></i>A · plain streak tracker</span><span><i style="background:var(--b)"></i>B · Future Feed</span></div>
+<div class="panels" id="panels"></div>
+<div class="tiles">
+  <div class="tile"><b>6 of 6</b><span>preferred B (all six participants)</span></div>
+  <div class="tile"><b>5 Yes · 1 Maybe</b><span>would keep using B for two weeks (all 6). A, among the 4 who tried it: 0 Yes, 2 Maybe, 2 No</span></div>
+  <div class="tile"><b>229 s vs 167 s</b><span>median time exploring on their own, B (n=4) vs A (n=3)</span></div>
+</div>
+<details><summary>Table view</summary><table id="tbl"></table></details>
+<p class="note">Small sample (4 complete pairs, 6 people in total), friends and classmates, one session each, self-reported intentions.
+Treat this as a strong early signal, not proof.</p>
+</div>
+<div class="tip" id="tip"></div>
+<script>
+const P = [{"p": "P1", "habit": "running", "order": "AB", "A_motivation": 3, "A_predicted_days": 3, "A_future_self": 3, "A_enjoy": 3, "B_motivation": 6, "B_predicted_days": 7, "B_future_self": 7, "B_enjoy": 7}, {"p": "P3", "habit": "basketball", "order": "AB", "A_motivation": 2, "A_predicted_days": 1, "A_future_self": 2, "A_enjoy": 2, "B_motivation": 7, "B_predicted_days": 6, "B_future_self": 7, "B_enjoy": 7}, {"p": "P4", "habit": "running", "order": "BA", "A_motivation": 2, "A_predicted_days": 2, "A_future_self": 1, "A_enjoy": 2, "B_motivation": 6, "B_predicted_days": 7, "B_future_self": 5, "B_enjoy": 7}, {"p": "P6", "habit": "writing", "order": "BA", "A_motivation": 2, "A_predicted_days": 1, "A_future_self": 2, "A_enjoy": 2, "B_motivation": 6, "B_predicted_days": 5, "B_future_self": 5, "B_enjoy": 5}];
+const M = [["motivation", "Motivation for tomorrow", 1, 7], ["predicted_days", "Days they'd do it next week", 0, 7],
+           ["future_self", "Connected to future self", 1, 7], ["enjoy", "Enjoyment", 1, 7]];
+const mean = (xs) => xs.reduce((s, x) => s + x, 0) / xs.length;
+const W = 220, H = 230, L = 28, R = 12, T = 12, B = 26, xA = L + 40, xB = W - R - 40;
+const tip = document.getElementById("tip");
+document.getElementById("panels").innerHTML = M.map(([k, label, lo, hi]) => {
+  const y = (v) => T + (hi - v) / (hi - lo) * (H - T - B);
+  const a = P.map((p) => p["A_" + k]), b = P.map((p) => p["B_" + k]);
+  const ticks = [];
+  for (let v = lo; v <= hi; v++) ticks.push(`<line x1="${L}" x2="${W - R}" y1="${y(v)}" y2="${y(v)}" stroke="var(--grid)"/><text x="${L - 8}" y="${y(v) + 4}" text-anchor="end">${v}</text>`);
+  const lines = P.map((p, i) => {
+    const off = (i - (P.length - 1) / 2) * 5;  // a little spread so overlapping people stay visible
+    const ya = y(p["A_" + k]), yb = y(p["B_" + k]), tipText = `${p.p} · ${p.habit} (${p.order === "AB" ? "A first" : "B first"}): A ${p["A_" + k]} → B ${p["B_" + k]}`;
+    return `<g class="person" data-tip="${tipText}">
+      <line x1="${xA + off}" y1="${ya}" x2="${xB + off}" y2="${yb}" stroke="#b9b8b2" stroke-width="2"/>
+      <circle cx="${xA + off}" cy="${ya}" r="5" fill="var(--a)" stroke="var(--surface)" stroke-width="2"/>
+      <circle cx="${xB + off}" cy="${yb}" r="5" fill="var(--b)" stroke="var(--surface)" stroke-width="2"/>
+      <line x1="${xA + off}" y1="${ya}" x2="${xB + off}" y2="${yb}" stroke="transparent" stroke-width="16"/>
+      <circle cx="${xA + off}" cy="${ya}" r="12" fill="transparent"/><circle cx="${xB + off}" cy="${yb}" r="12" fill="transparent"/></g>`;
+  }).join("");
+  return `<div class="panel"><h2>${label}</h2><p>avg ${mean(a).toFixed(1)} → ${mean(b).toFixed(1)} · ${b.filter((v, i) => v > a[i]).length} of ${P.length} higher in B</p>
+    <svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="${label}: A average ${mean(a).toFixed(1)}, B average ${mean(b).toFixed(1)}">
+      ${ticks.join("")}<text x="${xA}" y="${H - 6}" text-anchor="middle">A</text><text x="${xB}" y="${H - 6}" text-anchor="middle">B</text>${lines}</svg></div>`;
+}).join("");
+document.querySelectorAll(".person").forEach((g) => {
+  g.addEventListener("pointermove", (e) => { tip.textContent = g.dataset.tip; tip.style.left = e.clientX + 14 + "px"; tip.style.top = e.clientY + 12 + "px"; tip.style.opacity = 1; });
+  g.addEventListener("pointerleave", () => (tip.style.opacity = 0));
+});
+document.getElementById("tbl").innerHTML = `<tr><th>Person</th><th>Habit</th><th>Order</th>${M.map(([, l]) => `<th>${l} (A → B)</th>`).join("")}</tr>` +
+  P.map((p) => `<tr><td>${p.p}</td><td>${p.habit}</td><td>${p.order}</td>${M.map(([k]) => `<td>${p["A_" + k]} → ${p["B_" + k]}</td>`).join("")}</tr>`).join("");
+</script></body></html>

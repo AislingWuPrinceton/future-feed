@@ -647,8 +647,8 @@ def demo_reset():
 SURVEY_COLUMNS = ["participant", "date", "order", "habit",
                   *[f"{v}_{k}" for v in "AB" for k in ("motivation", "predicted_days", "future_self", "enjoy",
                                                          "keep_using", "explore_seconds", "observations")],
-                  "preference", "why", "unrealistic_or_uncomfortable", "stopped_timeline_feeling",
-                  "stopped_timeline_comment", "current_habit_app", "quote_ok", "followup_did_habit", "notes"]
+                  "preference", "why", "unrealistic_or_uncomfortable", "pull", "slump_feeling", "slump_comment",
+                  "current_habit_app", "quote_ok", "followup_did_habit", "notes"]
 
 
 class SurveyIn(BaseModel):
