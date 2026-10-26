@@ -1081,10 +1081,16 @@ let CLOUDS = [], DECO = [];
 // which felt landscape is behind the town: night, sunset, or the app date's season; and how far down
 // each picture its cream path runs (the buildings stand on it)
 const PATH_Y = { background: .79, background_night: .79, background_autumn: .74, background_spring: .75, background_sunset: .73, background_winter: .82 };
+// the four seasons you can pick in the town's corner; picking the one in use again goes back to following the date
+const SEASONS = [["spring", "Spring", "background_spring"], ["summer", "Summer", "background"], ["autumn", "Autumn", "background_autumn"], ["winter", "Winter", "background_winter"]];
+let season = localStorage.getItem("ff-season");
+function dateSeason() {
+  const m = +S.today.slice(5, 7);
+  return m >= 3 && m <= 5 ? "spring" : m >= 9 && m <= 11 ? "autumn" : m === 12 || m <= 2 ? "winter" : "summer";
+}
 function townBackdrop() {
-  const m = +S.today.slice(5, 7), hr = new Date().getHours();
-  const want = night ? "background_night" : hr >= 17 && hr < 19 ? "background_sunset"
-    : m >= 3 && m <= 5 ? "background_spring" : m >= 9 && m <= 11 ? "background_autumn" : m === 12 || m <= 2 ? "background_winter" : "background";
+  const hr = new Date().getHours(), sz = SEASONS.find((x) => x[0] === (season || dateSeason()));
+  const want = night ? "background_night" : !season && hr >= 17 && hr < 19 ? "background_sunset" : sz[2];
   const name = ART[`${want}.jpg`] ? want : ART["background.jpg"] ? "background" : null;
   return name && { name, p: PATH_Y[name] || .79, native: name === want && night };
 }
@@ -1144,8 +1150,12 @@ function renderTown(opts = {}) {
   $("town").innerHTML = `
     ${DEFS}
     <div class="sky">${BGP ? `<img class="bg-photo" style="--p:${bg.p}" src="${artUrl(`${bg.name}.jpg`)}" alt="">` : SKY}${night && !bg?.native ? `<span class="stars"></span>` : ""}</div>
+    ${BGP ? `<div class="seasons" role="group" aria-label="Season">${SEASONS.filter((x) => ART[`${x[2]}.jpg`]).map(([k, label, file]) => {
+      const on = !night && (season || dateSeason()) === k;
+      return `<button class="season ${on ? "on" : ""}" data-season="${k}" aria-pressed="${on}" title="${on && season ? "Back to following the date" : `See your town in ${label.toLowerCase()}`}"><i style="background-image:url(${artUrl(`${file}.jpg`)})"></i><span>${label}</span></button>`;
+    }).join("")}</div>` : ""}
     <div class="mobile">
-      ${[[2, 30, 190], [30, 92, 140], [50, 14, 210]].map(([x, len, w], i) => `<span class="hang cloud-h" style="--x:${x}%; --len:${len}px; --t:${5 + i * 1.3}s; width:${w}px"><i class="thread"></i><button class="cloud" aria-label="A felt cloud">${CLOUDS[i % 2] || CLOUD}<span class="drops"></span></button></span>`).join("")}
+      ${[[24, 30, 190], [30, 92, 140], [50, 14, 210]].map(([x, len, w], i) => `<span class="hang cloud-h" style="--x:${x}%; --len:${len}px; --t:${5 + i * 1.3}s; width:${w}px"><i class="thread"></i><button class="cloud" aria-label="A felt cloud">${CLOUDS[i % 2] || CLOUD}<span class="drops"></span></button></span>`).join("")}
       ${night ? [[18, 40], [40, 22], [66, 54], [93, 30]].map(([x, len], i) => `<span class="hang star-h" style="--x:${x}%; --len:${len}px; --t:${4 + i}s"><i class="thread"></i><button class="star" aria-label="A felt star">${STAR}</button></span>`).join("")
         : `<span class="hang balloon-h" style="--x:76%; --len:46px; --t:7s"><i class="thread"></i><button class="balloon" aria-label="A felt balloon">${BALLOON}</button></span>`}
       <span class="hang sun-h" style="--x:89%; --len:26px; --t:6.5s"><i class="thread"></i><button class="sun" id="sun" aria-label="Day or night" title="${night ? "Back to day" : "See your town at night"}">${SUN[night ? 1 : 0]}</button></span>
@@ -1201,6 +1211,14 @@ function renderTown(opts = {}) {
   };
   town.querySelectorAll(".lot[data-h]").forEach((l) => (l.onmouseenter = () => { sfx.tick(); side(l); }));
   $("lot-add").onclick = openAdd;
+  town.querySelectorAll("[data-season]").forEach((b) => (b.onclick = (e) => {
+    e.stopPropagation();
+    const k = b.dataset.season;
+    season = !night && season === k ? null : k;
+    if (season) localStorage.setItem("ff-season", season); else localStorage.removeItem("ff-season");
+    night = false; sfx.chime(); renderTown({ noAnim: true });
+    $("town").querySelectorAll(".bg-photo").forEach((im) => replay(im, "swap"));
+  }));
   $("sun").onclick = () => { night = !night; sfx.chime(); renderTown({ noAnim: true }); };
   if (!town.dataset.bound) {
     town.dataset.bound = "1";

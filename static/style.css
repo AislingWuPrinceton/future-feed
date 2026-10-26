@@ -547,6 +547,20 @@ body.study .page { padding-bottom: 120px; }
 .town.night { background: #2a3150; }
 .town.night .sky-wash { fill: url(#skynight); }
 .town.night .sky-wash2 { fill: #3c4a7c; opacity: .6; }
+/* season picker: four little felt swatches cut from the backdrops, top-left of the town */
+.seasons { position: absolute; top: 12px; left: 12px; z-index: 6; display: flex; gap: 4px; padding: 5px 6px; background: rgba(255, 250, 240, .86);
+  border: 2px solid var(--ink); border-radius: var(--wobble-sm); box-shadow: 2px 2px 0 rgba(43, 36, 32, .7); }
+.season { display: flex; flex-direction: column; align-items: center; gap: 1px; border: 0; background: none; padding: 2px 3px; cursor: pointer; border-radius: 10px;
+  font-family: var(--hand); font-size: 16px; font-weight: 700; line-height: 1; color: var(--muted); transition: transform .3s cubic-bezier(.3, 1.6, .5, 1); }
+.season i { width: 38px; height: 38px; border-radius: 50%; border: 2px solid rgba(43, 36, 32, .35); background-size: 340% auto; background-position: 50% 62%;
+  filter: saturate(.75); transition: filter .2s, border-color .2s; }
+.season:hover { transform: translateY(-2px) rotate(-3deg); }
+.season:hover i { filter: none; }
+.season.on { color: var(--ink); }
+.season.on i { border: 2.5px solid var(--ink); filter: none; box-shadow: 0 0 0 3px var(--yellow); }
+.bg-photo.swap { animation: swap .7s ease-out; }
+@keyframes swap { from { opacity: 0; filter: blur(4px); } }
+@media (max-width: 760px) { .seasons { top: 8px; left: 8px; gap: 1px; padding: 3px 4px; } .season { font-size: 13px; } .season i { width: 28px; height: 28px; } }
 .sun { position: relative; width: 92px; height: 92px; border: 0; padding: 0; background: none; margin-top: -8px;
   transition: transform .4s cubic-bezier(.3, 1.4, .5, 1); }
 .sun svg { width: 100%; height: 100%; overflow: visible; position: relative; }
