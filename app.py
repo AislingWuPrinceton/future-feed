@@ -466,6 +466,26 @@ def checkin(habit_id: int, plain: bool = False):
     return {**result, "level_before": before["level"], "level_after": after["level"]}
 
 
+@app.get("/api/photo/{post_id}")
+def post_photo(post_id: int):
+    """A postcard's photo served from here, so the 3D walk can paint it into a frame (WebGL can't use most
+    photo sites directly). Only the photo already saved on that post is fetched; nothing else."""
+    import httpx
+    from fastapi.responses import Response
+    with db.connect() as c:
+        row = c.execute("SELECT photo FROM posts WHERE id = ?", (post_id,)).fetchone()
+    photo = json.loads(row["photo"]) if row and row["photo"] else None
+    for url in [u for u in ((photo or {}).get("thumb"), (photo or {}).get("url")) if u and u.startswith("https://")]:
+        try:
+            r = httpx.get(url, timeout=12, follow_redirects=True, headers={"User-Agent": "FutureFeed/1.0"})
+            kind = r.headers.get("content-type", "")
+            if r.status_code == 200 and kind.startswith("image/") and len(r.content) < 8_000_000:
+                return Response(r.content, media_type=kind, headers={"Cache-Control": "max-age=86400"})
+        except httpx.HTTPError:
+            continue
+    raise HTTPException(404, "No photo for that postcard.")
+
+
 @app.get("/api/feed")
 def feed(timeline: str = "kept"):
     if timeline not in ("kept", "stopped"):

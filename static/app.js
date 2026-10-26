@@ -1791,7 +1791,7 @@ function dollFloors(h) {
   return floors;
 }
 
-function openWalk(h) {
+function openWalkFlat(h) {
   if (!ART["room_empty.jpg"]) return;
   townArt();
   const floors = dollFloors(h), { R, STAIR, SLAB, ROOF, GROUND } = DH;
@@ -1928,5 +1928,66 @@ function openWalk(h) {
   let last = { f: 0, s: 0 };
   floors.forEach((fl, i) => fl.rooms.forEach((r, j) => { if (r.state !== "empty") last = { f: i, s: j }; }));
   setTimeout(() => { place(0, -1, 500); setTimeout(() => go(last.f, last.s), 600); }, 300);
+  sfx.paper();
+}
+
+// the real 3D walk (three.js loads only when you step inside); the flat dollhouse above is the fallback
+async function openWalk(h) {
+  let mod;
+  try { mod = await import("./walk3d.js"); } catch { return openWalkFlat(h); }
+  if (!mod.webglOK()) return openWalkFlat(h);
+  const floors = dollFloors(h).map((fl) => ({ ...fl, rooms: fl.rooms.map((r) => ({ ...r,
+    label: r.state === "full" ? dayLabel(r.day) : r.state === "wait" ? "Tomorrow" : `Room ${r.k + 1}`,
+    sub: r.state === "full" ? (r.key ? "floor postcard" : `room ${r.k + 1}`) : r.state === "next" ? "next to fill" : r.state === "wait" ? `room ${r.k + 1} opens` : "still empty" })) }));
+  const el = document.createElement("div");
+  el.className = "walk walk3d";
+  el.innerHTML = `<div class="walk-hud">
+      <button class="btn sketch" id="walk-x">← Back</button>
+      <p class="walk-where" id="walk-where"></p>
+      <span class="walk-act" id="walk-act"></span>
+      <span class="walk-pad"><button data-go="up" aria-label="Upstairs">▲</button><button data-go="left" aria-label="Left">◀</button><button data-go="open" aria-label="Open">●</button><button data-go="right" aria-label="Right">▶</button><button data-go="down" aria-label="Downstairs">▼</button></span>
+    </div>
+    <p class="walk-help">Click a room to walk there · drag to look around · arrow keys walk, ▲▼ take the stairs · Enter opens the room you're in</p>
+    <span class="walk-say" id="walk-say"></span>`;
+  document.body.appendChild(el);
+  document.body.classList.add("walking-open");
+  const bg = townBackdrop();
+  const roomAt = (f, s) => floors[f]?.rooms[s];
+  const openRoomAt = (f, s) => { const r = roomAt(f, s); if (r?.state === "full" && r.p) openRoom(r.p, r.rn, dayLabel(r.day)); };
+  const say = (t) => { const b = $("walk-say"); b.textContent = t; replay(b, "show"); };
+  const where = (f, s) => {
+    const r = roomAt(f, s);
+    $("walk-where").innerHTML = `<b>${esc(lookName(h))} · floor ${floors[f].f + 1}</b><small>${s < 0 ? "the stairs" : r.state === "full" ? `${dayLabel(r.day)} · Enter or click to read it` : r.state === "next" ? "the next room: hold to build it" : r.state === "wait" ? "opens tomorrow" : "still empty"}</small>`;
+    $("walk-act").innerHTML = r?.state === "next" ? `<button class="lot-hold" data-hold="${h.id}"><i></i><span>Hold to build</span></button>` : r?.state === "full" ? `<button class="btn primary sketch" id="walk-open">Read this room's postcard</button>` : "";
+    $("walk-act").querySelectorAll(".lot-hold").forEach(bindHold);
+    $("walk-open")?.addEventListener("click", () => openRoomAt(f, s));
+  };
+  const w = mod.walk3D({
+    mount: el, floors, roofColor: STYLE[KIND[h.icon] || "studio"]?.roof, background: bg ? artUrl(`${bg.name}.jpg`) : null,
+    avatar: S.profile.avatar, sfx,
+    photo: (f, s) => { const p = roomAt(f, s)?.p; return p?.photo ? `/api/photo/${p.id}` : null; },
+    onOpen: openRoomAt,
+    onMoved: (f, s) => { where(f, s); const r = roomAt(f, s); if (r?.state === "full") say(r.key ? "A whole floor, built!" : `My room from ${dayLabel(r.day)}.`); },
+  });
+  where(0, -1);
+  const onKey = (e) => {
+    if (!$("pc").hidden || e.target.closest?.("input, textarea")) return;
+    if (e.key === "Escape") return close();
+    if (e.key === "Enter" || e.key === " ") { e.preventDefault(); return openRoomAt(w.pos.f, w.pos.s); }
+    if (e.key.startsWith("Arrow")) { e.preventDefault(); w.key(e.key); }
+  };
+  addEventListener("keydown", onKey);
+  el.querySelectorAll("[data-go]").forEach((b) => (b.onclick = () => b.dataset.go === "open" ? openRoomAt(w.pos.f, w.pos.s)
+    : w.key({ up: "ArrowUp", down: "ArrowDown", left: "ArrowLeft", right: "ArrowRight" }[b.dataset.go])));
+  function close() {
+    removeEventListener("keydown", onKey); w.dispose();
+    el.classList.add("bye"); document.body.classList.remove("walking-open");
+    setTimeout(() => el.remove(), 350);
+  }
+  $("walk-x").onclick = close;
+  // come in through the front, then head for your newest room
+  let last = { f: 0, s: 0 };
+  floors.forEach((fl, i) => fl.rooms.forEach((r, j) => { if (r.state !== "empty") last = { f: i, s: j }; }));
+  setTimeout(() => w.go(last.f, last.s), 700);
   sfx.paper();
 }

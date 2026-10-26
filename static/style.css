@@ -1245,3 +1245,13 @@ body.walking-open { overflow: hidden; }
 .walk-in { width: auto; margin: 10px 0 0; padding: 8px 18px; display: inline-flex; align-items: center; gap: 6px; }
 .walk-in .ico { width: 20px; height: 20px; }
 @media (max-width: 760px) { .walk-help { display: none; } .walk-where b { font-size: 19px; } }
+
+.walk3d canvas { position: absolute; inset: 0; display: block; touch-action: none; cursor: grab; }
+.walk3d canvas:active { cursor: grabbing; }
+.walk-act { display: flex; align-items: center; }
+.walk-act .btn { width: auto; margin: 0; padding: 7px 14px; font-size: 13px; }
+.walk-act .lot-hold { position: static; translate: none; }
+.walk-say { position: absolute; left: 50%; top: 42%; translate: -50% 0; z-index: 5; background: #fff; border: 2px solid var(--ink); border-radius: 16px; padding: 5px 14px;
+  font-weight: 800; font-size: 15px; opacity: 0; pointer-events: none; }
+.walk-say.show { animation: sayit 2.4s ease forwards; }
+@media (max-width: 760px) { .walk-hud { flex-wrap: wrap; } .walk-act { order: 5; width: 100%; } }
