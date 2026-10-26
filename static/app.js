@@ -1537,8 +1537,7 @@ function renderInside(opts = {}) {
     <div class="restyle-panel" id="restyle-panel" hidden><p class="pick-label">Building style <small>· your ${esc(h.short)} building in town changes too</small></p>${stylePicker("look", allLooks(), h.look && hasLook(h.look) ? h.look : "", "Town picks")}</div>
     ${nextUp ? `<p class="in-future"><span class="storeys">${plan.map(() => "<i></i>").join("")}</span>
       ${plan.length} more floor${plan.length === 1 ? "" : "s"} to build above · next is floor ${nextUp.f + 1}${nextUp.yr ? `, around ${nextUp.yr}` : ""}</p>` : ""}
-    <div class="in-stack ${opts.enter ? "enter" : ""}">${lived}</div>
-    <div class="in-ground"></div>`;
+    <div class="in-stack ${opts.enter ? "enter" : ""}">${lived}</div>`;
 
   $("in-tabs").querySelectorAll("[data-in]").forEach((b) => (b.onclick = () => { inHabit = +b.dataset.in; sfx.tick(); renderInside({ enter: true }); }));
   $("inside").querySelectorAll("[data-post]").forEach((b) => (b.onclick = () => openRoom(mine.find((p) => p.id === +b.dataset.post), b.dataset.room, b.querySelector("b")?.textContent)));
