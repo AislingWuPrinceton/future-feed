@@ -143,21 +143,6 @@ def hang_frame(img, box, frame):
     return out.convert("RGB")
 
 
-def felt_swatch():
-    """A patch of real felt (the bare cream wall of the plain room), made neutral grey so the 3D walk can tint it
-    any colour and still look like wool: tex_felt.jpg."""
-    f = RAW / "room.png"
-    if not f.exists():
-        return
-    img = Image.open(f).convert("L")
-    W, H = img.size
-    patch = img.crop((int(.38 * W), int(.13 * H), int(.84 * W), int(.47 * H))).resize((512, 512), Image.LANCZOS)
-    a = np.asarray(patch, float)
-    a = (a - a.mean()) * 2.2 + 222  # keep the fibres, centre it near white so tinting gives the true colour
-    Image.fromarray(np.clip(a, 0, 255).astype("uint8")).save(ROOT / "tex_felt.jpg", quality=90)
-    print("tex_felt.jpg")
-
-
 def save(img, name, width):
     if img.width > width:
         img = img.resize((width, round(img.height * width / img.width)), Image.LANCZOS)
@@ -204,7 +189,6 @@ def main():
         print(f"{f.stem}: {len(parts)} pieces" + ("" if len(parts) == len(names) else " (unexpected count: numbered instead of named)"))
         for i, p in enumerate(parts):
             save(p, f"prop_{names[i]}" if len(parts) == len(names) else f"{f.stem}_{i}", 360)
-    felt_swatch()
     # name -> [width, height] (+ the picture frame box for rooms), so the page can lay things out before they load
     sizes = {f.name: list(Image.open(f).size) + (frames.get(f.name) or []) for f in sorted(ROOT.iterdir()) if f.suffix in (".webp", ".jpg")}
     (ROOT / "manifest.json").write_text(json.dumps(sizes, indent=1))
