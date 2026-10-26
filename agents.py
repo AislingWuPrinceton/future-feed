@@ -193,14 +193,20 @@ def keyword_ok(img):
 
 def rank_photos(query, habit_key, avoid=(), pool=None, anchor=None):
     """Library photos ordered by how well their scene, title, and tags match the story's photo query."""
+    from collections import Counter
     pool = pool if pool is not None else PHOTOS.get(habit_key, [])
     pool = [img for img in pool if img.get("safe", True) and keyword_ok(img)]
-    if anchor:
-        on_topic = [img for img in pool if anchor in (img["title"] + " " + " ".join(img["tags"])).lower()]
-        pool = on_topic or pool
+    used = Counter(avoid)
     words = {w for w in query.lower().replace(",", " ").split() if len(w) > 2}
-    fresh = [img for img in pool if img["url"] not in avoid] or pool
-    return sorted(fresh, key=lambda img: -sum(1 for w in words if w in _text(img)))
+    score = lambda img: -sum(1 for w in words if w in _text(img))
+    fresh = [img for img in pool if img["url"] not in used]
+    if anchor:  # on-topic first, but never at the price of repeating a photo
+        on_topic = [img for img in fresh if anchor in (img["title"] + " " + " ".join(img["tags"])).lower()]
+        fresh = on_topic or fresh
+    if fresh:
+        return sorted(fresh, key=score)
+    # every photo has been used: the least-used ones come first, so repeats are spread out rather than one shot every time
+    return sorted(pool, key=lambda img: (used[img["url"]], score(img)))
 
 
 PHOTO_PROMPT = """You screen stock photos for a wholesome habit app used by students and families.
@@ -299,7 +305,7 @@ def build_ladder(run_id, name, minutes):
     )
 
 
-def fetch_photos(queries, per_query=4):
+def fetch_photos(queries, per_query=4, page=1):
     """Live Openverse search for a custom habit (slow, so it runs once when the habit is created)."""
     from concurrent.futures import ThreadPoolExecutor
     import httpx
@@ -307,7 +313,7 @@ def fetch_photos(queries, per_query=4):
     def one(q):
         try:
             r = httpx.get("https://api.openverse.org/v1/images/",
-                          params={"q": q, "page_size": per_query, "mature": "false", "category": "photograph"}, timeout=25)
+                          params={"q": q, "page_size": per_query, "page": page, "mature": "false", "category": "photograph"}, timeout=25)
             return [(q, img) for img in r.json().get("results", [])[:per_query]]
         except Exception:
             return []

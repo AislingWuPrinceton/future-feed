@@ -96,7 +96,12 @@ def compose_post(habit, kind, st, life_event="", combo_with=None):
     with db.connect() as c:
         used = [json.loads(r["photo"])["url"] for r in c.execute("SELECT photo FROM posts WHERE photo IS NOT NULL")
                 if r["photo"] and r["photo"] != "null"]
+        for r in c.execute("SELECT payload FROM drafts"):  # postcards written ahead count too
+            d = json.loads(r["payload"])
+            used += [ph["url"] for ph in (d.get("photo"), d.get("stopped_photo")) if ph]
     custom_pool = refill_photos(habit) if habit.get("custom") else None
+    if custom_pool is not None and not [img for img in custom_pool if img["url"] not in used]:
+        custom_pool = grow_photos(habit, [s["photo_query"]])  # used them all up: find more for this very scene
     # prefer photos whose title/tags actually mention the habit (avoids odd off-topic stock shots)
     anchor = game.template_for(habit)["short"].lower() if custom_pool else \
         {"guitar": "guitar", "running": "run", "reading": "book", "spanish": None, "saving": None}.get(habit["key"])
@@ -372,6 +377,21 @@ def make_custom(body):
                 "photo_queries": lad["photo_queries"][:6],
                 "photos": [p for p in agents.fetch_photos(lad["photo_queries"]) if agents.keyword_ok(p)]}
     return template
+
+
+def grow_photos(habit, queries):
+    """A custom habit that has used every photo it has looks up more (for the scene being written now) and keeps them."""
+    t = game.template_for(habit)
+    have = {img["url"] for img in t.get("photos") or []}
+    q = queries[0]
+    tries = list(dict.fromkeys([q, " ".join(q.split()[:2]), t["short"]]))  # specific phrases often find nothing; shorter ones do
+    page = 1 + len(have) // 16  # a later page each time, so it doesn't bring back the same batch
+    new = [p for p in agents.fetch_photos(tries, per_query=8, page=page) if agents.keyword_ok(p) and p["url"] not in have]
+    if new:
+        t["photos"] = (t.get("photos") or []) + new[:12]
+        with db.connect() as c:
+            c.execute("UPDATE habits SET custom = ? WHERE id = ?", (json.dumps(t, ensure_ascii=False), habit["id"]))
+    return t.get("photos") or []
 
 
 def refill_photos(habit):
