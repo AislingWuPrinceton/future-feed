@@ -69,7 +69,7 @@ function pickItem(t, on) {
   return `
     <div class="pick-item sketch ${on ? "on" : ""}" data-key="${t.key}">
       <div class="pick-top">
-        ${custom ? `<button type="button" class="em icon-btn" data-icon="" aria-label="Choose an icon" title="Choose an icon">${hico("custom")}<small>icon</small></button>` : `<span class="em">${hico(t.key)}</span>`}
+        ${custom ? `<button type="button" class="em icon-btn" data-icon="" aria-label="Choose an icon" title="Choose an icon">${hico("custom")}</button>` : `<span class="em">${hico(t.key)}</span>`}
         ${custom ? `<input class="cname" maxlength="40" placeholder="Something else: meditate, draw, piano…">` : `<span class="name">${t.label}</span>`}
         <input type="number" class="amt" min="1" max="240" value="${t.default_amount}" aria-label="amount">
         <span class="unit">${t.unit === "dollars" ? "$ / day" : "min / day"}</span>
@@ -129,7 +129,7 @@ function bindIconPick(item) {
     e.stopPropagation();
     const n = b.dataset.icon;
     btn.dataset.icon = n;
-    btn.innerHTML = `${n ? ico(n) : hico("custom")}<small>${n ? "change" : "icon"}</small>`;
+    btn.innerHTML = n ? ico(n) : hico("custom");
     btn.classList.toggle("chosen", !!n);
     grid.querySelectorAll(".ip").forEach((x) => x.classList.toggle("on", x === b));
     grid.hidden = true; btn.classList.remove("open");
