@@ -5,6 +5,7 @@ import random
 import re
 import threading
 import uuid
+from typing import Optional
 
 import uvicorn
 from fastapi import FastAPI, HTTPException
@@ -502,8 +503,8 @@ def habit_or_404(habit_id):
 
 
 class HabitEdit(BaseModel):
-    amount: int | None = None
-    goal: str | None = None
+    amount: Optional[int] = None
+    goal: Optional[str] = None
 
 
 @app.patch("/api/habits/{habit_id}")

@@ -8,7 +8,7 @@ Most habit apps only count streaks, so people get bored and quit. Future Feed tu
 
 ## Run it locally (about 3 minutes)
 
-You need Python 3.10 or newer and an internet connection (the postcard photos load from Creative Commons sites).
+You need Python 3.9 or newer (the one built into macOS works) and an internet connection (the postcard photos load from Creative Commons sites).
 
 1. Clone the repo and enter the folder.
    ```bash
