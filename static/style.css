@@ -964,14 +964,6 @@ body.study .page { padding-bottom: 120px; }
 .in-hero.enter, .in-stack.enter { animation: walkin .55s cubic-bezier(.2, 1.2, .4, 1) both; }
 .in-stack.enter { animation-delay: .12s; }
 
-.in-future { margin-top: 18px; padding: 12px 18px 6px; border-radius: 22px; background: rgba(255, 250, 240, .84); }
-.in-future h3 { margin: 0 0 4px; font-family: var(--hand); font-size: 26px; color: #6d5a43; }
-.inside .fl.plan { display: flex; align-items: center; gap: 16px; padding: 10px 0; margin: 0; opacity: 1; background: none; border: 0; border-top: 1.5px solid rgba(90, 66, 50, .1); }
-.inside .fl.plan:first-of-type { border-top: 0; }
-.plan-text { min-width: 0; }
-.plan-text b { font-family: var(--hand); font-size: 24px; line-height: 1; margin-right: 8px; color: #5b8fd1; }
-.plan-text small { font-weight: 800; font-size: 12px; color: var(--muted); }
-.plan-text i { display: block; font-size: 13px; color: var(--muted); }
 
 .in-stack { display: flex; flex-direction: column; gap: 18px; margin-top: 18px; }
 .inside .fl.built, .inside .fl.building { padding: 16px 18px 20px; border: 0; border-radius: 26px; background: rgba(255, 250, 240, .9);
@@ -991,25 +983,18 @@ body.study .page { padding-bottom: 120px; }
   .in-hero-text h2 { justify-content: center; font-size: 34px; }
   .in-hero-text .tip-bar { margin: 0 auto; }
   .in-mini .ibld { zoom: .5; }
-  .inside .fl.plan { flex-direction: column; align-items: flex-start; gap: 6px; }
   .inside .rooms.pics { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; }
 }
 
-/* building signs: a felt bead for each room of the floor being built */
-.lot-sign { display: flex; flex-direction: column; align-items: center; gap: 3px; }
-.lot-sign .beads { display: flex; gap: 3px; }
-.lot-sign .beads i { width: 11px; height: 11px; border-radius: 50%; background: #efe4cf; box-shadow: inset 0 1px 2px rgba(60, 40, 20, .35); }
-.lot-sign .beads i.on { background: radial-gradient(circle at 35% 30%, #fff3b8, #f2b84b 60%, #c98a22); box-shadow: 0 1px 1px rgba(60, 40, 20, .3); }
-.lot.celebrate .lot-sign .beads i.last { animation: beadpop .8s cubic-bezier(.2, 1.8, .4, 1) .4s both; }
-@keyframes beadpop { 0% { transform: scale(0); } 100% { transform: none; } }
-.lot-sign .beads.bar { display: block; width: 64px; height: 7px; border-radius: 4px; background: #efe4cf; overflow: hidden; box-shadow: inset 0 1px 2px rgba(60, 40, 20, .3); }
-.lot-sign .beads.bar i { display: block; height: 100%; background: #f2b84b; }
+/* building signs: handwritten like every other label in town, with the rooms filled on the next floor */
+.lot-sign { font-family: var(--hand); font-size: 20px; font-weight: 700; line-height: 1.1; padding: 1px 11px 2px 6px; }
+.lot-sign small { font-size: 15px; color: var(--muted); margin-left: 2px; }
 
-/* floors still to come: a calm timeline of years */
-.in-future .muted { margin: 0 0 4px; font-size: 13px; }
-.plan-year { flex: none; width: 58px; height: 58px; border-radius: 50%; display: grid; place-items: center; font-family: var(--hand); font-size: 22px; font-weight: 700;
-  color: #5a6b8c; background: radial-gradient(circle at 35% 30%, #fff, #e6edf5); box-shadow: 0 2px 6px rgba(60, 40, 20, .15); }
-.plan-text b { color: var(--ink); }
+/* floors still to come: one quiet line, with a little stack of pale storeys */
+.inside .in-future { display: flex; align-items: center; justify-content: center; gap: 10px; width: fit-content; max-width: 100%; margin: 16px auto 0;
+  padding: 6px 16px 6px 10px; border: 0; border-radius: 99px; background: rgba(255, 250, 240, .72); font-family: var(--hand); font-size: 19px; color: #6d5a43; }
+.in-future .storeys { display: flex; flex-direction: column; gap: 2px; }
+.in-future .storeys i { display: block; width: 26px; height: 4px; border-radius: 2px; background: rgba(109, 90, 67, .28); }
 .room.rpic.empty.more { opacity: .7; filter: saturate(.6); }
 .room.rpic.empty.more .tag small { display: block; }
 

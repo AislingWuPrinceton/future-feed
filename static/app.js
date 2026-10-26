@@ -946,7 +946,7 @@ const artUrl = (n) => `/static/art/${n}`;
 async function loadArt() {
   ART = await fetch("/static/art/manifest.json").then((r) => (r.ok ? r.json() : {})).catch(() => ({}));
 }
-// One felt storey per finished floor; the floor in progress shows as beads on the building's sign.
+// One felt storey per finished floor; the floor in progress shows as a room count on its sign.
 function feltBuilding(h, kind, fresh) {
   const piece = (role) => ART[`${kind}_${role}.webp`];
   if (!piece("roof") || !piece("floor") || !piece("ground")) return null;
@@ -1120,14 +1120,12 @@ function renderTown(opts = {}) {
          <em>${left} more check-in${s} · ${days === 0 ? "could finish today" : days === 1 ? "could finish tomorrow" : `about ${days} days`}</em>`
       : `<em>All six floors are built.</em>`;
     const signAt = back ? 46 + art.signAt * .76 : art.signAt;
-    const beads = !prog ? "" : prog.n <= 8
-      ? `<span class="beads" title="${prog.done} of ${prog.n} rooms on the next floor">${Array.from({ length: prog.n }, (_, i) => `<i class="${i < prog.done ? "on" : ""} ${i === prog.done - 1 ? "last" : ""}"></i>`).join("")}</span>`
-      : `<span class="beads bar" title="${prog.done} of ${prog.n} rooms on the next floor"><i style="width:${(prog.done / prog.n) * 100}%"></i></span>`;
+    const rooms = prog ? `<small>${prog.done}/${prog.n} rooms</small>` : "";  // rooms filled on the floor being built
     return `
       <div class="lot ${back ? "back" : ""} ${rise ? "rise" : ""} ${opts.working === h.id ? "working" : ""} ${h.checked_today ? "done-today" : ""}" data-h="${h.id}" style="--b:${idx}; width:${art.width}px; --lw:${art.width}px">
         <div class="lot-tip"><b>${KIND_NAME[kind]} · ${Math.min(MAXF, h.level)} of 6 floors</b>${tip}</div>
         ${h.quest ? `<div class="lot-storm">${ico("storm")}<span class="rain"></span><b>Comeback quest ${h.quest.progress}/3</b></div>` : ""}
-        <div class="lot-sign" style="bottom:${signAt + 4}px"><span>${hIcon(h, "inline")} ${esc(h.short)}</span>${beads}</div>
+        <div class="lot-sign" style="bottom:${signAt + 4}px">${hIcon(h, "inline")}<b>${esc(h.short)}</b>${rooms}</div>
         <div class="lot-work">Building floor ${built + 1}…<br><small>your postcard is on its way</small></div>
         <button class="lot-b" aria-label="${esc(h.short)}: go inside">${art.svg}</button>
         <button class="mailbox ${mine.length ? "has" : ""}" data-mail="${h.id}" aria-label="Postcards">${mine.length ? MAILBOX.up : MAILBOX.down}${mine.length ? `<b>${mine.length}</b>` : ""}</button>
@@ -1246,7 +1244,9 @@ function renderInside(opts = {}) {
   if (wrap.hidden) return;
   if (!S.habits.some((h) => h.id === inHabit)) inHabit = S.habits[0].id;
   const h = S.habits.find((x) => x.id === inHabit), kind = KIND[h.icon] || "studio", st = STYLE[kind];
-  const L = S.level_checkins, days = h.days || [], mine = POSTS.kept.filter((p) => p.habit_id === h.id);
+  const mine = POSTS.kept.filter((p) => p.habit_id === h.id);
+  // check-in days come from the server; an older server doesn't send them, so read them off the postcards
+  const L = S.level_checkins, days = h.days || [...new Set(mine.map((p) => p.created_day).filter(Boolean))].sort();
   const seenRooms = inSeen[h.id] ?? days.length;
   inSeen[h.id] = days.length;
   $("in-tabs").innerHTML = S.habits.map((x) => `<button data-in="${x.id}" class="${x.id === h.id ? "on" : ""}">${hIcon(x, "inline")} ${KIND_NAME[KIND[x.icon] || "studio"]} · ${esc(x.short)}</button>`).join("");
@@ -1276,11 +1276,7 @@ function renderInside(opts = {}) {
       return "";
     }).join("");
     const story = h.chapters[ch] ? `~${year(h.chapter_dates[ch])}: future you ${esc(lower(h.chapters[ch]))}` : "A bonus floor: you're already past the last chapter.";
-    if (state === "plan") {  // floors still to come: when, and what future you is doing by then
-      return { state, html: `<section class="fl plan"><span class="plan-year">${h.chapters[ch] ? year(h.chapter_dates[ch]) : "+"}</span>
-        <div class="plan-text"><b>Floor ${f + 1}</b><small>${n} room${n > 1 ? "s" : ""}</small>
-        <i>${h.chapters[ch] ? `Future you ${esc(lower(h.chapters[ch]))}` : "A bonus floor, past the last chapter."}</i></div></section>` };
-    }
+    if (state === "plan") return { state, f, n, yr: h.chapters[ch] ? year(h.chapter_dates[ch]) : null };
     const status = state === "built" ? "Built ✓" : `Building now · ${done} of ${n} rooms`;
     return { state, html: `<section class="fl ${state}" style="--f:${f}">
       <header><b>Floor ${f + 1}</b><span class="pill">${status}</span><i>${story}</i></header>
@@ -1288,7 +1284,7 @@ function renderInside(opts = {}) {
   }).reverse();
 
   const full = Math.min(MAXF, h.level), prog = floorProgress(h), bg = townBackdrop(), mini = feltBuilding(h, kind, { floors: 99 });
-  const plan = floors.filter((x) => x.state === "plan").map((x) => x.html).join(""), lived = floors.filter((x) => x.state !== "plan").map((x) => x.html).join("");
+  const plan = floors.filter((x) => x.state === "plan"), nextUp = plan[plan.length - 1], lived = floors.filter((x) => x.state !== "plan").map((x) => x.html).join("");
   $("inside").style.setProperty("--inbg", bg ? `url(${artUrl(`${bg.name}.jpg`)})` : "none");
   $("inside").innerHTML = `
     <div class="in-hero ${opts.enter ? "enter" : ""}" style="--roof:${st.roof}">
@@ -1300,7 +1296,8 @@ function renderInside(opts = {}) {
         ${prog ? `<span class="tip-bar"><i style="width:${(prog.done / prog.n) * 100}%"></i></span><small>Floor ${full + 1}: ${prog.done} of ${prog.n} rooms · ${prog.n - prog.done} more check-in${prog.n - prog.done === 1 ? "" : "s"} to finish it</small>` : `<small>Every floor is built. Ten years tall.</small>`}
       </div>
     </div>
-    ${plan ? `<div class="in-future"><h3>Floors still to come</h3><p class="muted">Each one opens when the floor below is full.</p>${plan}</div>` : ""}
+    ${nextUp ? `<p class="in-future"><span class="storeys">${plan.map(() => "<i></i>").join("")}</span>
+      ${plan.length} more floor${plan.length === 1 ? "" : "s"} to build above · next is floor ${nextUp.f + 1}${nextUp.yr ? `, around ${nextUp.yr}` : ""}</p>` : ""}
     <div class="in-stack ${opts.enter ? "enter" : ""}">${lived}</div>
     <div class="in-ground"></div>`;
 
