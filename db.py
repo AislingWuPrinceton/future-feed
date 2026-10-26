@@ -1,10 +1,12 @@
 import json
+import os
 import sqlite3
 from contextlib import contextmanager
 from pathlib import Path
 
 DATA = Path(__file__).resolve().parent / "data"
-DB_PATH = DATA / "futurefeed.db"
+# FUTUREFEED_DB points a second copy of the app (the A/B study) at its own file, so resetting it never touches your town
+DB_PATH = Path(os.environ["FUTUREFEED_DB"]).resolve() if os.environ.get("FUTUREFEED_DB") else DATA / "futurefeed.db"
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT);
@@ -89,7 +91,7 @@ CREATE TABLE IF NOT EXISTS events (
 
 
 def init():
-    DATA.mkdir(exist_ok=True)
+    DB_PATH.parent.mkdir(exist_ok=True)
     with connect() as c:
         c.execute("PRAGMA journal_mode=WAL")  # background threads (pre-writing, photo checks) write concurrently
         c.executescript(SCHEMA)

@@ -241,7 +241,10 @@ def detect_slumps():
         if st["checkins"] and st["gap"] is not None and st["gap"] >= game.BOSS_GAP_DAYS and not st["quest"]:
             with db.connect() as c:
                 c.execute("INSERT INTO quests (habit_id, started_day) VALUES (?, ?)", (h["id"], game.today().isoformat()))
-            generate_post(h, "boss")
+            try:
+                generate_post(h, "boss")
+            except Exception as e:  # never let a failed slump post stop the app from loading
+                db.log_event("", "boss_post_failed", f"habit {h['id']}: {e}"[:300])
 
 
 # ---------- API ----------
@@ -681,6 +684,12 @@ def survey_csv():
         w.writerow(row)
     return Response(buf.getvalue(), media_type="text/csv",
                     headers={"Content-Disposition": "attachment; filename=ab-results.csv"})
+
+
+@app.get("/api/study-info")
+def study_info():
+    """Which database this server uses, so the study console can warn before a reset wipes someone's real town."""
+    return {"db": db.DB_PATH.name, "personal": db.DB_PATH.name == "futurefeed.db"}
 
 
 @app.get("/research")

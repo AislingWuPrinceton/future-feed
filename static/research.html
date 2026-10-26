@@ -39,6 +39,9 @@
 <div class="wrap">
   <span class="logo">Future Feed</span> <span class="tag">STUDY CONSOLE</span>
   <p class="muted">For you, the researcher. Keep this tab open; the app opens in a second tab. Answers are saved here and survive "Reset everything".</p>
+  <p class="err" id="db-warn" hidden style="font-size:15px;font-weight:700;background:#fde8ec;padding:10px 12px;border-radius:8px">
+    This console is running on your personal database: "Reset app" would erase your own town. Start the study server instead
+    (port 8002, see docs/ab-test-plan.md) and open its /research page.</p>
 
   <div class="box" id="setup">
     <h2>1 · Participant</h2>
@@ -55,7 +58,7 @@
   <div class="box" id="final">
     <h2>4 · Final questions <span class="muted" style="font-size:13px;font-weight:400">(participant fills in)</span></h2>
     <div id="final-qs"></div>
-    <p class="q">Researcher notes (you)<small>First reactions word for word, confusion, did they scroll or open “You, if you stopped”?</small></p>
+    <p class="q">Researcher notes (you)<small>First reactions word for word, confusion, did they open a postcard, flip it, go inside a building, play with the town?</small></p>
     <textarea id="notes"></textarea>
     <p class="err" id="final-err"></p>
     <button class="btn primary" id="save-final">Save final answers</button>
@@ -80,15 +83,16 @@ const VERSION_QS = [
   { k: "keep_using", q: "Would you keep using this app for two weeks?", type: "choice", options: ["Yes", "Maybe", "No"] },
 ];
 const FINAL_QS = [
-  { k: "preference", q: "Which version would you rather use?", type: "choice", options: ["A · plain streak tracker", "B · future Instagram feed", "No preference"] },
+  { k: "preference", q: "Which version would you rather use?", type: "choice", options: ["A · plain streak tracker", "B · postcards from future you + your town", "No preference"] },
   { k: "why", q: "Why? (one or two sentences)", type: "text" },
   { k: "unrealistic_or_uncomfortable", q: "Did anything in version B feel unrealistic, fake, or uncomfortable?", type: "text" },
-  { k: "stopped_timeline_feeling", q: "How did it feel to see “You, if you stopped”?", type: "choice", options: ["Motivating", "Neutral", "Discouraging", "Didn't see it"] },
-  { k: "stopped_timeline_comment", q: "Anything to add about that? (optional)", type: "text", optional: true },
+  { k: "pull", q: "In version B, what made you most want to come back tomorrow?", type: "choice", options: ["The postcard from future me", "Watching my building grow", "The streak", "Nothing really"] },
+  { k: "slump_feeling", q: "In version B, how did the “storm” after the 4 skipped days feel?", type: "choice", options: ["Motivating", "Neutral", "Discouraging", "Didn't notice it"] },
+  { k: "slump_comment", q: "Anything to add about that? (optional)", type: "text", optional: true },
   { k: "current_habit_app", q: "What habit app, if any, do you use today?", type: "text" },
   { k: "quote_ok", q: "Can I quote you anonymously in my report?", type: "choice", options: ["Yes", "No"] },
 ];
-const NAMES = { A: "Version A · plain streak tracker", B: "Version B · Future Feed" };
+const NAMES = { A: "Version A · plain streak tracker", B: "Version B · Future Feed (postcards + town)" };
 const URLS = { A: "/?mode=plain&study=1", B: "/?study=1" };
 const answers = { 1: {}, 2: {}, final: {} };
 
@@ -127,10 +131,12 @@ function renderRounds() {
         <button class="btn primary" style="width:auto" data-open="${v}">Open ${v} in new tab</button>
       </p>
       <ol class="steps">
-        <li>They onboard with their own name, a real friend's name, and <b>the same one habit</b> each round.</li>
-        <li>They tap <b>I did it</b> (day 1).</li>
-        <li>You: black bar at the bottom → <b>Next day →</b>. They tap <b>I did it</b>.</li>
-        <li>You: black bar → <b>Skip 4 days ⏭</b>. Let them react${v === "B" ? " to the slump post" : ""}. They tap <b>I did it</b>.</li>
+        ${v === "B" ? `<li>A short story (3 pages) opens first. Let them read it or skip it; don't explain the app yourself.</li>` : ""}
+        <li>They onboard with their own name, a real friend's name, and <b>the same one habit</b> each round (pick it from the list, not "Something else").</li>
+        ${v === "B" ? `<li>A 6-step tour appears. Let them click through it at their own pace.</li>` : ""}
+        <li>They <b>press and hold “Hold to check in”</b> (day 1).${v === "B" ? " A postcard arrives; let them read and flip it." : ""}</li>
+        <li>You: black bar at the bottom → <b>Next day →</b>. They hold to check in again.</li>
+        <li>You: black bar → <b>Skip 4 days ⏭</b>. Let them react${v === "B" ? " to the storm and the worried postcard" : " to the streak reset"}. They hold to check in.</li>
         <li>Say “Feel free to keep looking around. Tell me when you're done.” and start the timer.</li>
       </ol>
       <div class="row2">
@@ -152,6 +158,8 @@ function renderRounds() {
 const timers = {};
 function bindRounds() {
   document.querySelectorAll("[data-reset]").forEach((b) => (b.onclick = async () => {
+    const info = await (await fetch("/api/study-info")).json();
+    if (info.personal && !confirm("This is your personal database. Reset anyway and erase your own town?")) return;
     await fetch("/api/demo/reset", { method: "POST" });
     b.textContent = "Reset ✓";
   }));
@@ -252,6 +260,7 @@ $("next").onclick = () => {
 $("pid").oninput = renderRounds;
 $("final-qs").innerHTML = FINAL_QS.map((q) => qHTML(q, "final")).join("");
 loadResults().then((rows) => { $("pid").value = nextId(rows); renderRounds(); });
+fetch('/api/study-info').then((r) => r.json()).then((i) => { $('db-warn').hidden = !i.personal; });
 </script>
 </body>
 </html>

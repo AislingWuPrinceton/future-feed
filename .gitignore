@@ -7,3 +7,6 @@ data/futurefeed.db-wal
 data/futurefeed.db-shm
 static/art/raw/
 pictures/
+data/study.db
+data/study.db-wal
+data/study.db-shm

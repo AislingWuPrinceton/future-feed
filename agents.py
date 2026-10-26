@@ -48,9 +48,16 @@ def _call(run_id, agent, **kwargs):
     if used >= DAILY_TOKEN_CAP:
         db.log_event(run_id, "budget_block", f"{agent}: {used} tokens used today, cap {DAILY_TOKEN_CAP}")
         raise BudgetExceeded(f"Daily AI budget reached ({DAILY_TOKEN_CAP:,} tokens). Your future will keep until tomorrow.")
-    response = client().responses.create(model=MODEL, **kwargs)
-    db.log_usage(run_id, agent, response.usage)
-    return json.loads(response.output_text)
+    for attempt in range(2):
+        response = client().responses.create(model=MODEL, **kwargs)
+        db.log_usage(run_id, agent, response.usage)
+        try:
+            return json.loads(response.output_text)
+        except json.JSONDecodeError:
+            # the reply was cut off before the JSON closed: log it and try once more with more room
+            db.log_event(run_id, "cut_off_reply", f"{agent}: attempt {attempt + 1}, {len(response.output_text)} chars")
+            kwargs["max_output_tokens"] = int(kwargs.get("max_output_tokens", 1500) * 1.6)
+    raise ValueError(f"The {agent} agent's reply was cut off twice.")
 
 
 # ---------- 1. Story agent ----------
@@ -127,7 +134,7 @@ def story(run_id, context):
         instructions=STORY_PROMPT,
         input=json.dumps(context, ensure_ascii=False),
         text={"format": {"type": "json_schema", "name": "story", "strict": True, "schema": STORY_SCHEMA}},
-        max_output_tokens=1500,
+        max_output_tokens=3000,  # the reply carries two posts, a letter and a stamp; 1500 could cut it off
     )
 
 
