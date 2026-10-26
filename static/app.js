@@ -1466,15 +1466,11 @@ const dayLabel = (d) => new Date(`${d}T12:00`).toLocaleDateString("en-US", { mon
 
 // a felt room photo behind a room; the postcard hangs in the picture frame the slicer found on its back wall
 const EMPTY_ROOMS = ["room_sage", "room_blue", "room_apricot", "room_blush", "room"];
-// rooms painted without a picture frame get one drawn on a bare stretch of wall (kept clear of the windows)
-const DRAWN_FRAME = { room: [.44, .13, .76, .45], room_apricot: [.2, .13, .52, .45], room_blue: [.42, .13, .74, .45],
-  room_blush: [.24, .13, .58, .45], room_sage: [.42, .13, .74, .45] };
 function roomPic(name) {
   const a = ART[`${name}.jpg`];
   if (!a) return "";
-  const painted = a.length >= 6;
-  const [x0, y0, x1, y1] = painted ? a.slice(2) : DRAWN_FRAME[name] || [.36, .14, .68, .46];
-  return `rpic ${painted ? "" : "framed"}" style="--bg:url(${artUrl(`${name}.jpg`)}); --x0:${x0}; --y0:${y0}; --x1:${x1}; --y1:${y1}`;
+  const [x0, y0, x1, y1] = a.length >= 6 ? a.slice(2) : [.36, .14, .68, .46];  // the frame on the wall (scripts/slice_art.py hangs one where a room has none)
+  return `rpic" style="--bg:url(${artUrl(`${name}.jpg`)}); --x0:${x0}; --y0:${y0}; --x1:${x1}; --y1:${y1}`;
 }
 
 function renderInside(opts = {}) {

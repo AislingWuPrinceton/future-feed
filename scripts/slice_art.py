@@ -95,6 +95,54 @@ def frame_box(img):
     return None
 
 
+# rooms painted without a picture frame: where on the bare wall to hang one (inner box, as fractions; clear of the windows)
+DRAWN_FRAME = {"room": (.44, .13, .76, .45), "room_apricot": (.2, .13, .52, .45), "room_blue": (.42, .13, .74, .45),
+               "room_blush": (.24, .13, .58, .45), "room_sage": (.42, .13, .74, .45)}
+
+
+def felt_frame(width):
+    """The needle-felted frame from the music room, cut off its red wall: (RGBA crop, its inner box in crop pixels)."""
+    src = Image.open(RAW / "room_hall.png").convert("RGB")
+    src = src.resize((width, round(src.height * width / src.width)), Image.LANCZOS)
+    inner = frame_box(src)
+    W, H = src.size
+    m = round(.07 * W)
+    x0, y0, x1, y1 = round(inner[0] * W), round(inner[1] * H), round(inner[2] * W), round(inner[3] * H)
+    crop = src.crop((x0 - m, y0 - m, x1 + m, y1 + m))
+    a = np.asarray(crop, float)
+    wall = np.median(np.concatenate([a[:4].reshape(-1, 3), a[-4:].reshape(-1, 3), a[:, :4].reshape(-1, 3), a[:, -4:].reshape(-1, 3)]), axis=0)
+    keep = Image.fromarray((np.linalg.norm(a - wall, axis=-1) > 60).astype("uint8") * 255)
+    # the wall is whatever the edges reach; everything inside (frame and mat) stays
+    probe = keep.convert("RGB")
+    for seed in ((0, 0), (crop.width - 1, 0), (0, crop.height - 1), (crop.width - 1, crop.height - 1)):
+        if probe.getpixel(seed) == (0, 0, 0):
+            ImageDraw.floodfill(probe, seed, (255, 0, 0))
+    wallmask = np.all(np.asarray(probe) == (255, 0, 0), axis=-1)
+    # keep only the frame itself (the piece joined to the middle), not bits of guitar or hooks near the corners
+    solid = Image.fromarray(np.where(wallmask, 0, 255).astype("uint8")).filter(ImageFilter.MinFilter(3)).convert("RGB")
+    ImageDraw.floodfill(solid, (crop.width // 2, crop.height // 2), (0, 255, 0))
+    frame_only = np.all(np.asarray(solid) == (0, 255, 0), axis=-1)
+    alpha = Image.fromarray(frame_only.astype("uint8") * 255).filter(ImageFilter.MaxFilter(3)).filter(ImageFilter.GaussianBlur(1))
+    crop.putalpha(alpha)
+    return crop, (m, m, m + x1 - x0, m + y1 - y0)
+
+
+def hang_frame(img, box, frame):
+    """Hang the felt frame on a room's wall so its inner opening lands on box, with a soft shadow below it."""
+    piece, (ix0, iy0, ix1, iy1) = frame
+    W, H = img.size
+    tx0, ty0, tx1, ty1 = box[0] * W, box[1] * H, box[2] * W, box[3] * H
+    sx, sy = (tx1 - tx0) / (ix1 - ix0), (ty1 - ty0) / (iy1 - iy0)
+    piece = piece.resize((round(piece.width * sx), round(piece.height * sy)), Image.LANCZOS)
+    at = (round(tx0 - ix0 * sx), round(ty0 - iy0 * sy))
+    shadow = Image.new("RGBA", piece.size, (60, 40, 20, 0))
+    shadow.putalpha(piece.getchannel("A").point(lambda v: v * .45).filter(ImageFilter.GaussianBlur(W / 90)))
+    out = img.convert("RGBA")
+    out.alpha_composite(shadow, (at[0] + round(W / 150), at[1] + round(W / 70)))
+    out.alpha_composite(piece, at)
+    return out.convert("RGB")
+
+
 def save(img, name, width):
     if img.width > width:
         img = img.resize((width, round(img.height * width / img.width)), Image.LANCZOS)
@@ -104,7 +152,7 @@ def save(img, name, width):
 
 def main():
     ROOT.mkdir(exist_ok=True)
-    frames = {}
+    frames, frame = {}, None
     for f in sorted(RAW.glob("*.png")):  # background*, scene_*, room_* -> plain resized jpgs
         width = BACKDROPS.get(f.stem.split("_")[0])
         if not width:
@@ -115,6 +163,11 @@ def main():
         img.save(ROOT / f"{f.stem}.jpg", quality=86, optimize=True)
         if f.stem.startswith("room"):
             frames[f"{f.stem}.jpg"] = frame_box(img)
+            if not frames[f"{f.stem}.jpg"] and f.stem in DRAWN_FRAME and (RAW / "room_hall.png").exists():
+                frame = frame or felt_frame(width)
+                img = hang_frame(img, DRAWN_FRAME[f.stem], frame)
+                img.save(ROOT / f"{f.stem}.jpg", quality=86, optimize=True)
+                frames[f"{f.stem}.jpg"] = [round(v, 3) for v in DRAWN_FRAME[f.stem]]
         print(f"{f.stem}.jpg {img.width}x{img.height} {frames.get(f.stem + '.jpg') or ''}")
     # every other picture in raw/ is a building: roof, upper floor and ground floor, top to bottom
     others = sorted(f.stem for f in RAW.glob("*.png") if not f.stem.startswith(("background", "scene", "room", "scenery")))
