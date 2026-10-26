@@ -332,24 +332,21 @@ function checkinDays() {  // day -> how many habits were checked in that day
   });
   return n;
 }
+let weekBack = 0;  // 0 = the seven days ending today, 1 = the seven before that, ...
 function renderMail() {
   const latest = POSTS.kept.filter((p) => p.kind !== "boss").slice(0, 3), counts = checkinDays();
-  const week = [...Array(7)].map((_, i) => {
-    const d = new Date(S.today + "T12:00:00"); d.setDate(d.getDate() - 6 + i);
-    const iso = d.toISOString().slice(0, 10);
-    return { iso, n: counts[iso] || 0, today: iso === S.today, label: d.toLocaleDateString("en-US", { weekday: "short" }) };
-  });
-  const done = week.filter((d) => d.n).length;
+  const first = Object.keys(counts).sort()[0] || S.today;
+  const maxBack = Math.max(8, Math.ceil((new Date(S.today + "T12:00:00") - new Date(first + "T12:00:00")) / (7 * 864e5)));  // always a couple of months to browse
+  weekBack = Math.min(weekBack, maxBack);
   const wrap = document.createElement("div");
   wrap.className = "me-mail sketch";
   wrap.innerHTML = `
     <div class="mail-fan"><p class="mail-kicker" id="fan-title"></p><div class="fan" id="fan"></div><small class="mail-hint" id="fan-hint"></small></div>
     <div class="mail-week">
-      <p class="mail-kicker">This week</p>
-      <div class="week-stamps">${week.map((d, i) => `<button class="wk ${d.n ? "on" : ""} ${d.today ? "today" : ""}" data-day="${d.iso}" style="--i:${i}"
-          title="${d.n ? `${d.n} check-in${d.n > 1 ? "s" : ""}${d.today ? " today" : ""}, tap to see the postcards` : d.today ? "Not yet today" : "No check-ins"}">
-          <i>${d.n ? (d.n > 1 ? d.n : "✓") : d.today ? "?" : ""}</i><span>${d.today ? "Today" : d.label}</span></button>`).join("")}</div>
-      <p class="week-sum"><b>${done}</b> of 7 days ${done >= 5 ? "· what a week" : done ? "· keep the stamps coming" : "· your first stamp is one check-in away"}</p>
+      <div class="week-head"><button class="wk-nav" data-wk="1" aria-label="Earlier week">‹</button><p class="mail-kicker" id="wk-title"></p>
+        <button class="wk-nav" data-wk="-1" aria-label="Later week">›</button></div>
+      <div class="week-stamps" id="wk-stamps"></div>
+      <p class="week-sum" id="wk-sum"></p>
     </div>`;
   $("me").append(wrap);
   // the fan on the left shows the latest postcards, or a day's postcards when you tap its stamp; it never changes size
@@ -368,7 +365,9 @@ function renderMail() {
     hint.innerHTML = day ? `Tap a card to read it · <button class="fan-back">back to latest</button>` : n ? "Tap a card to read it" : "";
     hint.querySelector(".fan-back")?.addEventListener("click", (e) => { e.stopPropagation(); pick(null); });
   };
+  let pickedDay = null;
   const pick = (day) => {
+    pickedDay = day;
     wrap.querySelectorAll(".wk").forEach((x) => x.classList.toggle("picked", x.dataset.day === day));
     if (!day) return fill(latest, "Latest from 2036");
     const posts = POSTS.kept.filter((x) => x.created_day === day && x.kind !== "boss").reverse();  // in the order they arrived
@@ -376,7 +375,31 @@ function renderMail() {
     fill(posts, `${name} · ${posts.length} postcard${posts.length > 1 ? "s" : ""}`, day);
   };
   fill(latest, "Latest from 2036");
-  wrap.querySelectorAll(".wk").forEach((b) => (b.onclick = (e) => {
+  // the stamp row: any seven days, stepped back and forth with the arrows (never into the future, never before the first check-in)
+  const drawWeek = () => {
+    const week = [...Array(7)].map((_, i) => {
+      const d = new Date(S.today + "T12:00:00"); d.setDate(d.getDate() - 6 + i - weekBack * 7);
+      const iso = d.toISOString().slice(0, 10);
+      return { iso, n: counts[iso] || 0, today: iso === S.today, label: d.toLocaleDateString("en-US", { weekday: "short" }), date: d.getDate() };
+    });
+    const done = week.filter((d) => d.n).length, f = (iso) => new Date(iso + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" });
+    wrap.querySelector("#wk-title").textContent = weekBack === 0 ? "This week" : weekBack === 1 ? "Last week" : `${f(week[0].iso)} – ${f(week[6].iso)}`;
+    wrap.querySelector("#wk-stamps").innerHTML = week.map((d, i) => `<button class="wk ${d.n ? "on" : ""} ${d.today ? "today" : ""}" data-day="${d.iso}" style="--i:${i}"
+        title="${f(d.iso)}: ${d.n ? `${d.n} check-in${d.n > 1 ? "s" : ""}, tap to see the postcards` : d.today ? "not yet today" : "no check-ins"}">
+        <i>${d.n ? (d.n > 1 ? d.n : "✓") : d.today ? "?" : ""}</i><span>${d.today ? "Today" : weekBack ? `${d.label} ${d.date}` : d.label}</span></button>`).join("");
+    wrap.querySelector("#wk-sum").innerHTML = week[6].iso < first ? "Before your road began. Your first stamp came later." :
+      `<b>${done}</b> of 7 days ${done >= 5 ? "· what a week" : weekBack ? "" : done ? "· keep the stamps coming" : "· your first stamp is one check-in away"}`;
+    wrap.querySelector('[data-wk="1"]').disabled = weekBack >= maxBack;
+    wrap.querySelector('[data-wk="-1"]').disabled = weekBack === 0;
+    bindStamps();
+  };
+  wrap.querySelectorAll(".wk-nav").forEach((b) => (b.onclick = (e) => {
+    e.stopPropagation();
+    weekBack = Math.max(0, Math.min(maxBack, weekBack + +b.dataset.wk));
+    sfx.paper(); drawWeek();
+    if (pickedDay) wrap.querySelector(`.wk[data-day="${pickedDay}"]`)?.classList.add("picked");  // the day you're reading stays marked if it's in view
+  }));
+  const bindStamps = () => wrap.querySelectorAll(".wk").forEach((b) => (b.onclick = (e) => {
     e.stopPropagation();
     const day = b.dataset.day;
     if (!POSTS.kept.some((x) => x.created_day === day)) {
@@ -387,6 +410,7 @@ function renderMail() {
     sfx.tick();
     pick(b.classList.contains("picked") ? null : day);  // tap the same stamp again to go back to the latest
   }));
+  drawWeek();
 }
 
 // ---------- today: hold to check in ----------
