@@ -1705,8 +1705,13 @@ const TOUR = [
   { sel: "#me .me-mail", title: "2 · A postcard arrives", text: "Each check-in brings a postcard from you in the future. The newest ones wait here, and the stamps show your week." },
   { sel: "#town", title: "3 · Your 2036 town", text: "Every habit is a building. Each check-in fills one room, and a full floor of rooms makes the building one storey taller.", view: "town" },
   { sel: "#town .lot[data-h] .lot-b", title: "4 · Your rooms", text: "Tap a building to see its rooms, floor by floor. Each room holds the postcard from the day you earned it.", view: "town" },
-  { sel: "#town .seasons", title: "5 · Play with it", text: "Pick a season, tap the sun for night, shake the trees. It's your town.", view: "town" },
-  { sel: "#menu-btn", title: "6 · More in the menu", text: "Play your next 10 years as a story, add another habit, or see this guide again." },
+  // the little things you can play with; each one shows itself off while it's highlighted
+  { sel: "#sun", title: "5 · Day and night", text: "Tap the sun to see your town at night. Tap the moon to bring the morning back.", view: "town",
+    poke: (t) => replay(t.closest(".hang"), "kick") },
+  { sel: "#town .prop.tree", title: "6 · Shake the trees", text: "Tap a tree or a flower bush and it shakes loose a few felt leaves and petals.", view: "town", poke: (t) => t.click() },
+  { sel: "#town .cloud", title: "7 · Make it rain", text: "Tap a cloud for a little felt shower. The balloon bounces when you tap it, too.", view: "town", poke: (t) => t.click() },
+  { sel: "#town .seasons", title: "8 · Pick a season", text: "Spring blossom, summer meadow, autumn leaves or winter snow. Tap the one you're in to follow the calendar again.", view: "town" },
+  { sel: "#menu-btn", title: "9 · More in the menu", text: "Play your next 10 years as a story, manage your habits, or see this guide again." },
 ];
 function startTour() {
   if (!GUIDE || !S?.profile) return;
@@ -1754,7 +1759,12 @@ function startTour() {
     el.classList.add("moving");
     place();
     setTimeout(() => { place(); el.classList.remove("moving"); }, 450);
-    setTimeout(place, 900);  // smooth scrolling can take longer than that
+    setTimeout(() => {  // smooth scrolling can be slow or skipped: if the target still isn't on screen, jump to it
+      const t = target(), r = t?.getBoundingClientRect();
+      if (r && (r.bottom < 0 || r.top > innerHeight)) t.scrollIntoView({ block: "center", inline: "center" });
+      place();
+    }, 900);
+    if (s.poke) setTimeout(() => { if (TOUR[i] === s && target()) s.poke(target()); }, 1000);
     addEventListener("scrollend", place, { once: true });
   }
   addEventListener("resize", place); addEventListener("scroll", place, { passive: true });
