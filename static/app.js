@@ -496,6 +496,7 @@ function bindFlip() {
 }
 
 function openPostcard(p, arrived = false) {
+  $("pc-body").className = "pc-big";
   const head = arrived ? `<p class="arrived">A postcard from ${year(p.live_date || p.future_date)} just arrived</p>` : "";
   const actions = `<div class="pc-actions"><button class="btn sketch" id="pc-turn">Turn it over ↻</button><button class="btn sketch" id="pc-close">Back to the road</button></div>`;
   if (!arrived) {
@@ -522,6 +523,21 @@ function openPostcard(p, arrived = false) {
   bindFlip();
   $("pc-close").onclick = () => ($("pc").hidden = true);
   $("pc-close").textContent = VIEW === "inside" ? "Back to the rooms" : "Back to town";
+}
+
+// A room up close: the felt room with that day's photo in its frame, and the postcard beside it.
+function openRoom(p, room, when) {
+  if (!ART[`${room}.jpg`]) return openPostcard(p);
+  $("pc-body").className = "pc-big room-open";
+  $("pc-body").innerHTML = `<div class="room-view">
+      <div class="room-big"><div class="room big ${roomPic(room)}"><span class="rm-photo">${photoHTML(p)}</span>${when ? `<span class="tag"><b>${esc(when)}</b></span>` : ""}</div></div>
+      <div class="room-side">${cardHTML(p)}
+        <div class="pc-actions"><button class="btn sketch" id="pc-turn">Turn it over ↻</button><button class="btn sketch" id="pc-close">Back to the rooms</button></div></div>
+    </div>`;
+  $("pc").hidden = false;
+  sfx.paper();
+  bindFlip();
+  $("pc-close").onclick = () => ($("pc").hidden = true);
 }
 
 // ---------- story reel ----------
@@ -930,19 +946,14 @@ const artUrl = (n) => `/static/art/${n}`;
 async function loadArt() {
   ART = await fetch("/static/art/manifest.json").then((r) => (r.ok ? r.json() : {})).catch(() => ({}));
 }
-// Every finished floor is a whole felt storey; the floor being built sits on top as a pale outline
-// whose wool fills in from the bottom, one room (check-in) at a time, so the town shows daily progress.
+// One felt storey per finished floor; the floor in progress shows as beads on the building's sign.
 function feltBuilding(h, kind, fresh) {
   const piece = (role) => ART[`${kind}_${role}.webp`];
   if (!piece("roof") || !piece("floor") || !piece("ground")) return null;
   const W = Math.round(STYLE[kind].W * 1.45), hOf = (role) => Math.round((piece(role)[1] * W) / piece(role)[0]);
-  const prog = floorProgress(h), full = Math.min(MAXF, h.level), count = Math.max(1, full + (prog ? 1 : 0));
+  const count = Math.max(1, Math.min(MAXF, h.level));
   const img = (role, cls) => `<img class="i-${role} ${cls}" src="${artUrl(`${kind}_${role}.webp`)}" width="${W}" height="${hOf(role)}" alt="" draggable="false">`;
-  const storey = (i) => {
-    const role = i ? "floor" : "ground";
-    if (prog && i === full) return `<span class="i-part floor" style="--pct:${(prog.done / prog.n).toFixed(3)}">${img(role, "ghost")}${img(role, "fill")}</span>`;
-    return img(role, `floor ${i >= fresh.floors ? "new" : ""}`);
-  };
+  const storey = (i) => img(i ? "floor" : "ground", `floor ${i >= fresh.floors ? "new" : ""}`);
   const height = hOf("roof") + (count - 1) * hOf("floor") + hOf("ground");
   return {
     svg: `<span class="ibld" style="width:${W}px">${img("roof", `roof ${count > fresh.floors ? "new" : ""}`)}${Array.from({ length: count }, (_, i) => storey(i)).reverse().join("")}</span>`,
@@ -1109,11 +1120,14 @@ function renderTown(opts = {}) {
          <em>${left} more check-in${s} · ${days === 0 ? "could finish today" : days === 1 ? "could finish tomorrow" : `about ${days} days`}</em>`
       : `<em>All six floors are built.</em>`;
     const signAt = back ? 46 + art.signAt * .76 : art.signAt;
+    const beads = !prog ? "" : prog.n <= 8
+      ? `<span class="beads" title="${prog.done} of ${prog.n} rooms on the next floor">${Array.from({ length: prog.n }, (_, i) => `<i class="${i < prog.done ? "on" : ""} ${i === prog.done - 1 ? "last" : ""}"></i>`).join("")}</span>`
+      : `<span class="beads bar" title="${prog.done} of ${prog.n} rooms on the next floor"><i style="width:${(prog.done / prog.n) * 100}%"></i></span>`;
     return `
       <div class="lot ${back ? "back" : ""} ${rise ? "rise" : ""} ${opts.working === h.id ? "working" : ""} ${h.checked_today ? "done-today" : ""}" data-h="${h.id}" style="--b:${idx}; width:${art.width}px; --lw:${art.width}px">
         <div class="lot-tip"><b>${KIND_NAME[kind]} · ${Math.min(MAXF, h.level)} of 6 floors</b>${tip}</div>
         ${h.quest ? `<div class="lot-storm">${ico("storm")}<span class="rain"></span><b>Comeback quest ${h.quest.progress}/3</b></div>` : ""}
-        <div class="lot-sign" style="bottom:${signAt + 4}px">${hIcon(h, "inline")} ${esc(h.short)}</div>
+        <div class="lot-sign" style="bottom:${signAt + 4}px"><span>${hIcon(h, "inline")} ${esc(h.short)}</span>${beads}</div>
         <div class="lot-work">Building floor ${built + 1}…<br><small>your postcard is on its way</small></div>
         <button class="lot-b" aria-label="${esc(h.short)}: go inside">${art.svg}</button>
         <button class="mailbox ${mine.length ? "has" : ""}" data-mail="${h.id}" aria-label="Postcards">${mine.length ? MAILBOX.up : MAILBOX.down}${mine.length ? `<b>${mine.length}</b>` : ""}</button>
@@ -1246,7 +1260,8 @@ function renderInside(opts = {}) {
       const k = from + r, day = days[k];
       if (day) {
         const p = mine.find((x) => x.created_day === day), key = p?.kind === "level_up";
-        return `<button class="room full ${k >= seenRooms ? "pop" : ""} ${key ? "keystone" : ""} ${roomPic(key && ART["room_party.jpg"] ? "room_party" : `room_${kind}`)}" ${p ? `data-post="${p.id}"` : "disabled"}>
+        const rn = key && ART["room_party.jpg"] ? "room_party" : `room_${kind}`;
+        return `<button class="room full ${k >= seenRooms ? "pop" : ""} ${key ? "keystone" : ""} ${roomPic(rn)}" ${p ? `data-post="${p.id}" data-room="${rn}"` : "disabled"}>
           <span class="rm-photo">${p ? photoHTML(p) : hIcon(h)}</span><span class="tag"><b>${dayLabel(day)}</b><small>${key ? "floor postcard" : `room ${k + 1}`}</small></span></button>`;
       }
       if (k === days.length) {
@@ -1254,14 +1269,17 @@ function renderInside(opts = {}) {
         if (h.checked_today) return `<div class="room next wait ${roomPic("room_empty")}"><span class="tag"><b>Tomorrow</b><small>room ${k + 1} opens</small></span></div>`;
         return `<div class="room next ${roomPic("room_empty")}"><span class="tag"><b>Room ${k + 1}</b></span><button class="lot-hold" data-hold="${h.id}" ${busy ? "disabled" : ""}><i></i><span>Hold to build</span></button></div>`;
       }
-      return `<div class="room empty ${state === "plan" ? "" : roomPic(EMPTY_ROOMS[k % EMPTY_ROOMS.length])}"><small>${k + 1}</small></div>`;
+      if (k === days.length + 1 && state === "building") {  // the rest of this floor, as one quiet room
+        const rest = from + n - k;
+        return `<div class="room empty more ${roomPic(EMPTY_ROOMS[k % EMPTY_ROOMS.length])}"><span class="tag"><b>${rest === 1 ? `Room ${k + 1}` : `${rest} more rooms`}</b><small>to fill on this floor</small></span></div>`;
+      }
+      return "";
     }).join("");
     const story = h.chapters[ch] ? `~${year(h.chapter_dates[ch])}: future you ${esc(lower(h.chapters[ch]))}` : "A bonus floor: you're already past the last chapter.";
-    if (state === "plan") {  // floors still to come: a quiet row with a peek at their empty rooms
-      const peek = Array.from({ length: Math.min(n, 5) }, (_, r) => ART[`${EMPTY_ROOMS[(from + r) % EMPTY_ROOMS.length]}.jpg`]
-        ? `<img src="${artUrl(`${EMPTY_ROOMS[(from + r) % EMPTY_ROOMS.length]}.jpg`)}" alt="" loading="lazy">` : `<i></i>`).join("");
-      return { state, html: `<section class="fl plan"><div class="plan-peek">${peek}${n > 5 ? `<span>+${n - 5}</span>` : ""}</div>
-        <div class="plan-text"><b>Floor ${f + 1}</b><small>${n} room${n > 1 ? "s" : ""} · opens after check-in ${from}</small><i>${story}</i></div></section>` };
+    if (state === "plan") {  // floors still to come: when, and what future you is doing by then
+      return { state, html: `<section class="fl plan"><span class="plan-year">${h.chapters[ch] ? year(h.chapter_dates[ch]) : "+"}</span>
+        <div class="plan-text"><b>Floor ${f + 1}</b><small>${n} room${n > 1 ? "s" : ""}</small>
+        <i>${h.chapters[ch] ? `Future you ${esc(lower(h.chapters[ch]))}` : "A bonus floor, past the last chapter."}</i></div></section>` };
     }
     const status = state === "built" ? "Built ✓" : `Building now · ${done} of ${n} rooms`;
     return { state, html: `<section class="fl ${state}" style="--f:${f}">
@@ -1282,12 +1300,12 @@ function renderInside(opts = {}) {
         ${prog ? `<span class="tip-bar"><i style="width:${(prog.done / prog.n) * 100}%"></i></span><small>Floor ${full + 1}: ${prog.done} of ${prog.n} rooms · ${prog.n - prog.done} more check-in${prog.n - prog.done === 1 ? "" : "s"} to finish it</small>` : `<small>Every floor is built. Ten years tall.</small>`}
       </div>
     </div>
-    ${plan ? `<div class="in-future"><h3>Still to build</h3>${plan}</div>` : ""}
+    ${plan ? `<div class="in-future"><h3>Floors still to come</h3><p class="muted">Each one opens when the floor below is full.</p>${plan}</div>` : ""}
     <div class="in-stack ${opts.enter ? "enter" : ""}">${lived}</div>
     <div class="in-ground"></div>`;
 
   $("in-tabs").querySelectorAll("[data-in]").forEach((b) => (b.onclick = () => { inHabit = +b.dataset.in; sfx.tick(); renderInside({ enter: true }); }));
-  $("inside").querySelectorAll("[data-post]").forEach((b) => (b.onclick = () => openPostcard(mine.find((p) => p.id === +b.dataset.post))));
+  $("inside").querySelectorAll("[data-post]").forEach((b) => (b.onclick = () => openRoom(mine.find((p) => p.id === +b.dataset.post), b.dataset.room, b.querySelector("b")?.textContent)));
   $("inside").querySelectorAll(".lot-hold").forEach(bindHold);
   $("in-back").onclick = () => setView("town");
   if (opts.enter) requestAnimationFrame(() => $("inside").querySelector(".fl.building, .fl.built")?.scrollIntoView({ behavior: "smooth", block: "start" }));

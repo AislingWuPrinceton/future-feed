@@ -864,7 +864,7 @@ body.study .page { padding-bottom: 120px; }
   left: calc(var(--x0) * 100%); top: calc(var(--y0) * 100%); width: calc((var(--x1) - var(--x0)) * 100%); height: calc((var(--y1) - var(--y0)) * 100%); }
 .room.rpic .tag { background: rgba(255, 250, 240, .92); border-radius: 9px; padding: 2px 9px 3px; box-shadow: 0 2px 4px rgba(60, 40, 20, .2); }
 .room.rpic.full:hover { transform: translateY(-3px) scale(1.03); }
-.room.rpic.next { border: 0; outline: 3px dashed var(--pink); outline-offset: 2px; justify-content: flex-end; gap: 6px; }
+.room.rpic.next { border: 0; outline: 0; justify-content: flex-end; gap: 6px; box-shadow: 0 0 0 4px #ffe08a, 0 0 22px rgba(255, 200, 80, .55); }
 .room.rpic.next.working { animation: breathe2 1.2s ease-in-out infinite alternate; }
 @keyframes breathe2 { to { filter: brightness(1.12) saturate(1.15); } }
 .room.rpic.wait { opacity: .8; }
@@ -916,15 +916,6 @@ body.study .page { padding-bottom: 120px; }
   background: radial-gradient(closest-side, rgba(255, 196, 102, .55), transparent); mix-blend-mode: screen; }
 .town.night.photo .ibld img { filter: brightness(.6) saturate(.8) sepia(.12); }
 
-/* the floor being built: a pale outline that fills with wool from the bottom, room by room */
-.ibld .i-part { position: relative; display: block; width: 100%; margin-top: -3%; }
-.ibld .i-part img { margin: 0; }
-.ibld .i-part .ghost { opacity: .78; filter: grayscale(1) brightness(1.45) contrast(.55) blur(.4px); }
-.ibld .i-part .fill { position: absolute; inset: 0; clip-path: inset(calc((1 - var(--pct)) * 100%) 0 0 0); transition: clip-path 1.2s cubic-bezier(.3, 1.2, .5, 1); }
-.ibld .i-part::after { content: ""; position: absolute; left: 4%; right: 4%; bottom: calc(var(--pct) * 100%); height: 0; border-top: 2px dashed rgba(255, 250, 240, .9); }
-.lot.celebrate .i-part .fill { animation: fillup 1.2s ease-out .3s both; }
-@keyframes fillup { from { clip-path: inset(100% 0 0 0); } }
-
 /* hover card: just how tall it is and how long until the next floor */
 .lot-tip .tip-bar { display: block; height: 8px; margin: 7px 0 2px; border-radius: 4px; background: var(--paper-2); border: 1.5px solid var(--ink); overflow: hidden; }
 .lot-tip .tip-bar i { display: block; height: 100%; background: var(--yellow); }
@@ -953,7 +944,6 @@ body.study .page { padding-bottom: 120px; }
 .lot.empty.fenced .plot-sign .ico { width: 26px; height: 26px; }
 .lot.empty.fenced:hover .lot-plot { transform: none; background: none; }
 .lot.empty.fenced:hover .plot-sign { rotate: 3deg; translate: -50% -6px; }
-.town.night .ibld .i-part .ghost { filter: grayscale(1) brightness(.85) contrast(.6); opacity: .6; }
 
 /* ---------- inside a building: cosy rooms over a soft, blurred view of the town's landscape ---------- */
 .inside { position: relative; isolation: isolate; overflow: hidden; margin-top: 12px; padding: 22px clamp(12px, 3vw, 30px) 0;
@@ -974,15 +964,10 @@ body.study .page { padding-bottom: 120px; }
 .in-hero.enter, .in-stack.enter { animation: walkin .55s cubic-bezier(.2, 1.2, .4, 1) both; }
 .in-stack.enter { animation-delay: .12s; }
 
-.in-future { margin-top: 18px; padding: 12px 18px 6px; border-radius: 22px; background: rgba(255, 250, 240, .84); border: 2px dashed rgba(90, 66, 50, .3); }
+.in-future { margin-top: 18px; padding: 12px 18px 6px; border-radius: 22px; background: rgba(255, 250, 240, .84); }
 .in-future h3 { margin: 0 0 4px; font-family: var(--hand); font-size: 26px; color: #6d5a43; }
-.inside .fl.plan { display: flex; align-items: center; gap: 18px; padding: 10px 0; margin: 0; opacity: 1; background: none; border: 0; border-top: 1.5px dashed rgba(90, 66, 50, .16); }
+.inside .fl.plan { display: flex; align-items: center; gap: 16px; padding: 10px 0; margin: 0; opacity: 1; background: none; border: 0; border-top: 1.5px solid rgba(90, 66, 50, .1); }
 .inside .fl.plan:first-of-type { border-top: 0; }
-.plan-peek { flex: none; display: flex; align-items: center; width: 232px; }
-.plan-peek img, .plan-peek i { width: 50px; height: 50px; border-radius: 10px; object-fit: cover; margin-left: -16px; border: 2.5px solid #fffaf0;
-  box-shadow: 0 2px 5px rgba(60, 40, 20, .2); filter: saturate(.45) brightness(1.06); opacity: .8; background: #efe3cc; }
-.plan-peek :first-child { margin-left: 0; }
-.plan-peek span { margin-left: 10px; white-space: nowrap; font-weight: 800; font-size: 13px; color: var(--muted); }
 .plan-text { min-width: 0; }
 .plan-text b { font-family: var(--hand); font-size: 24px; line-height: 1; margin-right: 8px; color: #5b8fd1; }
 .plan-text small { font-weight: 800; font-size: 12px; color: var(--muted); }
@@ -1000,7 +985,6 @@ body.study .page { padding-bottom: 120px; }
 .inside .rooms.pics { grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 16px; }
 .inside .room.rpic { border-radius: 18px; box-shadow: 0 6px 14px rgba(60, 40, 20, .22); }
 .inside .room.rpic.empty { opacity: .55; filter: saturate(.55) brightness(1.05); }
-.inside .room.rpic.next { outline-offset: 4px; }
 .in-ground { height: 26px; margin: 22px calc(-1 * clamp(12px, 3vw, 30px)) 0; background: linear-gradient(#a9b866, #8e9f58); box-shadow: inset 0 4px 6px rgba(60, 70, 20, .25); }
 @media (max-width: 760px) {
   .in-hero { flex-direction: column; align-items: center; text-align: center; padding: 16px; gap: 10px; }
@@ -1009,4 +993,36 @@ body.study .page { padding-bottom: 120px; }
   .in-mini .ibld { zoom: .5; }
   .inside .fl.plan { flex-direction: column; align-items: flex-start; gap: 6px; }
   .inside .rooms.pics { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; }
+}
+
+/* building signs: a felt bead for each room of the floor being built */
+.lot-sign { display: flex; flex-direction: column; align-items: center; gap: 3px; }
+.lot-sign .beads { display: flex; gap: 3px; }
+.lot-sign .beads i { width: 11px; height: 11px; border-radius: 50%; background: #efe4cf; box-shadow: inset 0 1px 2px rgba(60, 40, 20, .35); }
+.lot-sign .beads i.on { background: radial-gradient(circle at 35% 30%, #fff3b8, #f2b84b 60%, #c98a22); box-shadow: 0 1px 1px rgba(60, 40, 20, .3); }
+.lot.celebrate .lot-sign .beads i.last { animation: beadpop .8s cubic-bezier(.2, 1.8, .4, 1) .4s both; }
+@keyframes beadpop { 0% { transform: scale(0); } 100% { transform: none; } }
+.lot-sign .beads.bar { display: block; width: 64px; height: 7px; border-radius: 4px; background: #efe4cf; overflow: hidden; box-shadow: inset 0 1px 2px rgba(60, 40, 20, .3); }
+.lot-sign .beads.bar i { display: block; height: 100%; background: #f2b84b; }
+
+/* floors still to come: a calm timeline of years */
+.in-future .muted { margin: 0 0 4px; font-size: 13px; }
+.plan-year { flex: none; width: 58px; height: 58px; border-radius: 50%; display: grid; place-items: center; font-family: var(--hand); font-size: 22px; font-weight: 700;
+  color: #5a6b8c; background: radial-gradient(circle at 35% 30%, #fff, #e6edf5); box-shadow: 0 2px 6px rgba(60, 40, 20, .15); }
+.plan-text b { color: var(--ink); }
+.room.rpic.empty.more { opacity: .7; filter: saturate(.6); }
+.room.rpic.empty.more .tag small { display: block; }
+
+/* a room up close */
+.pc-big.room-open { max-width: 980px; max-height: 94vh; overflow-y: auto; padding: 8px; }
+.room-view { display: flex; align-items: center; gap: 26px; width: 100%; }
+.room-big { flex: 1.2; min-width: 0; animation: roomzoom .5s cubic-bezier(.2, 1.2, .4, 1); }
+.room-big .room.big { width: 100%; padding: 14px; border-radius: 22px; cursor: default; box-shadow: 0 18px 40px rgba(30, 20, 10, .4); }
+.room-big .room.big .tag b { font-size: 16px; }
+.room-side { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; }
+@keyframes roomzoom { from { transform: scale(.6); opacity: 0; } }
+@media (max-width: 760px) {
+  .room-view { flex-direction: column; gap: 14px; }
+  .room-big, .room-side { flex: none; width: 100%; }
+
 }
