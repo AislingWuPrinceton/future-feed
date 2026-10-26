@@ -1237,6 +1237,7 @@ function renderTown(opts = {}) {
 
   const pop = 1 + (S.profile.cast?.length || 0), bg = townBackdrop(), BGP = !!bg;
   $("town").className = `town ${night ? "night" : ""} ${BGP ? `photo ${bg.name.replace("_", "-")}` : ""} ${bg?.native ? "native" : ""}`;
+  const keepX = $("town").querySelector(".street-scroll")?.scrollLeft || 0;  // redraws (sun, seasons) stay where you scrolled
   $("town").innerHTML = `
     ${DEFS}
     <div class="sky">${BGP ? `<img class="bg-photo" style="--p:${bg.p}" src="${artUrl(`${bg.name}.jpg`)}" alt="">` : SKY}${night && !bg?.native ? `<span class="stars"></span>` : ""}</div>
@@ -1263,6 +1264,7 @@ function renderTown(opts = {}) {
     <div class="grain"><svg width="100%" height="100%"><rect width="100%" height="100%" filter="url(#grain)"/></svg></div>`;
 
   const town = $("town");
+  town.querySelector(".street-scroll").scrollLeft = keepX;
   // tap a building: it squishes like wool, then you walk inside
   town.querySelectorAll(".lot[data-h] .lot-b").forEach((b) => (b.onclick = (e) => {
     e.stopPropagation();
