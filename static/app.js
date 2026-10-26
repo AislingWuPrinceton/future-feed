@@ -1935,7 +1935,7 @@ function openWalkFlat(h) {
 async function openWalk(h) {
   let mod;
   try { mod = await import("./walk3d.js"); } catch { return openWalkFlat(h); }
-  if (!mod.webglOK()) return openWalkFlat(h);
+  if (!mod.webglOK() || !ART["tex_felt.jpg"]) return openWalkFlat(h);
   const floors = dollFloors(h).map((fl) => ({ ...fl, rooms: fl.rooms.map((r) => ({ ...r,
     label: r.state === "full" ? dayLabel(r.day) : r.state === "wait" ? "Tomorrow" : `Room ${r.k + 1}`,
     sub: r.state === "full" ? (r.key ? "floor postcard" : `room ${r.k + 1}`) : r.state === "next" ? "next to fill" : r.state === "wait" ? `room ${r.k + 1} opens` : "still empty" })) }));
@@ -1962,8 +1962,8 @@ async function openWalk(h) {
     $("walk-act").querySelectorAll(".lot-hold").forEach(bindHold);
     $("walk-open")?.addEventListener("click", () => openRoomAt(f, s));
   };
-  const w = mod.walk3D({
-    mount: el, floors, roofColor: STYLE[KIND[h.icon] || "studio"]?.roof, background: bg ? artUrl(`${bg.name}.jpg`) : null,
+  const w = await mod.walk3D({
+    mount: el, floors, felt: artUrl("tex_felt.jpg"), roofColor: STYLE[KIND[h.icon] || "studio"]?.roof, background: bg ? artUrl(`${bg.name}.jpg`) : null,
     avatar: S.profile.avatar, sfx,
     photo: (f, s) => { const p = roomAt(f, s)?.p; return p?.photo ? `/api/photo/${p.id}` : null; },
     onOpen: openRoomAt,
