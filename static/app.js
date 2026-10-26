@@ -84,6 +84,7 @@ function pickItem(t, on) {
           <select class="lvl">${START.map((x, i) => `<option value="${i}">${x}</option>`).join("")}</select></label>
         <label>Your dream, in a few words <small>(optional)</small>
           <input class="goal" maxlength="100" placeholder="${custom ? "e.g. finish a 10-day retreat" : "e.g. play at my sister's wedding"}"></label>
+        ${PLAIN || !allLooks().length ? "" : `<p class="pick-label">Your building <small>· pick a style, or let the town choose</small></p>${stylePicker("look", allLooks(), "", "Town picks")}`}
       </div>
     </div>`;
 }
@@ -92,7 +93,7 @@ function pickList(el, preselect) {
   const all = [...S.templates, { key: "custom", label: "Something else", unit: "minutes", default_amount: 15 }];
   el.innerHTML = all.map((t) => pickItem(t, t.key === preselect)).join("");
   el.querySelectorAll(".pick-item").forEach((item) => {
-    bindIconPick(item);
+    bindIconPick(item); bindLookPick(item);
     item.addEventListener("click", (e) => {
       if (e.target.closest("input, select, label")) {
         if (e.target.classList.contains("cname") && !item.classList.contains("on")) selectPick(el, item, true);
@@ -115,9 +116,14 @@ const picked = (el) => [...el.querySelectorAll(".pick-item.on")].map((i) => ({
   goal: i.querySelector(".goal").value.trim(),
   name: i.querySelector(".cname")?.value.trim() || "",
   icon: i.querySelector(".icon-btn")?.dataset.icon || "",
+  look: i.dataset.look || "",
 }));
 
 // the star on a custom habit opens a grid of icons; "Let AI choose" leaves it to the Ladder agent
+function bindLookPick(item) {
+  const sp = item.querySelector(".style-pick.sp-look");
+  if (sp) bindStylePicker(sp, (n) => (item.dataset.look = n));
+}
 function bindIconPick(item) {
   const btn = item.querySelector(".icon-btn"), grid = item.querySelector(".icon-pick");
   if (!btn) return;
@@ -194,7 +200,7 @@ function openAdd() {
   $("another-custom").onclick = () => {
     $("another-custom").insertAdjacentHTML("beforebegin", pickItem({ key: "custom", unit: "minutes", default_amount: 15 }, true));
     const item = $("another-custom").previousElementSibling;
-    bindIconPick(item);
+    bindIconPick(item); bindLookPick(item);
     item.addEventListener("click", (e) => { if (!e.target.closest("input, select, label")) selectPick($("add-habits"), item, !item.classList.contains("on")); });
     item.querySelector(".cname").focus();
   };
@@ -669,12 +675,22 @@ function openRoom(p, room, when) {
   $("pc-body").innerHTML = `<div class="room-view">
       <div class="room-big"><div class="room big ${roomPic(room)}"><span class="rm-photo">${photoHTML(p)}</span>${when ? `<span class="tag"><b>${esc(when)}</b></span>` : ""}</div></div>
       <div class="room-side">${cardHTML(p)}
-        <div class="pc-actions"><button class="btn sketch" id="pc-turn">Turn it over ↻</button><button class="btn sketch" id="pc-close">Back to the rooms</button></div></div>
+        <div class="pc-actions"><button class="btn sketch" id="pc-turn">Turn it over ↻</button><button class="btn sketch" id="pc-close">Back to the rooms</button></div>
+        <details class="room-style"><summary>Decorate this room</summary>${stylePicker("room", roomStyles(), p.room && ART[`${p.room}.jpg`] ? p.room : "", "Usual")}</details></div>
     </div>`;
   $("pc").hidden = false;
   sfx.paper();
   bindFlip();
   $("pc-close").onclick = () => ($("pc").hidden = true);
+  bindStylePicker($("pc-body").querySelector(".room-style"), async (n) => {
+    await api(`/api/posts/${p.id}/room`, { name: n });
+    p.room = n;
+    const usual = p.kind === "level_up" && ART["room_party.jpg"] ? "room_party" : `room_${KIND[S.habits.find((x) => x.id === p.habit_id)?.icon] || "studio"}`;
+    const big = $("pc-body").querySelector(".room.big"), name = n || usual;
+    big.className = `room big ${roomPic(name)}`.replace(/" style=.*$/, "");
+    const m = roomPic(name).match(/style="([^"]*)/); if (m) big.setAttribute("style", m[1]);
+    renderInside();
+  });
 }
 
 // ---------- story reel ----------
@@ -836,17 +852,44 @@ const LOOK_NAME = { ...KIND_NAME, bakery: "Bakery", florist: "Flower shop", obse
 const LOOK_W = { bakery: 140, florist: 136, observatory: 118, postoffice: 144, toyshop: 136, cottage: 142 };
 const LOOKS_FOR = { hall: ["hall", "toyshop"], library: ["library", "postoffice", "observatory"], studio: ["studio", "observatory", "toyshop"], gym: ["gym", "cottage"],
   cafe: ["cafe", "bakery", "postoffice"], home: ["home", "cottage", "florist"], garden: ["garden", "florist", "observatory"] };
+const hasLook = (l) => !!(l && ART[`${l}_roof.webp`] && ART[`${l}_floor.webp`] && ART[`${l}_ground.webp`]);
+// every building style in static/art (new art shows up here by itself once it's sliced)
+const allLooks = () => Object.keys(ART).map((n) => n.match(/^(.+)_roof\.webp$/)?.[1]).filter(hasLook);
+const lookLabel = (l) => LOOK_NAME[l] || l.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 function lookOf(h) {
-  const taken = new Set(), has = (l) => ART[`${l}_roof.webp`];
+  if (hasLook(h.look)) return h.look;  // the style you picked
+  const taken = new Set(S.habits.map((x) => x.look).filter(hasLook));
   for (const x of [...S.habits].sort((a, b) => a.id - b.id)) {
+    if (hasLook(x.look)) continue;
     const kind = KIND[x.icon] || "studio";
-    const look = [...LOOKS_FOR[kind], ...Object.keys(LOOK_NAME)].find((l) => has(l) && !taken.has(l)) || kind;
+    const look = [...LOOKS_FOR[kind], ...allLooks()].find((l) => hasLook(l) && !taken.has(l)) || kind;
     taken.add(look);
     if (x.id === h.id) return look;
   }
   return KIND[h.icon] || "studio";
 }
-const lookName = (h) => LOOK_NAME[lookOf(h)] || KIND_NAME[KIND[h.icon] || "studio"];
+const lookName = (h) => lookLabel(lookOf(h));
+// room styles: every room_*.jpg except the empty one
+const roomStyles = () => Object.keys(ART).map((n) => n.match(/^(room(?:_[a-z0-9_]+)?)\.jpg$/)?.[1]).filter((r) => r && r !== "room_empty");
+const roomLabel = (r) => r === "room" ? "Plain" : r.replace(/^room_/, "").replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+// a little grid of styles to pick from; "" is "let the town choose"
+function stylePicker(kind, items, current, autoLabel) {
+  const thumb = (n) => kind === "look"
+    ? `<span class="lk"><img src="${artUrl(`${n}_roof.webp`)}" alt=""><img src="${artUrl(`${n}_ground.webp`)}" alt=""></span>`
+    : `<span class="rk" style="background-image:url(${artUrl(`${n}.jpg`)})"></span>`;
+  return `<div class="style-pick sp-${kind}">
+    ${autoLabel ? `<button type="button" class="sp auto ${current ? "" : "on"}" data-style=""><span class="sp-auto">${ico("custom")}</span><small>${autoLabel}</small></button>` : ""}
+    ${items.map((n) => `<button type="button" class="sp ${n === current ? "on" : ""}" data-style="${n}" title="${kind === "look" ? lookLabel(n) : roomLabel(n)}">${thumb(n)}<small>${kind === "look" ? lookLabel(n) : roomLabel(n)}</small></button>`).join("")}
+  </div>`;
+}
+function bindStylePicker(root, onPick) {
+  root.querySelectorAll(".sp").forEach((b) => (b.onclick = (e) => {
+    e.stopPropagation();
+    root.querySelectorAll(".sp").forEach((x) => x.classList.toggle("on", x === b));
+    replay(b, "boing"); sfx.pop();
+    onPick(b.dataset.style);
+  }));
+}
 // The town is made of needle felt: every piece of colour is a puffy wool patch (an SVG filter
 // adds fuzzy edges, fibre texture and soft light), and the outlines are running stitches.
 const SC = 1.35, X0 = 14, INK = "#2b2420", THREAD = "#5a4232";
@@ -1109,7 +1152,7 @@ async function loadArt() {
 function feltBuilding(h, kind, fresh) {
   const piece = (role) => ART[`${kind}_${role}.webp`];
   if (!piece("roof") || !piece("floor") || !piece("ground")) return null;
-  const W = Math.round((LOOK_W[kind] || STYLE[kind].W) * 1.45), hOf = (role) => Math.round((piece(role)[1] * W) / piece(role)[0]);
+  const W = Math.round((LOOK_W[kind] || STYLE[kind]?.W || 140) * 1.45), hOf = (role) => Math.round((piece(role)[1] * W) / piece(role)[0]);
   const count = Math.max(1, Math.min(MAXF, h.level));
   const img = (role, cls) => `<img class="i-${role} ${cls}" src="${artUrl(`${kind}_${role}.webp`)}" width="${W}" height="${hOf(role)}" alt="" draggable="false">`;
   const storey = (i) => img(i ? "floor" : "ground", `floor ${i >= fresh.floors ? "new" : ""}`);
@@ -1446,7 +1489,7 @@ function renderInside(opts = {}) {
       const k = from + r, day = days[k];
       if (day) {
         const p = mine.find((x) => x.created_day === day), key = p?.kind === "level_up";
-        const rn = key && ART["room_party.jpg"] ? "room_party" : `room_${kind}`;
+        const rn = p?.room && ART[`${p.room}.jpg`] ? p.room : key && ART["room_party.jpg"] ? "room_party" : `room_${kind}`;
         return `<button class="room full ${k >= seenRooms ? "pop" : ""} ${key ? "keystone" : ""} ${roomPic(rn)}" ${p ? `data-post="${p.id}" data-room="${rn}"` : "disabled"}>
           <span class="rm-photo">${p ? photoHTML(p) : hIcon(h)}</span><span class="tag"><b>${dayLabel(day)}</b><small>${key ? "floor postcard" : `room ${k + 1}`}</small></span></button>`;
       }
@@ -1474,7 +1517,7 @@ function renderInside(opts = {}) {
   $("inside").style.setProperty("--inbg", bg ? `url(${artUrl(`${bg.name}.jpg`)})` : "none");
   $("inside").innerHTML = `
     <div class="in-hero ${opts.enter ? "enter" : ""}" style="--roof:${st.roof}">
-      ${mini ? `<div class="in-mini">${mini.svg}</div>` : ""}
+      ${mini ? `<div class="in-mini">${mini.svg}<button class="restyle" id="restyle">Change style</button></div>` : ""}
       <div class="in-hero-text">
         <p class="kicker">Inside your ${lookName(h).toLowerCase()}</p>
         <h2>${hIcon(h, "inline")} ${esc(h.short)}</h2>
@@ -1482,6 +1525,7 @@ function renderInside(opts = {}) {
         ${prog ? `<span class="tip-bar"><i style="width:${(prog.done / prog.n) * 100}%"></i></span><small>Floor ${full + 1}: ${prog.done} of ${prog.n} rooms · ${prog.n - prog.done} more check-in${prog.n - prog.done === 1 ? "" : "s"} to finish it</small>` : `<small>Every floor is built. Ten years tall.</small>`}
       </div>
     </div>
+    <div class="restyle-panel" id="restyle-panel" hidden><p class="pick-label">Building style <small>· your ${esc(h.short)} building in town changes too</small></p>${stylePicker("look", allLooks(), h.look && hasLook(h.look) ? h.look : "", "Town picks")}</div>
     ${nextUp ? `<p class="in-future"><span class="storeys">${plan.map(() => "<i></i>").join("")}</span>
       ${plan.length} more floor${plan.length === 1 ? "" : "s"} to build above · next is floor ${nextUp.f + 1}${nextUp.yr ? `, around ${nextUp.yr}` : ""}</p>` : ""}
     <div class="in-stack ${opts.enter ? "enter" : ""}">${lived}</div>
@@ -1490,6 +1534,14 @@ function renderInside(opts = {}) {
   $("in-tabs").querySelectorAll("[data-in]").forEach((b) => (b.onclick = () => { inHabit = +b.dataset.in; sfx.tick(); renderInside({ enter: true }); }));
   $("inside").querySelectorAll("[data-post]").forEach((b) => (b.onclick = () => openRoom(mine.find((p) => p.id === +b.dataset.post), b.dataset.room, b.querySelector("b")?.textContent)));
   $("inside").querySelectorAll(".lot-hold").forEach(bindHold);
+  if ($("restyle")) {
+    $("restyle").onclick = () => { const pn = $("restyle-panel"); pn.hidden = !pn.hidden; sfx.tick(); };
+    bindStylePicker($("restyle-panel"), async (n) => {
+      await api(`/api/habits/${h.id}/look`, { name: n });
+      h.look = n; renderInside(); renderTown({ noAnim: true });
+      $("restyle-panel").hidden = false;
+    });
+  }
   $("in-back").onclick = () => setView("town");
   if (opts.enter) requestAnimationFrame(() => $("inside").querySelector(".fl.building, .fl.built")?.scrollIntoView({ behavior: "smooth", block: "start" }));
 }

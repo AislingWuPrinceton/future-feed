@@ -94,11 +94,11 @@ def init():
         c.execute("PRAGMA journal_mode=WAL")  # background threads (pre-writing, photo checks) write concurrently
         c.executescript(SCHEMA)
         cols = {r["name"] for r in c.execute("PRAGMA table_info(habits)")}
-        for col, ddl in (("start_level", "INTEGER DEFAULT 0"), ("goal", "TEXT DEFAULT ''"), ("custom", "TEXT")):
+        for col, ddl in (("start_level", "INTEGER DEFAULT 0"), ("goal", "TEXT DEFAULT ''"), ("custom", "TEXT"), ("look", "TEXT DEFAULT ''")):
             if col not in cols:
                 c.execute(f"ALTER TABLE habits ADD COLUMN {col} {ddl}")
         post_cols = {r["name"] for r in c.execute("PRAGMA table_info(posts)")}
-        for col in ("chapter INTEGER", "letter TEXT", "postmark TEXT", "stamp TEXT"):
+        for col in ("chapter INTEGER", "letter TEXT", "postmark TEXT", "stamp TEXT", "room TEXT"):
             if col.split()[0] not in post_cols:
                 c.execute(f"ALTER TABLE posts ADD COLUMN {col}")
 

@@ -125,6 +125,7 @@ def stats(habit, assume_checkin=False):
     return {
         "id": habit["id"], "key": habit["key"], "label": t["label"], "short": t["short"], "emoji": t["emoji"],
         "icon": icon_for(t, habit["key"]),
+        "look": habit.get("look") or "",
         "amount": habit["amount"], "unit": t["unit"], "measure": t["measure"],
         "checkins": len(days), "days": [d.isoformat() for d in sorted(days)], "checked_today": now in checked, "streak": streak, "gap": gap,
         "adherence": round(adherence, 3), "level": level, "next_level_at": next_at,

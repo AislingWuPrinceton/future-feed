@@ -332,6 +332,10 @@ class HabitIn(BaseModel):
     goal: str = ""
     name: str = ""   # only for key == "custom"
     icon: str = ""   # custom only: picked by the user; empty lets the Ladder agent choose
+    look: str = ""   # building style picked by the user (an art name like "bakery"); empty lets the town choose
+
+
+ART_NAME = re.compile(r"^[a-z0-9_]{1,30}$")
 
 
 def make_custom(body):
@@ -388,9 +392,9 @@ def add_habit(body: HabitIn):
             raise HTTPException(400, "Pick an amount between 1 and 240.")
         template = make_custom(body)
         with db.connect() as c:
-            c.execute("INSERT INTO habits (key, amount, started_on, start_level, goal, custom) VALUES (?,?,?,?,?,?)",
+            c.execute("INSERT INTO habits (key, amount, started_on, start_level, goal, custom, look) VALUES (?,?,?,?,?,?,?)",
                       ("custom-" + uuid.uuid4().hex[:6], body.amount, game.today().isoformat(), body.start_level,
-                       body.goal.strip()[:100], json.dumps(template, ensure_ascii=False)))
+                       body.goal.strip()[:100], json.dumps(template, ensure_ascii=False), clean_art(body.look)))
         return {"ok": True, "label": template["label"]}
     if body.key not in game.TEMPLATES:
         raise HTTPException(400, "Unknown habit.")
@@ -401,8 +405,36 @@ def add_habit(body: HabitIn):
     if not 0 <= body.start_level < len(START_LEVELS):
         raise HTTPException(400, "Unknown starting level.")
     with db.connect() as c:
-        c.execute("INSERT INTO habits (key, amount, started_on, start_level, goal) VALUES (?,?,?,?,?)",
-                  (body.key, body.amount, game.today().isoformat(), body.start_level, body.goal.strip()[:100]))
+        c.execute("INSERT INTO habits (key, amount, started_on, start_level, goal, look) VALUES (?,?,?,?,?,?)",
+                  (body.key, body.amount, game.today().isoformat(), body.start_level, body.goal.strip()[:100], clean_art(body.look)))
+    return {"ok": True}
+
+
+def clean_art(name):
+    """A style is just the name of a picture set in static/art; anything else means 'let the town choose'."""
+    name = (name or "").strip()
+    return name if ART_NAME.match(name) else ""
+
+
+class StyleIn(BaseModel):
+    name: str = ""
+
+
+@app.post("/api/habits/{habit_id}/look")
+def set_look(habit_id: int, body: StyleIn):
+    """Restyle a building (empty = back to the town's pick)."""
+    with db.connect() as c:
+        if not c.execute("UPDATE habits SET look = ? WHERE id = ? AND active = 1", (clean_art(body.name), habit_id)).rowcount:
+            raise HTTPException(404, "No such building.")
+    return {"ok": True}
+
+
+@app.post("/api/posts/{post_id}/room")
+def set_room(post_id: int, body: StyleIn):
+    """Redecorate one room (empty = the building's usual room)."""
+    with db.connect() as c:
+        if not c.execute("UPDATE posts SET room = ? WHERE id = ?", (clean_art(body.name), post_id)).rowcount:
+            raise HTTPException(404, "No such room.")
     return {"ok": True}
 
 
