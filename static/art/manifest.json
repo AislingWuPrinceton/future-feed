@@ -35,6 +35,18 @@
   1536,
   1024
  ],
+ "bakery_floor.webp": [
+  420,
+  180
+ ],
+ "bakery_ground.webp": [
+  420,
+  236
+ ],
+ "bakery_roof.webp": [
+  420,
+  193
+ ],
  "cafe_floor.webp": [
   420,
   181
@@ -46,6 +58,30 @@
  "cafe_roof.webp": [
   420,
   203
+ ],
+ "cottage_floor.webp": [
+  420,
+  167
+ ],
+ "cottage_ground.webp": [
+  420,
+  213
+ ],
+ "cottage_roof.webp": [
+  420,
+  227
+ ],
+ "florist_floor.webp": [
+  420,
+  194
+ ],
+ "florist_ground.webp": [
+  420,
+  243
+ ],
+ "florist_roof.webp": [
+  420,
+  206
  ],
  "garden_floor.webp": [
   420,
@@ -106,6 +142,30 @@
  "library_roof.webp": [
   420,
   279
+ ],
+ "observatory_floor.webp": [
+  420,
+  252
+ ],
+ "observatory_ground.webp": [
+  420,
+  269
+ ],
+ "observatory_roof.webp": [
+  420,
+  271
+ ],
+ "postoffice_floor.webp": [
+  420,
+  202
+ ],
+ "postoffice_ground.webp": [
+  420,
+  214
+ ],
+ "postoffice_roof.webp": [
+  420,
+  156
  ],
  "prop_balloon.webp": [
   221,
@@ -290,5 +350,17 @@
  "studio_roof.webp": [
   420,
   100
+ ],
+ "toyshop_floor.webp": [
+  420,
+  208
+ ],
+ "toyshop_ground.webp": [
+  420,
+  252
+ ],
+ "toyshop_roof.webp": [
+  420,
+  186
  ]
 }

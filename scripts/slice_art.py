@@ -15,7 +15,7 @@ from PIL import Image, ImageDraw, ImageFilter
 
 ROOT = Path(__file__).resolve().parent.parent / "static" / "art"
 RAW = ROOT / "raw"
-KINDS = ["hall", "library", "cafe", "home", "gym", "garden", "studio"]
+KINDS = ["hall", "library", "cafe", "home", "gym", "garden", "studio", "bakery", "florist", "observatory", "postoffice", "toyshop", "cottage"]
 BACKDROPS = {"background": 2000, "scene": 1600, "room": 600}  # file-name prefix -> max width
 KEY = (255, 0, 255)
 # what each sheet in docs/art_prompts.md holds, in reading order; saved as prop_<name>.webp when the count matches

@@ -688,6 +688,23 @@ const KIND = { guitar: "hall", music: "hall", piano: "hall", dance: "hall", read
   running: "gym", bike: "gym", dumbbell: "gym", wave: "gym", spanish: "cafe", chat: "cafe", pan: "cafe",
   saving: "home", heart: "home", lotus: "garden", sprout: "garden", drop: "garden", moon: "garden", sun: "garden" };
 const KIND_NAME = { hall: "Music hall", library: "Library", gym: "Gym", cafe: "Café", home: "Home", garden: "Greenhouse", studio: "Studio" };
+// what each building looks like from the street. A habit's kind still picks its rooms; the look is the facade,
+// and no two habits share one while there are looks left: the first free one that suits the habit, else any free one
+const LOOK_NAME = { ...KIND_NAME, bakery: "Bakery", florist: "Flower shop", observatory: "Observatory", postoffice: "Post office", toyshop: "Toy shop", cottage: "Cottage" };
+const LOOK_W = { bakery: 140, florist: 136, observatory: 118, postoffice: 144, toyshop: 136, cottage: 142 };
+const LOOKS_FOR = { hall: ["hall", "toyshop"], library: ["library", "postoffice", "observatory"], studio: ["studio", "observatory", "toyshop"], gym: ["gym", "cottage"],
+  cafe: ["cafe", "bakery", "postoffice"], home: ["home", "cottage", "florist"], garden: ["garden", "florist", "observatory"] };
+function lookOf(h) {
+  const taken = new Set(), has = (l) => ART[`${l}_roof.webp`];
+  for (const x of [...S.habits].sort((a, b) => a.id - b.id)) {
+    const kind = KIND[x.icon] || "studio";
+    const look = [...LOOKS_FOR[kind], ...Object.keys(LOOK_NAME)].find((l) => has(l) && !taken.has(l)) || kind;
+    taken.add(look);
+    if (x.id === h.id) return look;
+  }
+  return KIND[h.icon] || "studio";
+}
+const lookName = (h) => LOOK_NAME[lookOf(h)] || KIND_NAME[KIND[h.icon] || "studio"];
 // The town is made of needle felt: every piece of colour is a puffy wool patch (an SVG filter
 // adds fuzzy edges, fibre texture and soft light), and the outlines are running stitches.
 const SC = 1.35, X0 = 14, INK = "#2b2420", THREAD = "#5a4232";
@@ -950,7 +967,7 @@ async function loadArt() {
 function feltBuilding(h, kind, fresh) {
   const piece = (role) => ART[`${kind}_${role}.webp`];
   if (!piece("roof") || !piece("floor") || !piece("ground")) return null;
-  const W = Math.round(STYLE[kind].W * 1.45), hOf = (role) => Math.round((piece(role)[1] * W) / piece(role)[0]);
+  const W = Math.round((LOOK_W[kind] || STYLE[kind].W) * 1.45), hOf = (role) => Math.round((piece(role)[1] * W) / piece(role)[0]);
   const count = Math.max(1, Math.min(MAXF, h.level));
   const img = (role, cls) => `<img class="i-${role} ${cls}" src="${artUrl(`${kind}_${role}.webp`)}" width="${W}" height="${hOf(role)}" alt="" draggable="false">`;
   const storey = (i) => img(i ? "floor" : "ground", `floor ${i >= fresh.floors ? "new" : ""}`);
@@ -1113,7 +1130,7 @@ function renderTown(opts = {}) {
     const was = seen[h.id] || { floors: 99, lit: 999 };
     const fresh = opts.noAnim ? { floors: 99, lit: 999 } : was;
     const art = buildingSVG(h, idx, built, h.checkins, fresh, usedKinds.has(kind));
-    Object.assign(art, feltBuilding(h, kind, fresh) || {});
+    Object.assign(art, feltBuilding(h, lookOf(h), fresh) || {});
     const back = idx % 2 === 1, rise = !opts.noAnim && hadTown && !seen[h.id];  // back row: a little further up the meadow
     usedKinds.add(kind);
     const { total, lit } = art;
@@ -1130,13 +1147,13 @@ function renderTown(opts = {}) {
     const rooms = prog ? `<small>${prog.done}/${prog.n} rooms</small>` : "";  // rooms filled on the floor being built
     return `
       <div class="lot ${back ? "back" : ""} ${rise ? "rise" : ""} ${opts.working === h.id ? "working" : ""} ${h.checked_today ? "done-today" : ""}" data-h="${h.id}" style="--b:${idx}; width:${art.width}px; --lw:${art.width}px">
-        <div class="lot-tip"><b>${KIND_NAME[kind]} · ${Math.min(MAXF, h.level)} of 6 floors</b>${tip}</div>
+        <div class="lot-tip"><b>${lookName(h)} · ${Math.min(MAXF, h.level)} of 6 floors</b>${tip}</div>
         ${h.quest ? `<div class="lot-storm">${ico("storm")}<span class="rain"></span><b>Comeback quest ${h.quest.progress}/3</b></div>` : ""}
         <div class="lot-sign" style="bottom:${signAt + 4}px">${hIcon(h, "inline")}<b>${esc(h.short)}</b>${rooms}</div>
         <div class="lot-work">Building floor ${built + 1}…<br><small>your postcard is on its way</small></div>
         <button class="lot-b" aria-label="${esc(h.short)}: go inside">${art.svg}</button>
         <button class="mailbox ${mine.length ? "has" : ""}" data-mail="${h.id}" aria-label="Postcards">${mine.length ? MAILBOX.up : MAILBOX.down}${mine.length ? `<b>${mine.length}</b>` : ""}</button>
-        <p class="lot-name">${KIND_NAME[kind]}<small>${esc(h.short)} · ${h.checked_today ? "done today ✓" : "not yet today"}</small></p>
+        <p class="lot-name">${lookName(h)}<small>${esc(h.short)} · ${h.checked_today ? "done today ✓" : "not yet today"}</small></p>
         ${h.checked_today ? "" : `<button class="lot-hold" data-hold="${h.id}" ${busy ? "disabled" : ""}><i></i><span>Hold to build</span></button>`}
       </div>
       ${DECO.length ? `<span class="prop deco" style="--d:${idx}; width:${DECO[idx % DECO.length][1]}px">${pic(DECO[idx % DECO.length][0])}</span>` : ""}
@@ -1274,7 +1291,7 @@ function renderInside(opts = {}) {
   const L = S.level_checkins, days = h.days || [...new Set(mine.map((p) => p.created_day).filter(Boolean))].sort();
   const seenRooms = inSeen[h.id] ?? days.length;
   inSeen[h.id] = days.length;
-  $("in-tabs").innerHTML = S.habits.map((x) => `<button data-in="${x.id}" class="${x.id === h.id ? "on" : ""}">${hIcon(x, "inline")} ${KIND_NAME[KIND[x.icon] || "studio"]} · ${esc(x.short)}</button>`).join("");
+  $("in-tabs").innerHTML = S.habits.map((x) => `<button data-in="${x.id}" class="${x.id === h.id ? "on" : ""}">${hIcon(x, "inline")} ${lookName(x)} · ${esc(x.short)}</button>`).join("");
 
   const floors = L.map((need, f) => {
     const from = L[f - 1] || 0, n = need - from, done = Math.max(0, Math.min(n, days.length - from));
@@ -1308,14 +1325,14 @@ function renderInside(opts = {}) {
       <div class="rooms ${pics ? "pics" : ""}">${rooms}</div></section>` };
   }).reverse();
 
-  const full = Math.min(MAXF, h.level), prog = floorProgress(h), bg = townBackdrop(), mini = feltBuilding(h, kind, { floors: 99 });
+  const full = Math.min(MAXF, h.level), prog = floorProgress(h), bg = townBackdrop(), mini = feltBuilding(h, lookOf(h), { floors: 99 });
   const plan = floors.filter((x) => x.state === "plan"), nextUp = plan[plan.length - 1], lived = floors.filter((x) => x.state !== "plan").map((x) => x.html).join("");
   $("inside").style.setProperty("--inbg", bg ? `url(${artUrl(`${bg.name}.jpg`)})` : "none");
   $("inside").innerHTML = `
     <div class="in-hero ${opts.enter ? "enter" : ""}" style="--roof:${st.roof}">
       ${mini ? `<div class="in-mini">${mini.svg}</div>` : ""}
       <div class="in-hero-text">
-        <p class="kicker">Inside your ${KIND_NAME[kind].toLowerCase()}</p>
+        <p class="kicker">Inside your ${lookName(h).toLowerCase()}</p>
         <h2>${hIcon(h, "inline")} ${esc(h.short)}</h2>
         <p class="muted">${days.length} room${days.length === 1 ? "" : "s"} lived in · ${full} of ${MAXF} floors built</p>
         ${prog ? `<span class="tip-bar"><i style="width:${(prog.done / prog.n) * 100}%"></i></span><small>Floor ${full + 1}: ${prog.done} of ${prog.n} rooms · ${prog.n - prog.done} more check-in${prog.n - prog.done === 1 ? "" : "s"} to finish it</small>` : `<small>Every floor is built. Ten years tall.</small>`}
