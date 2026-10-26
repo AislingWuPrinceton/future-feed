@@ -1,93 +1,92 @@
 # Future Feed
 
-Repo: https://github.com/AislingWuPrinceton/future-feed
+Repo: https://github.com/AislingWuPrinceton/future-feed (public)
 
-**Check in on one small habit a day. Each check-in sends you a postcard from your future self and fills a room in your 2036 town.**
+**Check in on one small habit a day. Each check-in brings a postcard from your future self and fills a room in your 2036 town.**
 
-Most habit apps only record streaks, so people get bored and quit. Future Feed turns a habit into an unfolding story about your future self, shown as a needle-felt town. Each habit is a building. Tap it to go inside: every check-in is a room holding that day's postcard, and floor N has as many rooms as the check-ins it takes to reach it (1, 2, 4, 7, 16, 30), so filling a floor of rooms is what adds a floor to the building outside. Each floor is labeled with the chapter of your future and the year you'd reach it at your real pace. You check in by pressing and holding, then watch the postcard arrive. Check-ins unlock new chapters, your real pace decides how far those chapters can reach, slumps trigger a "boss," and a second feed shows the you who stopped.
+Most habit apps only count streaks, so people get bored and quit. Future Feed turns a habit into a story about your future self, set in a needle-felted town. Each habit is a building. Every check-in moves into a room and brings a postcard from you a few years ahead, written by AI but held to your real pace. Fill a floor of rooms (1, 2, 4, 7, 16, 30 check-ins) and the building grows a storey. Skip a few days and a storm rolls in, with a worried postcard and a 3-day comeback quest.
 
 ## Run it locally (about 3 minutes)
 
-You need Python 3.10 or newer and an internet connection to load the photos.
+You need Python 3.10 or newer and an internet connection (the postcard photos load from Creative Commons sites).
 
 1. Clone the repo and enter the folder.
    ```bash
    git clone https://github.com/AislingWuPrinceton/future-feed.git
    cd future-feed
    ```
-2. Create a virtual environment and install dependencies.
+2. Create a virtual environment and install the dependencies.
    ```bash
    python3 -m venv .venv
    source .venv/bin/activate        # Windows: .venv\Scripts\activate
    pip install -r requirements.txt
    ```
-3. Provide the API key. The app reads `.env` from this folder first, then from the folder one level up. It needs `PORTKEY_API_KEY`. See `.env.example`.
+3. Provide the API key. The app reads `.env` from this folder first, then from the folder one level up. It needs only `PORTKEY_API_KEY` (course key, model `gpt-6-luna`). See `.env.example`.
 4. Start the app.
    ```bash
    python app.py
    ```
-5. Open http://localhost:8000, enter your name, pick a habit, and tap **I did it**.
+5. Open http://localhost:8000. A three-page story explains the idea. Then enter your name, pick a habit, and **press and hold "Hold to check in"**. A short tour shows you around.
 
-**Try a month in two minutes:** open **Menu → Time travel (demo)**:
-- **Next day** checks in again tomorrow.
-- **Skip 4 days** triggers a slump boss and a 3-day comeback quest.
-- **Fast-forward 2 weeks** checks in on about 85% of days and jumps levels.
-- **Reset everything** starts over.
+No database setup is needed: `data/futurefeed.db` is created on first run. The habit data and a pre-vetted photo library ship in `data/`.
 
-**Study console:** http://localhost:8000/research walks you through each A/B session, stores survey answers (they survive Reset), and exports `ab-results.csv`.
+**Try a month in two minutes:** open **Menu → Time travel (demo)**.
+- **Next day** moves the app's clock forward one day.
+- **Skip 4 days (slump)** triggers the storm: a worried postcard and a 3-day comeback quest.
+- **Fast-forward 2 weeks** checks in on about 85% of days and climbs floors.
+- **Start over** erases everything.
 
-**A/B test mode:** http://localhost:8000/?mode=plain is the control group. It's an ordinary streak tracker with no feed and no AI. Give testers either version on their own device or a fresh copy, then compare check-in rates and motivation.
+## What you can do
 
-## How it plays
-
-| Mechanic | Rule |
+| Where | What |
 |---|---|
-| Levels | Unlocked at 1, 3, 7, 14, 30, and 60 check-ins. Each level opens a new chapter, like "plays for friends" or "first open mic." |
-| Starting point and dream | Onboarding asks where you're starting (brand new → already pretty good) and your dream in a few words. Experienced people start further along the ladder, and the story steers toward your dream. |
-| Pace cap | Your real check-in rate is projected over ten years. A chapter your pace can't reach in ten years stays locked even if your level allows it. Post dates show *when* you'd get there at this pace. |
-| Daily posts | Every check-in writes a new post. The story remembers earlier posts and recurring friends. About 30% of days bring a random life event (a "plot twist"). |
-| Boss | Three or more days without a check-in brings a worried post from future you. Check in three days in a row to save the moment. |
-| Combo | Two habits at Level 3 or higher collide in one surprise post. |
-| Instant postcards | Opening the app pre-writes the postcard your next check-in will produce (same day, same check-in count, same event, chosen deterministically), so the reveal is instant. A draft that doesn't match is discarded and the postcard is written live. |
-| Postcards are real cards | New postcards arrive in an envelope that opens; tap a card to turn it over. The back holds a short handwritten letter from future-you, a stamp, and a postmark. |
-| Two timelines | Each post has a twin from the you who stopped: same date, an everyday-life photo, wistful caption. |
-| Future-self avatar | Pick a character or upload a photo (kept on this computer, never sent to the AI). It evolves with your level: ring, habit badge at Lv3, gold at Lv4, crown at Lv5, animated rainbow at Lv6. |
-| Play your next 10 years | Plays your kept-going posts in date order as full-screen stories, a video-style recap. |
-| Journey map | A hand-drawn trail with 6 stops (one per chapter). Your photo or character is the game piece and hops forward on every check-in. A slump puts a storm over the next stop until the comeback quest is done. |
+| Today | Hold to check in. The postcard arrives in an envelope; tap it to turn it over (handwritten letter, AI-designed vintage stamp, postmark). |
+| Latest from 2036 | Your newest postcards. The week's stamps above them step back through past weeks; tap a day to see its postcards. |
+| Your 2036 town | One felt building per habit, growing a storey per full floor of rooms. Pick a season, tap the sun for night, shake the trees, make a cloud rain. |
+| Inside a building | Floor by floor, each room holds the postcard from the day you earned it. Change the building's style, or decorate any room. |
+| Menu | Add a habit (or "Something else": the AI designs its milestones), manage habits (edit, catch up a missed day, remove a building), play your next 10 years as a story, AI usage and safety log, How it works. |
 
 ## Agents and tools
 
 | Step | Who | What |
 |---|---|---|
-| 1 | Game engine (Python, `game.py`) | Levels, streaks, ten-year projection, which milestone is allowed, boss and quest state. No AI. |
-| 2 | Story agent (`gpt-6-luna`) | Writes the next post and its "stopped" twin, continuing the story and cast. Returns a photo query and the claims it makes. |
-| 3 | Reality-check agent (`gpt-6-luna`) | Compares the post with the allowed milestone and rewrites anything that overclaims. |
-| 4 | Photo tool | Picks the best-matching Creative Commons photo from a local Openverse library (`data/photos.json`) and credits it. The stopped timeline gets an everyday-life photo instead. |
-| 4b | Photo safety agent (`gpt-6-luna`, vision) | Looks at each candidate photo once (cached by URL) and rejects nudity, underwear or hosiery, suggestive framing, body close-ups, violence, and horror. A keyword filter runs first. Rejections are logged. `scripts/vet_photos.py` pre-vets the whole library (19 of 230 removed). |
-| 5 | Ladder agent (`gpt-6-luna`) | For a custom habit ("Something else"), designs a 6-step milestone ladder in practice hours, or refuses unsafe "habits" (e.g. checking an ex's profile, extreme calorie restriction). Its photos are fetched from Openverse once. |
+| 1 | Game engine (`game.py`, no AI) | Levels, streaks, ten-year projection of your real pace, which milestone is allowed, storm and quest state. |
+| 2 | Story agent (`gpt-6-luna`) | Writes the next postcard (caption, comments, letter, stamp design), continuing the story and its cast, and lists the claims it makes. |
+| 3 | Reality-check agent (`gpt-6-luna`) | Compares the caption with the allowed milestone and rewrites anything that overclaims. |
+| 4 | Photo tool + photo safety agent (`gpt-6-luna`, vision) | Picks a fresh Creative Commons photo for the scene; the safety agent looks at it once (cached by URL) and blocks unsafe images. |
+| 5 | Ladder agent (`gpt-6-luna`) | For a custom habit, designs a 6-step milestone ladder in practice hours, or refuses harmful "habits". |
 
-## Data and sources (`data/habits.json`)
-
-- Spanish: U.S. State Department FSI. Spanish is Category I, about 30 weeks or 600–750 class hours to professional working proficiency. https://www.state.gov/foreign-language-training/
-- Running: CDC, 150 minutes a week of moderate activity (https://www.cdc.gov/physical-activity-basics/guidelines/adults.html), and the NHS Couch to 5K plan.
-- Reading: Brysbaert (2019), an average silent reading speed of 238 words per minute. Books are assumed to be 80,000 words.
-- Saving: future value of daily deposits at an assumed 4% annual return. This is math, not financial advice.
-- Guitar milestones have no authoritative hours source, so they are conservative estimates and labeled that way in the app.
-- Icons: Future Feed's own hand-drawn set (`static/icons.js`), rendered with rough.js (MIT, vendored in `static/vendor/`).
-- Photos: Openverse (https://openverse.org), Creative Commons licensed and credited on every post. Rebuild the library with `python scripts/build_photo_pool.py`.
+Postcards are pre-written while you look at the app, so most check-ins reveal instantly.
 
 ## Safety built in
 
-- **Overclaiming:** the reality-check agent rewrites captions that exceed your real pace. Every rewrite, with before and after text, is shown in the **Safety log** (chart icon).
-- **Unsafe photos:** keyword filter plus the photo safety agent (vision) on every photo before it's shown.
-- **Unsafe habits:** the Ladder agent refuses harmful custom habits, and refusals are logged in the Safety log.
-- **Prompt injection:** names you type are treated as data. Handles are sanitized and lengths are capped.
-- **Runaway cost:** each call has an output cap and a daily token cap (`FUTUREFEED_DAILY_TOKEN_CAP`), with one check-in per habit per day.
-- **Tone:** the stopped timeline is wistful, never shaming.
+- **Overclaiming:** the reality-check agent rewrites captions that go beyond your real pace. Every rewrite is in **Menu → AI usage & safety log**.
+- **Unsafe photos:** a keyword filter plus the vision safety agent on every photo before it is shown.
+- **Unsafe habits and prompt injection:** the Ladder agent refuses harmful custom habits; typed names are treated as data, sanitized and length-capped.
+- **Runaway cost:** an output cap on every call, a daily token cap (`FUTUREFEED_DAILY_TOKEN_CAP`, default 300,000) and one check-in per habit per day.
+- **Privacy:** an uploaded avatar photo stays on this computer and is never sent to the AI.
+
+## A/B study
+
+`?mode=plain` is the control: an ordinary streak tracker with no postcards, no town and no AI. To run sessions without touching your own town, start a second copy on its own database and open its study console:
+
+```bash
+PORT=8002 FUTUREFEED_DB=data/study.db python app.py      # then open http://localhost:8002/research
+```
+
+Results from 6 participants: [`docs/ab-results.md`](docs/ab-results.md).
+
+## Data and sources
+
+- Spanish: U.S. State Department FSI (Category I, about 600–750 class hours to professional working proficiency).
+- Running: CDC activity guidelines and the NHS Couch to 5K plan. Reading: Brysbaert (2019), 238 words per minute.
+- Saving: future value of daily deposits at an assumed 4% return (math, not financial advice). Guitar milestones are labeled estimates.
+- Photos: Openverse, Creative Commons, credited on every postcard. Felt art generated for this project; icons drawn with rough.js (MIT, vendored).
 
 ## Tests
 
 ```bash
 pip install -r requirements-dev.txt
-python tests/run_flow.py      # onboarding, level-ups, slump boss, comeback (resets the local db)
+python tests/run_safety.py    # overclaim rewrites and name sanitizing (uses the API)
+python tests/run_flow.py      # onboarding, level-ups, slump, comeback (resets the local db)
 ```
