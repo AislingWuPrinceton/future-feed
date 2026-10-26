@@ -162,6 +162,21 @@ form input:focus, .pick-more select:focus, .pick-more input:focus { outline: non
 @keyframes stampin { 0% { transform: scale(1.8) rotate(-20deg); opacity: 0; } 60% { transform: scale(.9) rotate(4deg); opacity: 1; } 100% { transform: none; } }
 @keyframes todayglow { 50% { box-shadow: 0 0 0 5px rgba(255, 216, 107, .6); } }
 @keyframes nope { 25% { translate: -4px 0; } 75% { translate: 4px 0; } }
+.day-pop { grid-column: 1 / -1; position: relative; margin-top: 4px; background: #fffaf0; border: 2px solid var(--ink); border-radius: var(--wobble-sm);
+  box-shadow: 4px 5px 0 rgba(43, 36, 32, .25); padding: 10px 14px 8px; transform: rotate(-.5deg); animation: poppop .3s cubic-bezier(.3, 1.6, .5, 1); }
+.day-pop::before { content: ""; position: absolute; top: -9px; left: var(--arrow); width: 14px; height: 14px; background: #fffaf0;
+  border: 2px solid var(--ink); border-right: 0; border-bottom: 0; transform: rotate(45deg); }
+.day-fan { height: 160px; }
+.day-fan .fan-card { left: calc(var(--i) * var(--step)); top: 4px; width: 112px; height: 146px; z-index: calc(1 + var(--i));
+  transform: rotate(calc((var(--i) - 2) * 3deg)); animation: dealin .4s cubic-bezier(.3, 1.5, .5, 1) calc(var(--i) * .06s) backwards; }
+.day-fan .fan-card:hover { translate: 0 -8px; z-index: 9; }
+.fan.day-fan:hover .fan-card { transform: rotate(calc((var(--i) - 2) * 3deg)); }
+.fan-habit { margin-top: 5px; font: 800 11px Nunito, sans-serif; color: var(--ink); display: flex; align-items: center; gap: 3px; white-space: nowrap; overflow: hidden; }
+.fan-habit .hi, .fan-habit svg { width: 15px; height: 15px; flex: none; }
+.day-fan .fan-cap { margin-top: 3px; -webkit-line-clamp: 2; color: var(--muted); }
+.wk.picked i { transform: scale(1.15); box-shadow: 0 0 0 3px var(--ink); }
+@keyframes poppop { from { opacity: 0; transform: translateY(-6px) scale(.96); } }
+@keyframes dealin { from { opacity: 0; translate: calc(var(--i) * -40px) 10px; } }
 .week-sum { margin: 10px 0 0; font-size: 12px; color: var(--muted); }
 .week-sum b { font: 700 20px var(--hand); color: var(--ink); }
 @container me (max-width: 480px) { .me-mail { grid-template-columns: 1fr; gap: 12px; } .fan { height: 160px; } }

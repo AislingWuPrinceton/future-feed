@@ -333,11 +333,34 @@ function renderMail() {
   $("me").append(wrap);
   // the fan spreads on hover; tap any card to open it
   wrap.querySelectorAll(".fan-card[data-fan]").forEach((c) => (c.onclick = () => { sfx.paper(); openPostcard(latest[+c.dataset.fan]); }));
-  wrap.querySelectorAll(".wk").forEach((b) => (b.onclick = () => {
-    const p = POSTS.kept.find((x) => x.created_day === b.dataset.day);
-    if (p) { sfx.paper(); openPostcard(p); }
-    else { replay(b, "nope"); if (b.classList.contains("today")) $("today").scrollIntoView({ behavior: "smooth", block: "center" }); }
+  // a stamp opens that day's postcard; a day with several pops up a little fan of them, labelled by habit
+  wrap.querySelectorAll(".wk").forEach((b) => (b.onclick = (e) => {
+    e.stopPropagation();
+    const day = b.dataset.day, open = wrap.querySelector(".day-pop");
+    open?.remove(); wrap.querySelectorAll(".wk.picked").forEach((x) => x.classList.remove("picked"));
+    if (open?.dataset.day === day) return;
+    const posts = POSTS.kept.filter((x) => x.created_day === day && x.kind !== "boss").reverse();  // in the order they arrived
+    if (!posts.length) { replay(b, "nope"); if (b.classList.contains("today")) $("today").scrollIntoView({ behavior: "smooth", block: "center" }); return; }
+    if (posts.length === 1) { sfx.paper(); openPostcard(posts[0]); return; }
+    const habitOf = (p) => S.habits.find((h) => h.id === p.habit_id);
+    const pop = document.createElement("div");
+    pop.className = "day-pop"; pop.dataset.day = day;
+    pop.innerHTML = `<p class="mail-kicker">${b.classList.contains("today") ? "Today" : new Date(day + "T12:00:00").toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" })} · ${posts.length} postcards</p>
+      <div class="fan day-fan">${posts.map((p, i) => { const h = habitOf(p); return `<button class="fan-card" data-pop="${i}" style="--i:${i}">
+        <span class="fan-photo">${photoHTML(p)}</span><span class="fan-habit">${h ? `${hIcon(h, "inline")} ${esc(h.short)}` : ""}</span>
+        <span class="fan-cap">${esc(p.caption)}</span></button>`; }).join("")}</div>
+      <small class="mail-hint">Tap a card to read it</small>`;
+    wrap.append(pop);
+    b.classList.add("picked");
+    // spread the cards to fit the card's width, and point the pop-up at the stamp
+    const W = pop.clientWidth - 32, n = posts.length;
+    pop.style.setProperty("--step", `${Math.min(118, (W - 112) / (n - 1))}px`);
+    const br = b.getBoundingClientRect(), pr = pop.getBoundingClientRect();
+    pop.style.setProperty("--arrow", `${br.left + br.width / 2 - pr.left - 9}px`);
+    pop.querySelectorAll(".fan-card").forEach((c) => (c.onclick = () => { sfx.paper(); openPostcard(posts[+c.dataset.pop]); }));
+    sfx.tick();
   }));
+  wrap.onclick = (e) => { if (!e.target.closest(".day-pop")) { wrap.querySelector(".day-pop")?.remove(); wrap.querySelectorAll(".wk.picked").forEach((x) => x.classList.remove("picked")); } };
 }
 
 // ---------- today: hold to check in ----------
