@@ -47,7 +47,8 @@ h3 { font-size: 28px; }
 .btn.primary { background: var(--yellow); width: 100%; padding: 13px; font-size: 16px; }
 .btn.danger { color: var(--red); }
 .btn:disabled { opacity: .6; }
-.link { border: 0; background: none; font-family: var(--hand); font-size: 20px; color: var(--muted); text-decoration: underline wavy var(--pink); }
+.link { border: 0; background: none; font-family: var(--hand); font-size: 20px; color: var(--muted); cursor: pointer; transition: color .2s; }
+.link:hover { color: var(--ink); }
 .row { display: flex; gap: 10px; margin-top: 16px; }
 .row .btn { flex: 1; }
 
