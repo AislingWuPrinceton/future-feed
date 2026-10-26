@@ -774,7 +774,6 @@ $("menu").addEventListener("click", closeMenu);
 $("menu-avatar").onclick = () => (S?.profile ? openAvatarSheet() : null);
 $("menu-play").onclick = () => (S?.profile ? playReel() : null);
 $("menu-add").onclick = () => (S?.profile ? openAdd() : null);
-$("menu-intro").onclick = () => { if (!S?.profile) return; sessionStorage.removeItem("ff-intro"); wantIntro = true; window.scrollTo({ top: 0 }); playIntro(); renderTown(); };
 const soundLabel = () => ($("menu-sound").querySelector("b").textContent = sfx.muted ? "Sound: off" : "Sound: on");
 $("menu-sound").onclick = (e) => { e.stopPropagation(); sfx.toggle(); soundLabel(); if (!sfx.muted) sfx.pop(); };
 soundLabel();
@@ -829,7 +828,7 @@ $("demo-reset").onclick = async () => {
   $("ob-habits").innerHTML = "";
   localStorage.removeItem("ff-piece");
   localStorage.removeItem("ff-stop-years");
-  localStorage.removeItem("ff-tour"); sessionStorage.removeItem("ff-story"); sessionStorage.removeItem("ff-intro");  // a fresh start gets the story and tour again
+  localStorage.removeItem("ff-tour"); sessionStorage.removeItem("ff-story");  // a fresh start gets the story and tour again
   wantIntro = !PLAIN; startTour.queued = false;
   refresh();
 };
@@ -1586,10 +1585,9 @@ async function townMoment(id, levelUp) {
 // ---------- motion & delight ----------
 
 // Opening: a handwritten hello, then the town drops in.
-let wantIntro = !sessionStorage.getItem("ff-intro") && !PLAIN;
+let wantIntro = !PLAIN;  // every time you open the app
 function playIntro() {
   if (!wantIntro || !S?.profile) { wantIntro = false; return; }
-  sessionStorage.setItem("ff-intro", "1");
   const el = document.createElement("div");
   el.className = "intro";
   el.innerHTML = `<div class="intro-in">
