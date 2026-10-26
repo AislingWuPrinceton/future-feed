@@ -883,11 +883,17 @@ function stylePicker(kind, items, current, autoLabel) {
   </div>`;
 }
 function bindStylePicker(root, onPick) {
-  root.querySelectorAll(".sp").forEach((b) => (b.onclick = (e) => {
+  root.querySelectorAll(".sp").forEach((b) => (b.onclick = async (e) => {
     e.stopPropagation();
+    const was = root.querySelector(".sp.on");
     root.querySelectorAll(".sp").forEach((x) => x.classList.toggle("on", x === b));
     replay(b, "boing"); sfx.pop();
-    onPick(b.dataset.style);
+    root.querySelector(".sp-err")?.remove();
+    try { await onPick(b.dataset.style); }
+    catch (err) {  // e.g. a server still running older code: say so instead of doing nothing
+      root.querySelectorAll(".sp").forEach((x) => x.classList.toggle("on", x === was));
+      root.insertAdjacentHTML("beforeend", `<p class="sp-err">Couldn't save that style (${esc(err.message)}). Try restarting the server.</p>`);
+    }
   }));
 }
 // The town is made of needle felt: every piece of colour is a puffy wool patch (an SVG filter
