@@ -1704,7 +1704,7 @@ const TOUR = [
   { sel: "#today .hold, #today .habit-row", title: "1 · Do it, then hold", text: "Did today's small thing? Press and hold its button for a second. That's a check-in." },
   { sel: "#me .me-mail", title: "2 · A postcard arrives", text: "Each check-in brings a postcard from you in the future. The newest ones wait here, and the stamps show your week." },
   { sel: "#town", title: "3 · Your 2036 town", text: "Every habit is a building. Each check-in fills one room, and a full floor of rooms makes the building one storey taller.", view: "town" },
-  { sel: "#town .lot[data-h] .lot-b", title: "4 · Step inside", text: "Tap a building to go inside. Every room holds the postcard from the day you earned it.", view: "town" },
+  { sel: "#town .lot[data-h] .lot-b", title: "4 · Your rooms", text: "Tap a building to see its rooms, floor by floor. Each room holds the postcard from the day you earned it.", view: "town" },
   { sel: "#town .seasons", title: "5 · Play with it", text: "Pick a season, tap the sun for night, shake the trees. It's your town.", view: "town" },
   { sel: "#menu-btn", title: "6 · More in the menu", text: "Play your next 10 years as a story, add another habit, or see this guide again." },
 ];
@@ -1724,10 +1724,17 @@ function startTour() {
     if (!t) return;
     const r = t.getBoundingClientRect(), pad = 8;
     Object.assign(hole.style, { left: `${r.left - pad}px`, top: `${r.top - pad}px`, width: `${r.width + pad * 2}px`, height: `${r.height + pad * 2}px` });
-    const below = r.bottom + 14 + tip.offsetHeight < innerHeight || r.top < tip.offsetHeight + 24;
-    const x = Math.max(12, Math.min(innerWidth - tip.offsetWidth - 12, r.left + r.width / 2 - tip.offsetWidth / 2));
-    tip.style.left = `${x}px`;
-    tip.style.top = `${below ? Math.min(innerHeight - tip.offsetHeight - 12, r.bottom + pad + 10) : r.top - pad - 10 - tip.offsetHeight}px`;
+    // below if it fits, else above, else beside the target, so the card never covers what it's pointing at
+    const tw = tip.offsetWidth, th = tip.offsetHeight, gap = pad + 10;
+    const clampX = (x) => Math.max(12, Math.min(innerWidth - tw - 12, x)), clampY = (y) => Math.max(12, Math.min(innerHeight - th - 12, y));
+    let x = clampX(r.left + r.width / 2 - tw / 2), y;
+    if (innerHeight - r.bottom - gap >= th + 12) y = r.bottom + gap;
+    else if (r.top - gap >= th + 12) y = r.top - gap - th;
+    else {
+      x = r.right + gap + tw + 12 <= innerWidth ? r.right + gap : r.left - gap - tw >= 12 ? r.left - gap - tw : x;
+      y = clampY(r.top + r.height / 2 - th / 2);
+    }
+    tip.style.left = `${x}px`; tip.style.top = `${y}px`;
   }
   function show() {
     const s = TOUR[i];
@@ -1747,6 +1754,8 @@ function startTour() {
     el.classList.add("moving");
     place();
     setTimeout(() => { place(); el.classList.remove("moving"); }, 450);
+    setTimeout(place, 900);  // smooth scrolling can take longer than that
+    addEventListener("scrollend", place, { once: true });
   }
   addEventListener("resize", place); addEventListener("scroll", place, { passive: true });
   show();
