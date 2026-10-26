@@ -535,8 +535,24 @@ function letterOf(p) {
 
 function postmarkOf(p) {
   const d = new Date((p.live_date || p.future_date) + "T12:00:00");
-  const place = (p.postmark || p.location || "SOMEWHERE AHEAD").toUpperCase().slice(0, 18);
+  let place = (p.postmark || p.location || "SOMEWHERE AHEAD").toUpperCase();
+  if (place.length > 24) place = place.slice(0, 25).replace(/\s+\S*$/, "") || place.slice(0, 24);  // the ring fits it to the circle; cut long ones at a word
   return { place, date: d.toLocaleDateString("en-US", { month: "short", year: "numeric" }).toUpperCase() };
+}
+
+// a vintage stamp for each postcard: the story agent designs it (motif, title, value, ink); older posts get one from their habit
+const STAMP_INK = { rose: ["#b9506b", "#f6dde3"], sage: ["#55804f", "#e2ecd9"], teal: ["#2e7a80", "#d7eae8"], mustard: ["#a8780e", "#f6e7b8"],
+  plum: ["#6e3d6c", "#ebdcea"], rust: ["#ad5230", "#f5ddcd"], navy: ["#2f4a78", "#dbe3f0"] };
+function stampHTML(p) {
+  const h = S.habits.find((x) => x.id === p.habit_id);
+  const d = p.stamp || { motif: h?.icon || "custom", color: Object.keys(STAMP_INK)[p.id % 7], value: "36¢",
+    title: p.kind === "level_up" ? "NEW FLOOR" : (h?.short || postmarkOf(p).place).toUpperCase().slice(0, 16) };
+  const [inkC, tint] = STAMP_INK[d.color] || STAMP_INK.rose;
+  return `<div class="vstamp" style="--ink:${inkC}; --tint:${tint}"><div class="vs-frame">
+      <span class="vs-top">FUTURE POST</span><span class="vs-val">${esc(d.value)}</span>
+      <div class="vs-art">${ico(d.motif)}</div>
+      <span class="vs-title">${esc(d.title)}</span><span class="vs-yr">${year(p.live_date || p.future_date)}</span>
+    </div></div>`;
 }
 
 function cardHTML(p) {
@@ -544,7 +560,6 @@ function cardHTML(p) {
   const who = stoppedSelf ? S.profile.handle.replace(".2036", ".someday") : S.profile.handle;
   const b = (p.basis || "").replace(/ ?combo:\d+/, "").trim();
   const pm = postmarkOf(p);
-  const stampFace = S.profile.avatar?.photo && !stoppedSelf ? `<img src="${S.profile.avatar.photo}" alt="">` : iconOfPost(p);
   return `
     <div class="pc3d ${stoppedSelf ? "stopped" : ""}" id="pc3d">
       <div class="pc-inner" id="pc-inner">
@@ -564,11 +579,11 @@ function cardHTML(p) {
         <div class="pc-face back">
           <div class="pc-letter"><p>${esc(stoppedSelf ? p.caption : letterOf(p))}</p></div>
           <div class="pc-right">
-            <div class="stamp"><div class="stamp-in">${stampFace}</div><span>${year(p.live_date || p.future_date)}</span></div>
+            <div class="stamp">${stampHTML(p)}</div>
             <div class="postmark"><svg viewBox="0 0 120 120" aria-hidden="true">
                 <defs><path id="pm-arc-${p.id}" d="M60 60 m-44 0 a44 44 0 1 1 88 0 a44 44 0 1 1 -88 0"/></defs>
                 <circle cx="60" cy="60" r="54" /><circle cx="60" cy="60" r="34" />
-                <text><textPath href="#pm-arc-${p.id}" startOffset="2%">${esc(pm.place)} · ${esc(pm.place)} ·</textPath></text>
+                <text><textPath href="#pm-arc-${p.id}" textLength="268" lengthAdjust="spacingAndGlyphs">${esc(pm.place)} · FUTURE POST ·</textPath></text>
                 <text x="60" y="66" text-anchor="middle" class="pm-date">${esc(pm.date)}</text></svg>
               <svg class="waves" viewBox="0 0 160 40" aria-hidden="true"><path d="M0 8 Q20 0 40 8 T80 8 T120 8 T160 8 M0 20 Q20 12 40 20 T80 20 T120 20 T160 20 M0 32 Q20 24 40 32 T80 32 T120 32 T160 32"/></svg>
             </div>

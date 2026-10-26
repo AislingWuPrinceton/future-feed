@@ -459,13 +459,22 @@ body.study .page { padding-bottom: 120px; }
 .pc-letter { border-right: 2px solid #e6dcc9; padding-right: 12px; display: flex; align-items: center; }
 .pc-letter p { font-family: var(--hand); font-size: 23px; line-height: 32px; color: #2b3a67; margin: 0; }
 .pc-right { display: flex; flex-direction: column; align-items: flex-end; gap: 10px; position: relative; }
-.stamp { width: 84px; padding: 6px; background: #fff; transform: rotate(4deg);
-  -webkit-mask: radial-gradient(circle 4px at 4px 4px, transparent 98%, #000) -4px -4px / 12px 12px;
-  mask: radial-gradient(circle 4px at 4px 4px, transparent 98%, #000) -4px -4px / 12px 12px; filter: drop-shadow(1px 2px 2px rgba(0,0,0,.2)); }
-.stamp-in { aspect-ratio: 1; background: #fff4e0; border: 1.5px solid var(--ink); display: flex; align-items: center; justify-content: center; overflow: hidden; }
-.stamp-in img { width: 100%; height: 100%; object-fit: cover; }
-.stamp-in .ico { width: 70%; height: 70%; }
-.stamp span { display: block; text-align: center; font-family: var(--hand); font-size: 16px; font-weight: 700; color: var(--pink); }
+.stamp { transform: rotate(4deg); filter: drop-shadow(1px 2px 2px rgba(0, 0, 0, .22)); }
+/* perforated only along the edge: holes every 9px on the rim, the middle stays solid (sizes are multiples of 9) */
+.vstamp { width: 99px; height: 126px; padding: 7px; background: #fffaf0;
+  -webkit-mask: radial-gradient(circle 3.3px, #0000 96%, #000) -4.5px -4.5px / 9px 9px, linear-gradient(#000 0 0) center / calc(100% - 8px) calc(100% - 8px) no-repeat;
+  mask: radial-gradient(circle 3.3px, #0000 96%, #000) -4.5px -4.5px / 9px 9px, linear-gradient(#000 0 0) center / calc(100% - 8px) calc(100% - 8px) no-repeat; }
+.vs-frame { position: relative; height: 100%; border: 1.6px solid var(--ink); outline: 1px solid var(--ink); outline-offset: -5px;
+  background: var(--tint) repeating-linear-gradient(-45deg, transparent 0 3px, color-mix(in srgb, var(--ink) 9%, transparent) 3px 4px);
+  display: flex; flex-direction: column; align-items: center; padding: 8px 7px 6px; color: var(--ink); }
+.vs-top { font: 800 6.5px Nunito, sans-serif; letter-spacing: 1.6px; }
+.vs-val { position: absolute; left: 8px; top: 15px; font: 700 15px/1 var(--hand); }
+.vs-art { flex: 1; width: 100%; margin: 4px 0 3px; display: grid; place-items: center; border-radius: 50% 50% 6px 6px; background: #fffaf0;
+  box-shadow: inset 0 0 0 1px var(--ink), inset 0 0 0 3px #fffaf0, inset 0 0 0 4px color-mix(in srgb, var(--ink) 40%, transparent); }
+.vs-art .ico { width: 74%; height: auto; filter: sepia(.25) saturate(.85); }
+.vs-art .ico svg { width: 100%; height: auto; display: block; }
+.vs-title { max-width: 100%; font: 800 7.5px/1.15 Nunito, sans-serif; letter-spacing: 1px; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.vs-yr { position: absolute; right: 8px; top: 15px; font: 700 13px/1 var(--hand); opacity: .8; }
 .postmark { position: absolute; right: 48px; top: 50px; width: 104px; transform: rotate(-14deg); opacity: .78; pointer-events: none; }
 .postmark svg { width: 100%; overflow: visible; }
 .postmark circle { fill: none; stroke: #6b3a5a; stroke-width: 2.2; }

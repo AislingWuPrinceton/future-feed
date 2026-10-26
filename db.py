@@ -98,7 +98,7 @@ def init():
             if col not in cols:
                 c.execute(f"ALTER TABLE habits ADD COLUMN {col} {ddl}")
         post_cols = {r["name"] for r in c.execute("PRAGMA table_info(posts)")}
-        for col in ("chapter INTEGER", "letter TEXT", "postmark TEXT"):
+        for col in ("chapter INTEGER", "letter TEXT", "postmark TEXT", "stamp TEXT"):
             if col.split()[0] not in post_cols:
                 c.execute(f"ALTER TABLE posts ADD COLUMN {col}")
 

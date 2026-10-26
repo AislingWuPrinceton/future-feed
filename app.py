@@ -112,7 +112,7 @@ def compose_post(habit, kind, st, life_event="", combo_with=None):
     return {
         "run_id": run_id, "kind": kind, "level": st["level"], "chapter": post_chapter, "future": future,
         "caption": caption, "location": s["location"][:60],
-        "letter": s["letter"][:400], "postmark": s["postmark"][:24].upper(), "comments": s["comments"][:3], "likes": likes,
+        "letter": s["letter"][:400], "postmark": s["postmark"][:24].upper(), "stamp": clean_stamp(s.get("stamp")), "comments": s["comments"][:3], "likes": likes,
         "photo": photo, "basis": (basis + " " + combo_tag).strip(),
         "stopped_caption": s["stopped_caption"], "stopped_photo": stopped_photo,
         "stopped_comments": [{"handle": prof["cast"][0]["handle"], "text": s["stopped_comment"]}] if s["stopped_comment"] else [],
@@ -120,6 +120,14 @@ def compose_post(habit, kind, st, life_event="", combo_with=None):
                           "relation": s["new_character_relation"]},
         "fixed": not check["passes"], "problem": check["problem"],
     }
+
+
+def clean_stamp(st):
+    """The story agent's stamp design, trimmed; the page draws it."""
+    if not isinstance(st, dict) or st.get("motif") not in game.ICONS:
+        return ""
+    return json.dumps({"motif": st["motif"], "title": str(st.get("title", ""))[:16].upper(), "value": str(st.get("value", ""))[:7],
+                       "color": st.get("color") if st.get("color") in ("rose", "sage", "teal", "mustard", "plum", "rust", "navy") else "rose"})
 
 
 def store_post(habit, d):
@@ -133,10 +141,10 @@ def store_post(habit, d):
     cols = "habit_id, timeline, kind, level, chapter, future_date, caption, location, comments, likes, photo, basis, created_day, run_id"
     today = game.today().isoformat()
     with db.connect() as c:
-        cur = c.execute(f"INSERT INTO posts ({cols}, letter, postmark) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        cur = c.execute(f"INSERT INTO posts ({cols}, letter, postmark, stamp) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                         (habit["id"], "kept", d["kind"], d["level"], d["chapter"], d["future"], d["caption"], d["location"],
                          json.dumps(d["comments"], ensure_ascii=False), d["likes"], json.dumps(d["photo"]), d["basis"], today, d["run_id"],
-                         d.get("letter", ""), d.get("postmark", "")))
+                         d.get("letter", ""), d.get("postmark", ""), d.get("stamp", "")))
         c.execute(f"INSERT INTO posts ({cols}) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                   (habit["id"], "stopped", d["kind"], d["level"], d["chapter"], d["future"], d["stopped_caption"], "",
                    json.dumps(d["stopped_comments"], ensure_ascii=False), max(3, d["likes"] // 6),
@@ -439,6 +447,7 @@ def feed(timeline: str = "kept"):
     for r in rows:
         r["comments"] = json.loads(r["comments"] or "[]")
         r["photo"] = json.loads(r["photo"]) if r["photo"] else None
+        r["stamp"] = json.loads(r["stamp"]) if r.get("stamp") else None
         r["live_date"] = r["future_date"]
         if r["chapter"] is not None and r["habit_id"] in habits:
             h, st = habits[r["habit_id"]]
